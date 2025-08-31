@@ -1,0 +1,4 @@
+---
+description: Use Poetry for Python Package Management  - Always use Poetry for installing, adding, or updating Python packages. - Do not use pip or requirements.txt for dependency management. - Run `poetry install` to set up the environment. - When adding a new package, use `poetry add <package-name>`. - Ensure that the `pyproject.toml` and `poetry.lock` files are kept up to date.
+alwaysApply: false
+---

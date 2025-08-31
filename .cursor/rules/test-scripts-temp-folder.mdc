@@ -1,0 +1,4 @@
+---
+description: Place Test Scripts in Temporary Folders  - All test scripts and their outputs must be placed in a temporary directory in the project (e.g., `/project-tests` or a similar location). - Do not create or leave test files in the main project directory. - Ensure that the temporary directory is cleaned up after tests complete. - When running tests in Docker, mount the temporary directory as a volume if needed. - Use glob patterns to match test files, e.g., `tests/**/*.py` or `tests/**/*.ts`.
+alwaysApply: false
+---

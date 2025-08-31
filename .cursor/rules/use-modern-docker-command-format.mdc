@@ -1,0 +1,4 @@
+---
+description: Use Modern Docker Compose Command  - Always use the modern `docker compose` command (with a space) for all Docker Compose operations. - Do not use the legacy `docker-compose` command (with a hyphen). - Example: Use `docker compose up` instead of `docker-compose up`. - This ensures compatibility with Docker Compose v2 and future Docker releases.
+alwaysApply: false
+---

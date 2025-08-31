@@ -1,0 +1,142 @@
+# AI Ticket Creator Backend - Multi-service Docker Compose Configuration
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/ai_tickets
+      - REDIS_URL=redis://redis:6379
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mcp-server:
+        condition: service_started
+    volumes:
+      - ./uploads:/app/uploads
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    ports:
+      - "8001:8001"  
+    environment:
+      - BACKEND_URL=http://app:8000
+      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/ai_tickets
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "mcp_server/start_mcp_server.py", "--port", "8001"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=ai_tickets
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ai_tickets"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/ai_tickets
+      - REDIS_URL=redis://redis:6379
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - mcp-server
+    volumes:
+      - ./uploads:/app/uploads
+    command: ["celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  flower:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/ai_tickets
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    ports:
+      - "5555:5555"
+    command: ["celery", "-A", "app.celery_app", "flower", "--port=5555"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  test:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/ai_tickets_test
+      - REDIS_URL=redis://redis:6379/1
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - ENVIRONMENT=testing
+      - DEBUG=true
+      - PYTHONPATH=/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: ["python", "-m", "pytest", "tests/", "-v", "--tb=short"]
+    profiles:
+      - test
+
+volumes:
+  postgres_data:
+  redis_data:

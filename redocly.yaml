@@ -1,0 +1,227 @@
+apis:
+  main:
+    root: openapi.yaml
+
+# Extend configurations with common rules
+extends:
+  - recommended
+
+# Linting rules configuration
+rules:
+  # Info section
+  info-description: error
+  info-contact: warn
+  info-license: warn
+  
+  # Operations
+  operation-description: error
+  operation-operationId: warn
+  operation-summary: error
+  operation-tag-defined: error
+  
+  # Parameters
+  parameter-description: error
+  
+  # Paths
+  path-declaration-must-exist: error
+  path-not-include-query: error
+  path-parameters-defined: error
+  
+  # Components
+  component-name-unique: error
+  
+  # Security
+  security-defined: warn
+  
+  # Tags
+  tag-description: warn
+  tags-alphabetical: off
+  
+  # Responses
+  response-contains-header: off
+  
+  # Schema validation
+  spec: error
+  no-unresolved-refs: error
+  
+  # Custom rules
+  no-path-trailing-slash: error
+  no-identical-paths: error
+  no-ambiguous-paths: error
+
+# Theme configuration for ReDoc
+theme:
+  colors:
+    primary:
+      main: '#2c3e50'
+    success:
+      main: '#27ae60'
+    warning:
+      main: '#f39c12'
+    error:
+      main: '#e74c3c'
+  typography:
+    fontSize:
+      small: '12px'
+      medium: '14px'
+      large: '16px'
+    fontWeightLight: 300
+    fontWeightRegular: 400
+    fontWeightMedium: 500
+    fontWeightBold: 700
+  spacing:
+      unit: 5
+      sectionHorizontal: 40
+      sectionVertical: 40
+  breakpoints:
+    small: '50rem'
+    medium: '85rem'
+    large: '105rem'
+  sidebar:
+    backgroundColor: '#fafafa'
+    width: '260px'
+    
+# Feature configuration
+features:
+  openapi:
+    generateCodeSamples:
+      languages:
+        - lang: shell
+          label: cURL
+        - lang: python
+          label: Python
+        - lang: javascript
+          label: JavaScript
+        - lang: typescript
+          label: TypeScript
+  
+# Bundle configuration
+bundle:
+  lint: true
+
+# Build configuration for documentation
+build:
+  templateDir: 'docs/templates'
+  theme:
+    logo: 
+      url: 'https://via.placeholder.com/150x75?text=AI+Ticket+Creator'
+      altText: 'AI Ticket Creator API'
+    primaryColor: '#2c3e50'
+    primaryColorDark: '#1a252f'
+    favicon: 'favicon.ico'
+    
+# Plugin configuration
+plugins:
+  - './plugins/custom-renderer.js'
+
+# Decorator configuration for API enhancement
+decorators:
+  # Add response time information
+  add-response-time:
+    property: x-response-time
+    value: 'Typical response time: < 200ms'
+    
+  # Add rate limiting information  
+  add-rate-limit:
+    property: x-rate-limit
+    value: 'Rate limited to 1000 requests per hour per API key'
+
+# Documentation generation settings
+docs:
+  showConsole: true
+  theme: redoc
+  htmlTemplate: |
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>{{title}}</title>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/x-icon" href="favicon.ico">
+        <style>
+          body { margin: 0; padding: 0; }
+        </style>
+      </head>
+      <body>
+        <div id="redoc-container"></div>
+        <script src="https://cdn.jsdelivr.net/npm/redoc@2.1.3/bundles/redoc.standalone.js"></script>
+        <script>
+          Redoc.init('/openapi.yaml', {
+            theme: {
+              colors: {
+                primary: {
+                  main: '#2c3e50'
+                }
+              },
+              typography: {
+                fontSize: '14px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+              }
+            },
+            showConsole: true,
+            pathInMiddlePanel: true,
+            menuToggle: true,
+            scrollYOffset: 60,
+            hideDownloadButton: false,
+            hideLoading: false,
+            nativeScrollbars: false,
+            requiredPropsFirst: true,
+            sortPropsAlphabetically: true,
+            expandResponses: '200,201',
+            generateCodeSamples: {
+              languages: [
+                {
+                  lang: 'curl',
+                  label: 'cURL'
+                },
+                {
+                  lang: 'python',
+                  label: 'Python'
+                },
+                {
+                  lang: 'javascript',
+                  label: 'JavaScript'
+                }
+              ]
+            }
+          }, document.getElementById('redoc-container'));
+        </script>
+      </body>
+    </html>
+
+# Preview configuration
+preview:
+  port: 8080
+  host: localhost
+  
+# Lint severity levels
+lint:
+  extends:
+    - recommended
+  rules:
+    operation-2xx-response: error
+    operation-4xx-response: warn
+    assertion/operation-singular-tag: off
+    
+# Validation settings
+validate:
+  spec: true
+  resolveRemoteRefs: true
+
+# Code generation settings (if needed)
+codegen:
+  generators:
+    - name: python
+      output: ./generated/python-client
+    - name: typescript-fetch
+      output: ./generated/typescript-client
+
+# Custom preprocessor configuration
+preprocess:
+  rules:
+    # Remove internal endpoints from public docs
+    remove-internal-operations:
+      subject: 
+        property: x-internal
+        value: true
+      action: remove

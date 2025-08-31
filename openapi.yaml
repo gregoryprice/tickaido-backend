@@ -1,0 +1,1326 @@
+openapi: 3.0.3
+info:
+  title: AI Ticket Creator Backend API
+  description: |
+    # AI Ticket Creator Backend API
+
+    Comprehensive API for AI-powered ticket creation and management with Chrome extension support.
+
+    ## Features
+
+    - **AI-Powered Ticket Creation**: Smart ticket creation with context analysis using Pydantic AI
+    - **File Processing**: Upload and process multiple file types with AI transcription/OCR
+    - **Real-time Notifications**: WebSocket-based real-time updates and collaboration
+    - **Third-party Integrations**: Salesforce, Jira, ServiceNow, Zendesk, GitHub, Slack, Teams, Zoom integration
+    - **Chrome Extension Support**: Optimized for browser extension workflows
+    - **MCP Integration**: Model Context Protocol for enhanced AI capabilities
+
+    ## Authentication
+
+    This API uses JWT-based authentication with role-based access control.
+
+    ## File Processing
+
+    Supports comprehensive file processing including:
+    - AI transcription for audio/video files
+    - OCR for image files  
+    - Real-time progress tracking via WebSockets
+    - Automated metadata extraction
+    - Virus scanning with ClamAV
+
+    ## Architecture
+
+    Built on modern async Python stack:
+    - **FastAPI** for high-performance API endpoints
+    - **SQLAlchemy 2.0** with async PostgreSQL
+    - **Pydantic AI** for intelligent ticket processing
+    - **Celery** for background task processing
+    - **Redis** for caching and pub/sub
+    - **MCP Server** for AI tool integration
+  version: "1.0.0"
+  contact:
+    name: AI Ticket Creator API Support
+    email: support@aiticketcreator.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  x-logo:
+    url: https://via.placeholder.com/150x75?text=AI+Ticket+Creator
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.aiticketcreator.com
+    description: Production server
+
+paths:
+  /:
+    get:
+      tags:
+        - System
+      summary: Root endpoint with system information
+      description: Landing page with API overview and links to documentation
+      responses:
+        '200':
+          description: HTML landing page
+          content:
+            text/html:
+              schema:
+                type: string
+                example: "<!DOCTYPE html>..."
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check endpoint
+      description: Check the health status of all system components
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/tickets:
+    get:
+      tags:
+        - Tickets
+      summary: List tickets with search and filtering
+      description: Retrieve a paginated list of tickets with optional search, filtering, and sorting
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: q
+          in: query
+          description: Search query
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by ticket status
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TicketStatus'
+        - name: category
+          in: query
+          description: Filter by ticket category
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TicketCategory'
+        - name: priority
+          in: query
+          description: Filter by priority level
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TicketPriority'
+        - name: department
+          in: query
+          description: Filter by department
+          schema:
+            type: string
+        - name: created_by_id
+          in: query
+          description: Filter by creator user ID
+          schema:
+            type: string
+            format: uuid
+        - name: assigned_to_id
+          in: query
+          description: Filter by assigned user ID
+          schema:
+            type: string
+            format: uuid
+        - name: is_overdue
+          in: query
+          description: Filter by overdue status
+          schema:
+            type: boolean
+        - name: created_after
+          in: query
+          description: Filter tickets created after this date
+          schema:
+            type: string
+            format: date-time
+        - name: created_before
+          in: query
+          description: Filter tickets created before this date
+          schema:
+            type: string
+            format: date-time
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [created_at, updated_at, priority, status, title]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of tickets retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTicketResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+    post:
+      tags:
+        - Tickets
+      summary: Create a new support ticket
+      description: Create a new support ticket with standard input
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketCreateRequest'
+      responses:
+        '201':
+          description: Ticket created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/v1/tickets/ai-create:
+    post:
+      tags:
+        - Tickets
+        - AI
+      summary: Create ticket using AI analysis
+      description: Create a support ticket using AI analysis of user input, files, and context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketAICreateRequest'
+      responses:
+        '201':
+          description: Ticket created successfully using AI
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketAICreateResponse'
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/v1/tickets/{ticket_id}:
+    get:
+      tags:
+        - Tickets
+      summary: Get ticket by ID
+      description: Retrieve detailed information about a specific ticket
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          description: Unique identifier of the ticket
+          schema:
+            type: string
+            format: uuid
+        - name: include_ai_data
+          in: query
+          description: Include AI analysis data
+          schema:
+            type: boolean
+            default: true
+        - name: include_internal
+          in: query
+          description: Include internal notes
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Ticket details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+        '404':
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+    put:
+      tags:
+        - Tickets
+      summary: Update ticket
+      description: Update an existing ticket with new information
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          description: Unique identifier of the ticket
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketUpdateRequest'
+      responses:
+        '200':
+          description: Ticket updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+    delete:
+      tags:
+        - Tickets
+      summary: Delete ticket (soft delete)
+      description: Soft delete a ticket (marks as deleted but preserves data)
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          description: Unique identifier of the ticket
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Ticket deleted successfully
+        '404':
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/v1/tickets/{ticket_id}/status:
+    patch:
+      tags:
+        - Tickets
+      summary: Update ticket status
+      description: Update the status of an existing ticket
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          description: Unique identifier of the ticket
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketStatusUpdateRequest'
+      responses:
+        '200':
+          description: Ticket status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/v1/tickets/{ticket_id}/assign:
+    patch:
+      tags:
+        - Tickets
+      summary: Assign or unassign ticket
+      description: Assign a ticket to a user or unassign it
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          description: Unique identifier of the ticket
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketAssignmentRequest'
+      responses:
+        '200':
+          description: Ticket assignment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+        '400':
+          description: Bad request - validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/v1/tickets/stats/overview:
+    get:
+      tags:
+        - Tickets
+        - Analytics
+      summary: Get ticket statistics overview
+      description: Retrieve comprehensive statistics about tickets
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketStatsResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /ws:
+    get:
+      tags:
+        - WebSocket
+      summary: WebSocket Connection Endpoint
+      description: |
+        Establish a WebSocket connection for real-time communication.
+        
+        ## Connection
+        
+        Connect to the WebSocket endpoint with authentication:
+        ```
+        ws://localhost:8000/ws?token=your_jwt_token
+        ```
+        
+        ## Message Format
+        
+        All WebSocket messages follow this structure:
+        ```json
+        {
+          "type": "message_type",
+          "data": {},
+          "timestamp": "2025-01-01T12:00:00Z",
+          "protocol": "protocol_name"
+        }
+        ```
+        
+        ## Supported Protocols
+        
+        ### Ticket Protocol
+        - **subscribe_ticket_updates** - Subscribe to updates for a specific ticket
+        - **unsubscribe_ticket_updates** - Unsubscribe from ticket updates
+        - **ticket_status_change** - Notify about ticket status changes
+        
+        ### File Protocol
+        - **subscribe_job** - Subscribe to file processing job updates
+        - **unsubscribe_job** - Unsubscribe from job updates
+        - **get_job_status** - Get current status of a file processing job
+        
+        ### Chat Protocol (AI Interaction)
+        - **send_message** - Send message to AI agent
+        - **stream_request** - Request streaming AI response
+        - **create_conversation** - Create new AI conversation
+        - **get_messages** - Get conversation messages
+        
+        ## Error Handling
+        
+        Error responses follow this format:
+        ```json
+        {
+          "type": "error",
+          "protocol": "protocol_name",
+          "message": "Error description",
+          "original_message_type": "original_type",
+          "timestamp": "2025-01-01T12:00:00Z"
+        }
+        ```
+      parameters:
+        - name: token
+          in: query
+          description: JWT authentication token
+          required: true
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket connection established
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - insufficient permissions
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for API authentication
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: number
+          format: float
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [healthy, unhealthy]
+            ai_service:
+              type: string
+              enum: [healthy, unhealthy]
+            mcp_server:
+              type: string
+              enum: [healthy, unhealthy]
+        environment:
+          type: string
+        version:
+          type: string
+        error:
+          type: string
+          description: Error message if status is unhealthy
+
+    TicketStatus:
+      type: string
+      enum:
+        - new
+        - open
+        - in_progress
+        - pending
+        - resolved
+        - closed
+        - cancelled
+
+    TicketCategory:
+      type: string
+      enum:
+        - technical
+        - billing
+        - feature_request
+        - bug
+        - user_access
+        - general
+
+    TicketPriority:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+        - critical
+
+    TicketCreateRequest:
+      type: object
+      required:
+        - title
+        - description
+        - priority
+        - category
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        department:
+          type: string
+          nullable: true
+        assigned_to_id:
+          type: string
+          format: uuid
+          nullable: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    TicketUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        department:
+          type: string
+          nullable: true
+        assigned_to_id:
+          type: string
+          format: uuid
+          nullable: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    TicketStatusUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        resolution_summary:
+          type: string
+          nullable: true
+        internal_notes:
+          type: string
+          nullable: true
+
+    TicketAssignmentRequest:
+      type: object
+      properties:
+        assigned_to_id:
+          type: string
+          format: uuid
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+
+    TicketAICreateRequest:
+      type: object
+      required:
+        - user_input
+      properties:
+        user_input:
+          type: string
+          minLength: 1
+          description: Natural language description of the issue
+        uploaded_files:
+          type: array
+          items:
+            type: string
+          description: List of uploaded file paths for analysis
+        conversation_context:
+          type: array
+          items:
+            type: object
+          description: Previous conversation context
+        user_preferences:
+          type: object
+          additionalProperties: true
+          description: User preferences for ticket creation
+        integration_preference:
+          type: string
+          nullable: true
+          description: Preferred integration for routing
+
+    TicketDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        department:
+          type: string
+          nullable: true
+        created_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        assigned_to_id:
+          type: string
+          format: uuid
+          nullable: true
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        resolution_summary:
+          type: string
+          nullable: true
+        internal_notes:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_activity_at:
+          type: string
+          format: date-time
+        is_deleted:
+          type: boolean
+        ai_analysis:
+          type: object
+          nullable: true
+          properties:
+            confidence_score:
+              type: number
+              format: float
+            suggested_category:
+              type: string
+            suggested_priority:
+              type: string
+            keywords:
+              type: array
+              items:
+                type: string
+            estimated_effort:
+              type: string
+            business_impact:
+              type: string
+
+    TicketListResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        department:
+          type: string
+          nullable: true
+        assigned_to_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_activity_at:
+          type: string
+          format: date-time
+
+    TicketAICreateResponse:
+      type: object
+      properties:
+        ticket:
+          $ref: '#/components/schemas/TicketDetailResponse'
+        ai_analysis:
+          type: object
+          properties:
+            confidence_score:
+              type: number
+              format: float
+            reasoning:
+              type: string
+            suggested_actions:
+              type: array
+              items:
+                type: string
+            knowledge_base_matches:
+              type: array
+              items:
+                type: object
+            file_analysis_summary:
+              type: string
+        integration_routing:
+          type: object
+          nullable: true
+          properties:
+            recommended_integration:
+              type: string
+            routing_confidence:
+              type: number
+              format: float
+
+    TicketStatsResponse:
+      type: object
+      properties:
+        total_tickets:
+          type: integer
+        open_tickets:
+          type: integer
+        resolved_tickets:
+          type: integer
+        overdue_tickets:
+          type: integer
+        tickets_by_status:
+          type: object
+          additionalProperties:
+            type: integer
+        tickets_by_priority:
+          type: object
+          additionalProperties:
+            type: integer
+        tickets_by_category:
+          type: object
+          additionalProperties:
+            type: integer
+        average_resolution_time:
+          type: number
+          format: float
+        tickets_created_today:
+          type: integer
+        tickets_resolved_today:
+          type: integer
+
+    PaginatedTicketResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketListResponse'
+        total:
+          type: integer
+          description: Total number of items across all pages
+        page:
+          type: integer
+          description: Current page number (1-based)
+        size:
+          type: integer
+          description: Number of items per page
+        pages:
+          type: integer
+          description: Total number of pages
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message describing what went wrong
+        error_code:
+          type: string
+          description: Machine-readable error code
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+        request_id:
+          type: string
+          description: Unique identifier for this request
+
+    # WebSocket Message Schemas
+    WebSocketMessage:
+      type: object
+      description: Base WebSocket message structure
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Message type identifier
+        protocol:
+          type: string
+          description: Protocol handler name
+        timestamp:
+          type: string
+          format: date-time
+          description: Message timestamp
+
+    WebSocketErrorMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [error]
+            message:
+              type: string
+              description: Error description
+            original_message_type:
+              type: string
+              description: Original message type that caused the error
+
+    # Ticket Protocol Messages
+    TicketSubscribeMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - ticket_id
+          properties:
+            type:
+              type: string
+              enum: [subscribe_ticket_updates]
+            ticket_id:
+              type: string
+              format: uuid
+              description: Ticket ID to subscribe to
+
+    TicketUnsubscribeMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - ticket_id
+          properties:
+            type:
+              type: string
+              enum: [unsubscribe_ticket_updates]
+            ticket_id:
+              type: string
+              format: uuid
+              description: Ticket ID to unsubscribe from
+
+    TicketStatusChangeNotification:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [ticket_status_change]
+            ticket_id:
+              type: string
+              format: uuid
+            old_status:
+              $ref: '#/components/schemas/TicketStatus'
+            new_status:
+              $ref: '#/components/schemas/TicketStatus'
+            changed_by:
+              type: string
+              format: uuid
+            reason:
+              type: string
+              nullable: true
+
+    # File Protocol Messages
+    FileJobSubscribeMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - job_id
+          properties:
+            type:
+              type: string
+              enum: [subscribe_job]
+            job_id:
+              type: string
+              description: File processing job ID
+
+    FileJobUnsubscribeMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - job_id
+          properties:
+            type:
+              type: string
+              enum: [unsubscribe_job]
+            job_id:
+              type: string
+              description: File processing job ID
+
+    FileJobStatusMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - job_id
+          properties:
+            type:
+              type: string
+              enum: [get_job_status]
+            job_id:
+              type: string
+              description: File processing job ID
+
+    FileProcessingProgressNotification:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [file_processing_progress, file_processing_started, file_processing_completed, file_processing_failed]
+            job_id:
+              type: string
+              description: File processing job ID
+            filename:
+              type: string
+              description: Name of the file being processed
+            progress:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 100
+              description: Progress percentage (0-100)
+            stage:
+              type: string
+              enum: [upload, validation, processing, transcription, ocr, analysis, complete, failed]
+              description: Current processing stage
+            message:
+              type: string
+              description: Status message or error description
+            file_metadata:
+              type: object
+              description: Extracted file metadata
+              additionalProperties: true
+            results:
+              type: object
+              description: Processing results (available when completed)
+              properties:
+                transcription:
+                  type: string
+                  nullable: true
+                ocr_text:
+                  type: string
+                  nullable: true
+                analysis:
+                  type: object
+                  additionalProperties: true
+
+    # Chat Protocol Messages (AI Interaction)
+    ChatSendMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - conversation_id
+            - content
+          properties:
+            type:
+              type: string
+              enum: [send_message]
+            conversation_id:
+              type: string
+              format: uuid
+              description: Conversation ID
+            content:
+              type: string
+              description: Message content
+            context:
+              type: object
+              description: Additional context for AI processing
+              additionalProperties: true
+
+    ChatStreamRequest:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - conversation_id
+            - prompt
+          properties:
+            type:
+              type: string
+              enum: [stream_request]
+            conversation_id:
+              type: string
+              format: uuid
+              description: Conversation ID
+            prompt:
+              type: string
+              description: AI prompt
+            stream_settings:
+              type: object
+              properties:
+                max_tokens:
+                  type: integer
+                  minimum: 1
+                  maximum: 4000
+                temperature:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 2
+
+    ChatCreateConversation:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [create_conversation]
+            title:
+              type: string
+              nullable: true
+              description: Conversation title
+            initial_message:
+              type: string
+              nullable: true
+              description: Initial message to start conversation
+
+    ChatGetMessages:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          required:
+            - conversation_id
+          properties:
+            type:
+              type: string
+              enum: [get_messages]
+            conversation_id:
+              type: string
+              format: uuid
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 50
+            offset:
+              type: integer
+              minimum: 0
+              default: 0
+
+    ChatMessageNotification:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [chat_message, chat_response, chat_stream]
+            conversation_id:
+              type: string
+              format: uuid
+            message_id:
+              type: string
+              format: uuid
+            content:
+              type: string
+              description: Message content
+            sender:
+              type: string
+              enum: [user, assistant]
+            is_streaming:
+              type: boolean
+              description: Whether this is part of a streaming response
+            is_complete:
+              type: boolean
+              description: Whether streaming response is complete
+            metadata:
+              type: object
+              description: Additional message metadata
+              additionalProperties: true
+
+    # System Notifications
+    SystemNotification:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [system_alert, task_completion, data_update, health_update, performance_alert]
+            level:
+              type: string
+              enum: [info, warning, error, critical]
+              description: Notification severity level
+            title:
+              type: string
+              description: Notification title
+            message:
+              type: string
+              description: Notification message
+            action_url:
+              type: string
+              nullable: true
+              description: URL for follow-up action
+            expires_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: When notification expires
+
+tags:
+  - name: System
+    description: System health and information endpoints
+  - name: Tickets
+    description: Ticket management and CRUD operations
+  - name: AI
+    description: AI-powered functionality and intelligent automation
+  - name: Analytics
+    description: Statistics and reporting endpoints
+  - name: WebSocket
+    description: Real-time WebSocket communication protocols for live updates, file processing, and AI interactions
