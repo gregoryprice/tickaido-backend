@@ -13,6 +13,67 @@ from pydantic_ai.mcp import MCPServerStreamableHTTP
 logger = logging.getLogger(__name__)
 
 
+class AuthenticatedHTTPXClient(httpx.AsyncClient):
+    """
+    Custom HTTPX client that automatically injects JWT authentication headers.
+    
+    This client extends httpx.AsyncClient to automatically add Bearer token
+    authentication to all requests when an auth_token is provided.
+    """
+    
+    def __init__(self, auth_token: Optional[str] = None, **kwargs):
+        """
+        Initialize the authenticated HTTP client.
+        
+        Args:
+            auth_token: JWT token for authentication
+            **kwargs: Additional arguments passed to httpx.AsyncClient
+        """
+        self.auth_token = auth_token
+        
+        # Add auth headers to default headers if token provided
+        headers = kwargs.get('headers', {})
+        if auth_token:
+            auth_headers = self._get_auth_headers()
+            headers.update(auth_headers)
+            kwargs['headers'] = headers
+            
+        super().__init__(**kwargs)
+    
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """
+        Generate authentication headers.
+        
+        Returns:
+            Dict containing Authorization header if token is present, empty dict otherwise
+        """
+        if self.auth_token:
+            return {"Authorization": f"Bearer {self.auth_token}"}
+        return {}
+    
+    async def request(self, method: str, url, **kwargs):
+        """
+        Override request method to ensure auth headers are always included.
+        
+        Args:
+            method: HTTP method
+            url: Request URL
+            **kwargs: Additional request arguments
+            
+        Returns:
+            httpx.Response: The response from the server
+        """
+        # Merge auth headers with any provided headers
+        headers = kwargs.get('headers', {})
+        auth_headers = self._get_auth_headers()
+        
+        # Update headers with auth, giving priority to existing headers
+        merged_headers = {**auth_headers, **headers}
+        kwargs['headers'] = merged_headers
+        
+        return await super().request(method, url, **kwargs)
+
+
 def create_authenticated_mcp_client(url: str, auth_token: Optional[str] = None) -> MCPServerStreamableHTTP:
     """
     Create an MCP client with proper JWT authentication support.
@@ -61,8 +122,14 @@ class AuthenticatedMCPClient(MCPServerStreamableHTTP):
         """This approach is deprecated - use create_authenticated_mcp_client() instead"""
         logger.warning("[AUTH_MCP_CLIENT] AuthenticatedMCPClient class is deprecated, use create_authenticated_mcp_client() function")
         self.auth_token = auth_token
-        super().__init__(url, **kwargs)
         self._is_authenticated = auth_token is not None
+        
+        # If auth token provided, create authenticated HTTP client
+        if auth_token:
+            http_client = AuthenticatedHTTPXClient(auth_token=auth_token)
+            kwargs['http_client'] = http_client
+            
+        super().__init__(url, **kwargs)
         
     def get_auth_info(self) -> Dict[str, Any]:
         """
