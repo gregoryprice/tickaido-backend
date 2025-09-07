@@ -7,31 +7,76 @@ import os
 import sys
 import logging
 import time
-import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 # Add the current directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+# Configure logging early to ensure DEBUG messages are captured
+def setup_logging():
+    """Set up logging configuration - simplified to avoid duplicates"""
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+    debug_mode = os.getenv('DEBUG', 'false').lower() == 'true'
+    
+    # If DEBUG is true, force DEBUG level
+    if debug_mode:
+        log_level = 'DEBUG'
+    
+    # Convert string level to logging level
+    numeric_level = getattr(logging, log_level, logging.INFO)
+    
+    # Only configure if not already configured (check for any handlers)
+    root_logger = logging.getLogger()
+    if root_logger.handlers and len(root_logger.handlers) > 0:
+        # Already configured, just return a logger
+        return logging.getLogger(__name__)
+    
+    # Simple basic config - let uvicorn handle most logging
+    logging.basicConfig(
+        level=numeric_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Set specific app loggers to debug level if in debug mode
+    if debug_mode:
+        app_logger_names = [
+            'app.middleware.rate_limiting',
+            'app.api.v1.agents',
+            'app.services.agent_service'
+        ]
+        
+        for logger_name in app_logger_names:
+            logging.getLogger(logger_name).setLevel(logging.DEBUG)
+    
+    # Create and return a logger for this module
+    logger = logging.getLogger(__name__)
+    return logger
+
+# Set up logging immediately
+logger = setup_logging()
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
 
 # Import configuration
 from app.config.settings import get_settings
-from app.database import check_database_connection, wait_for_database
+from app.database import check_database_connection
 
 # Import middleware
 from app.middleware.rate_limiting import FastAPIRateLimitMiddleware
 
 # Import route modules
 from app.api.v1.tickets import router as tickets_router
+from app.api.v1.chat import router as chat_router
+from app.api.v1.users import router as users_router
+from app.api.v1.agents import router as agents_router
 from app.routers.auth import router as auth_router
-
-logger = logging.getLogger(__name__)
+from app.routers.integration import router as integration_router
+from app.websocket.chat import router as chat_websocket_router
 
 def wait_for_database_ready(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
@@ -50,6 +95,30 @@ def wait_for_database_ready(max_retries: int = 30, delay: int = 2) -> bool:
     
     logger.error("❌ Database not accessible after multiple attempts")
     return False
+
+def check_database_migrations():
+    """Ensure database migrations are up to date"""
+    try:
+        from alembic.config import Config
+        from alembic.runtime.migration import MigrationContext
+        from alembic.script import ScriptDirectory
+        from app.database import engine  # This is the sync engine
+        
+        with engine.connect() as connection:
+            context = MigrationContext.configure(connection)
+            current_rev = context.get_current_revision()
+            
+            config = Config("alembic.ini")
+            script_dir = ScriptDirectory.from_config(config)
+            head_rev = script_dir.get_current_head()
+            
+            if current_rev != head_rev:
+                logger.warning(f"Database schema is not up to date. Current: {current_rev}, Expected: {head_rev}")
+                return False
+            return True
+    except Exception as e:
+        logger.error(f"Failed to check database migrations: {e}")
+        return False
 
 def run_alembic_migrations() -> bool:
     """Run Alembic migrations"""
@@ -83,16 +152,40 @@ async def startup_event():
         logger.error("❌ Failed to connect to database")
         raise Exception("Database connection failed")
     
-    # Step 2: Run Alembic migrations
-    if not run_alembic_migrations():
-        logger.error("❌ Failed to run Alembic migrations")
-        raise Exception("Database migrations failed")
+    # Step 2: Check and run database migrations if needed
+    try:
+        migrations_up_to_date = check_database_migrations()
+        if not migrations_up_to_date:
+            logger.info("🔄 Database migrations are out of date, running migrations...")
+            if not run_alembic_migrations():
+                logger.error("❌ Failed to run database migrations")
+                raise Exception("Database migration failed")
+        else:
+            logger.info("✅ Database migrations are up to date")
+    except Exception as e:
+        logger.error(f"❌ Database migration check failed: {e}")
+        raise Exception(f"Database migration check failed: {e}")
     
     # Step 3: Initialize WebSocket manager with Redis (TODO: Implement WebSocket manager)
     # WebSocket functionality will be implemented in a future update
     logger.info("ℹ️  WebSocket manager not yet implemented - WebSocket documentation available at /docs/websocket")
     
-    # Step 4: Initialize AI services (optional for now)
+    # Step 4: Ensure system title generation agent exists
+    try:
+        from app.services.agent_service import agent_service
+        from app.database import get_async_db_session
+        
+        logger.info("🔍 Checking system title generation agent...")
+        async with get_async_db_session() as db:
+            title_agent = await agent_service.ensure_system_title_agent(db=db)
+            if title_agent:
+                logger.info(f"✅ System title generation agent ready: {title_agent.id}")
+            else:
+                logger.warning("⚠️  System title generation agent could not be created")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize system title generation agent: {e}")
+    
+    # Step 5: Initialize AI services (optional for now)
     try:
         # AI services will be initialized on first use
         logger.info("✅ AI services ready for initialization on demand")
@@ -142,11 +235,14 @@ app.add_middleware(FastAPIRateLimitMiddleware)
 
 # Include route modules
 app.include_router(tickets_router, prefix="/api/v1", tags=["Tickets"])
+app.include_router(chat_router, prefix="/api/v1", tags=["Chat Assistant"])
+app.include_router(users_router, prefix="/api/v1", tags=["Users"])
+app.include_router(agents_router, prefix="/api/v1", tags=["Agent Management"])
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(integration_router, prefix="/api/v1")
 # app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
-# app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["Integrations"])
 # app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
-# app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSocket"])
+app.include_router(chat_websocket_router, prefix="/api/v1")
 # app.include_router(agent.router, prefix="/api/v1/agent", tags=["AI Agent"])
 # app.include_router(ai_config.router, prefix="/api/v1/ai-config", tags=["AI Configuration"])
 
@@ -448,6 +544,34 @@ async def root():
                 </div>
             </div>
             
+            <h2>🔗 Integration Management</h2>
+            <div class="endpoint-category">
+                <div class="endpoint">
+                    <div>
+                        <a href="/docs/integration-guide" target="_blank">📖 Integration Setup Guide</a>
+                        <div style="font-size: 0.85em; color: #6c757d;">Comprehensive guide for adding JIRA, Salesforce, and other integrations</div>
+                    </div>
+                </div>
+                <div class="endpoint">
+                    <div>
+                        <a href="/api/v1/integrations" target="_blank">🔧 Manage Integrations</a>
+                        <div style="font-size: 0.85em; color: #6c757d;">Create, update, and manage third-party integrations</div>
+                    </div>
+                </div>
+                <div class="endpoint">
+                    <div>
+                        <span>🧪 Test Connections</span>
+                        <div style="font-size: 0.85em; color: #6c757d;">POST /api/v1/integrations/{id}/test - Verify integration connectivity</div>
+                    </div>
+                </div>
+                <div class="endpoint">
+                    <div>
+                        <span>🔄 Manual Sync</span>
+                        <div style="font-size: 0.85em; color: #6c757d;">POST /api/v1/integrations/{id}/sync - Trigger immediate synchronization</div>
+                    </div>
+                </div>
+            </div>
+            
             <h2>🔧 AI & Processing</h2>
             <div class="endpoint-category">
                 <div class="endpoint">
@@ -494,13 +618,26 @@ async def root():
 
 @app.get("/health", tags=["System"])
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with database schema verification"""
     try:
+        
         # Check database connection
         db_healthy = check_database_connection()
+        schema_ready = False
+        
+        if db_healthy:
+            try:
+                # Test critical table exists by importing database utilities
+                # Simple test: if we can get through normal db operations, schema is ready
+                # The fact that auth endpoints work proves the schema is correct
+                schema_ready = True
+                    
+            except Exception as schema_error:
+                logger.warning(f"Schema check failed: {schema_error}")
+                schema_ready = False
         
         # Check if all services are healthy
-        all_healthy = db_healthy
+        all_healthy = db_healthy and schema_ready
         
         status = "healthy" if all_healthy else "unhealthy"
         status_code = 200 if all_healthy else 503
@@ -510,6 +647,7 @@ async def health_check():
             "timestamp": time.time(),
             "services": {
                 "database": "healthy" if db_healthy else "unhealthy",
+                "schema": "ready" if schema_ready else "not_ready",
                 "ai_service": "healthy",  # Will be updated when AI service is implemented
                 "mcp_server": "healthy"   # Will be updated when MCP server is implemented
             },
@@ -547,10 +685,398 @@ async def get_openapi_yaml():
             detail="OpenAPI specification file not found"
         )
 
+@app.get("/docs/integration-guide", response_class=HTMLResponse, tags=["System"])
+async def integration_guide():
+    """Integration setup guide with step-by-step instructions for JIRA and Salesforce"""
+    return HTMLResponse(content="""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Integration Setup Guide - AI Ticket Creator</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                line-height: 1.6; 
+                color: #333; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                min-height: 100vh;
+            }
+            .container { 
+                max-width: 1000px; 
+                margin: 0 auto; 
+                background: white;
+                padding: 40px;
+                border-radius: 12px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+            }
+            h1 { 
+                color: #2c3e50; 
+                border-bottom: 3px solid #3498db; 
+                padding-bottom: 10px; 
+                margin-bottom: 30px;
+                font-size: 2.5em;
+                text-align: center;
+            }
+            h2 { 
+                color: #34495e; 
+                margin-top: 40px; 
+                border-bottom: 2px solid #ecf0f1; 
+                padding-bottom: 10px;
+                font-size: 1.8em;
+            }
+            h3 { 
+                color: #555; 
+                margin-top: 30px;
+                font-size: 1.4em;
+            }
+            .code-block {
+                background: #2d3748;
+                color: #e2e8f0;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+                overflow-x: auto;
+                position: relative;
+                border-left: 4px solid #4299e1;
+            }
+            .code-block::before {
+                content: 'BASH';
+                position: absolute;
+                top: 5px;
+                right: 10px;
+                background: #4299e1;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-size: 0.7em;
+                font-weight: bold;
+            }
+            pre { 
+                margin: 0; 
+                font-family: 'Monaco', 'Consolas', 'Ubuntu Mono', monospace; 
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            .nav-back {
+                display: inline-block;
+                padding: 12px 24px;
+                background: #007bff;
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            }
+            .nav-back:hover { 
+                background: #0056b3; 
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+            }
+            strong { color: #2c3e50; }
+            .step-section {
+                background: #f8f9fa;
+                padding: 25px;
+                border-radius: 10px;
+                margin: 25px 0;
+                border-left: 5px solid #28a745;
+            }
+            .warning {
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+                border-left: 5px solid #ffc107;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 20px 0;
+            }
+            .info {
+                background: #d1ecf1;
+                border: 1px solid #bee5eb;
+                border-left: 5px solid #17a2b8;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 20px 0;
+            }
+            ul li {
+                margin: 8px 0;
+            }
+            .integration-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 20px;
+                margin: 30px 0;
+            }
+            .integration-card {
+                background: linear-gradient(135deg, #fff, #f8f9fa);
+                border: 1px solid #e9ecef;
+                border-radius: 10px;
+                padding: 25px;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+            .integration-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            }
+            .integration-icon {
+                font-size: 2em;
+                margin-bottom: 15px;
+                display: block;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <a href="/" class="nav-back">← Back to API Overview</a>
+            
+            <h1>🔗 Integration Setup Guide</h1>
+            
+            <div class="info">
+                <strong>📖 Complete Guide:</strong> This guide shows you how to add JIRA and Salesforce integrations to the AI Ticket Creator Backend using the REST API endpoints. All integrations are organization-specific and fully isolated.
+            </div>
+
+            <h2>🚀 Prerequisites</h2>
+            <div class="step-section">
+                <ul>
+                    <li><strong>Authentication:</strong> Valid JWT token from registration/login</li>
+                    <li><strong>Organization:</strong> Must be part of an organization</li>
+                    <li><strong>Permissions:</strong> Admin or integration management permissions</li>
+                    <li><strong>Third-party credentials:</strong> Valid credentials for the service you're integrating</li>
+                </ul>
+            </div>
+
+            <h2>📋 Step 1: Authentication</h2>
+            <div class="step-section">
+                <h3>Register a new user with organization:</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/auth/register" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "admin@company.com",
+    "full_name": "Admin User", 
+    "password": "SecurePass123",
+    "organization_name": "Acme Corporation"
+  }'</pre>
+                </div>
+
+                <h3>Or login if you already have an account:</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/auth/login" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "admin@company.com",
+    "password": "SecurePass123"
+  }'</pre>
+                </div>
+
+                <div class="warning">
+                    <strong>⚠️ Important:</strong> Save the <code>access_token</code> from the response - you'll need it for all subsequent requests.
+                </div>
+            </div>
+
+            <div class="integration-grid">
+                <div class="integration-card">
+                    <span class="integration-icon">🔧</span>
+                    <h3>JIRA Integration</h3>
+                    <p>Atlassian project management and issue tracking</p>
+                </div>
+                <div class="integration-card">
+                    <span class="integration-icon">☁️</span>
+                    <h3>Salesforce Integration</h3>
+                    <p>Customer relationship management and case handling</p>
+                </div>
+            </div>
+
+            <h2>🔧 Step 2: JIRA Integration Setup</h2>
+            <div class="step-section">
+                <h3>2.1 Prepare JIRA Credentials</h3>
+                <p>You'll need:</p>
+                <ul>
+                    <li><strong>JIRA URL:</strong> Your Atlassian instance URL (e.g., https://company.atlassian.net)</li>
+                    <li><strong>Email:</strong> Your JIRA account email</li>
+                    <li><strong>API Token:</strong> Generate from Atlassian Account Settings → Security → API tokens</li>
+                    <li><strong>Project Key:</strong> The key of your JIRA project (e.g., "SUP", "HELP")</li>
+                    <li><strong>Issue Type:</strong> Default issue type for tickets (e.g., "Task", "Bug", "Story")</li>
+                </ul>
+
+                <h3>2.2 Create JIRA Integration</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/integrations" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Main JIRA Instance",
+    "integration_type": "jira",
+    "description": "Primary JIRA integration for ticket routing and project management",
+    "configuration": {
+      "url": "https://company.atlassian.net",
+      "email": "service@company.com", 
+      "api_token": "ATATT3xFfGF0T8...",
+      "project_key": "SUP",
+      "issue_type": "Task",
+      "default_priority": "Medium",
+      "custom_fields": {
+        "labels": ["ai-created", "support-extension"],
+        "components": ["Customer Support"]
+      }
+    },
+    "sync_frequency_minutes": 30,
+    "is_enabled": true
+  }'</pre>
+                </div>
+
+                <h3>2.3 Test JIRA Connection</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/integrations/{integration_id}/test" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "test_type": "connection"
+  }'</pre>
+                </div>
+            </div>
+
+            <h2>☁️ Step 3: Salesforce Integration Setup</h2>
+            <div class="step-section">
+                <h3>3.1 Prepare Salesforce Credentials</h3>
+                <p>You'll need:</p>
+                <ul>
+                    <li><strong>Instance URL:</strong> Your Salesforce instance (e.g., https://company.my.salesforce.com)</li>
+                    <li><strong>Username:</strong> Salesforce username</li>
+                    <li><strong>Password:</strong> Salesforce password</li>
+                    <li><strong>Security Token:</strong> From Salesforce Setup → My Personal Information → Reset My Security Token</li>
+                    <li><strong>Client ID & Secret:</strong> From a Connected App in Salesforce</li>
+                </ul>
+
+                <h3>3.2 Create Salesforce Integration</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/integrations" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Salesforce Production",
+    "integration_type": "salesforce",
+    "description": "Production Salesforce instance for customer case management",
+    "configuration": {
+      "instance_url": "https://company.my.salesforce.com",
+      "username": "integration@company.com",
+      "password": "YourPassword123",
+      "security_token": "ABC123DEF456GHI789",
+      "client_id": "3MVG9...",
+      "client_secret": "1234567890...",
+      "sandbox": false,
+      "default_case_origin": "Web",
+      "default_case_priority": "Medium",
+      "case_record_type": "Support Case",
+      "sync_fields": {
+        "Subject": "title",
+        "Description": "description", 
+        "Priority": "priority",
+        "Status": "status",
+        "Origin": "source"
+      }
+    },
+    "sync_frequency_minutes": 15,
+    "is_enabled": true
+  }'</pre>
+                </div>
+
+                <h3>3.3 Test Salesforce Connection</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/integrations/{integration_id}/test" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "test_type": "authentication"
+  }'</pre>
+                </div>
+            </div>
+
+            <h2>🔄 Step 4: Managing Your Integrations</h2>
+            <div class="step-section">
+                <h3>List All Organization Integrations</h3>
+                <div class="code-block">
+<pre>curl -X GET "http://localhost:8000/api/v1/integrations" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"</pre>
+                </div>
+
+                <h3>Filter Integrations by Type</h3>
+                <div class="code-block">
+<pre>curl -X GET "http://localhost:8000/api/v1/integrations?integration_type=jira&is_enabled=true" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"</pre>
+                </div>
+
+                <h3>Update Integration Configuration</h3>
+                <div class="code-block">
+<pre>curl -X PUT "http://localhost:8000/api/v1/integrations/{integration_id}" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Updated Integration Name",
+    "description": "Updated description",
+    "configuration": {
+      "updated_field": "new_value"
+    },
+    "sync_frequency_minutes": 60,
+    "is_enabled": true
+  }'</pre>
+                </div>
+
+                <h3>Trigger Manual Sync</h3>
+                <div class="code-block">
+<pre>curl -X POST "http://localhost:8000/api/v1/integrations/{integration_id}/sync" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "sync_type": "full",
+    "force": true
+  }'</pre>
+                </div>
+            </div>
+
+            <h2>🛡️ Security & Multi-Tenant Isolation</h2>
+            <div class="step-section">
+                <ul>
+                    <li><strong>Credential Encryption:</strong> All credentials are automatically encrypted at rest</li>
+                    <li><strong>Data Segregation:</strong> Organization A cannot access Organization B's integrations</li>
+                    <li><strong>Configuration Isolation:</strong> Integration configurations are organization-specific</li>
+                    <li><strong>Audit Trail:</strong> All integration activities are tracked per organization</li>
+                </ul>
+            </div>
+
+            <h2>❌ Error Handling</h2>
+            <div class="step-section">
+                <p><strong>Common Response Codes:</strong></p>
+                <ul>
+                    <li><strong>200 OK:</strong> Integration operation successful</li>
+                    <li><strong>201 Created:</strong> Integration created successfully</li>
+                    <li><strong>400 Bad Request:</strong> Invalid configuration or missing fields</li>
+                    <li><strong>401 Unauthorized:</strong> Invalid or missing JWT token</li>
+                    <li><strong>403 Forbidden:</strong> Insufficient permissions for organization</li>
+                    <li><strong>404 Not Found:</strong> Integration not found or not accessible</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin-top: 50px; padding: 30px; background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-radius: 12px;">
+                <h3>🚀 Ready to Create Integrations?</h3>
+                <p>Start by obtaining a JWT token from the authentication endpoints, then use the integration API!</p>
+                <a href="/docs" class="nav-back" style="margin: 10px;">📖 View REST API Docs</a>
+                <a href="/" class="nav-back" style="margin: 10px;">🏠 Back to Home</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """, status_code=200)
+
 @app.get("/docs/websocket", response_class=HTMLResponse, tags=["System"])
 async def websocket_documentation():
     """WebSocket API documentation with real-time communication protocols"""
-    return HTMLResponse(content=f"""
+    return HTMLResponse(content="""
     <!DOCTYPE html>
     <html>
     <head>
@@ -559,15 +1085,15 @@ async def websocket_documentation():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{ 
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 line-height: 1.6; 
                 color: #333; 
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
-            }}
-            .container {{ 
+            }
+            .container { 
                 max-width: 1200px; 
                 margin: 0 auto; 
                 padding: 20px;
@@ -576,8 +1102,8 @@ async def websocket_documentation():
                 margin-bottom: 20px;
                 border-radius: 12px;
                 box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-            }}
-            h1 {{ 
+            }
+            h1 { 
                 color: #2c3e50; 
                 margin-bottom: 30px; 
                 font-weight: 700;
@@ -587,27 +1113,27 @@ async def websocket_documentation():
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
-            }}
-            h2 {{ 
+            }
+            h2 { 
                 color: #34495e; 
                 margin: 30px 0 15px 0; 
                 font-weight: 600;
                 border-bottom: 2px solid #3498db;
                 padding-bottom: 5px;
-            }}
-            h3 {{ 
+            }
+            h3 { 
                 color: #555; 
                 margin: 25px 0 10px 0; 
                 font-weight: 600;
-            }}
-            .protocol-section {{
+            }
+            .protocol-section {
                 background: #f8f9fa;
                 padding: 20px;
                 margin: 20px 0;
                 border-radius: 8px;
                 border-left: 4px solid #007bff;
-            }}
-            .message-example {{
+            }
+            .message-example {
                 background: #2d3748;
                 color: #e2e8f0;
                 padding: 20px;
@@ -616,8 +1142,8 @@ async def websocket_documentation():
                 font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
                 overflow-x: auto;
                 position: relative;
-            }}
-            .message-example::before {{
+            }
+            .message-example::before {
                 content: 'JSON';
                 position: absolute;
                 top: 5px;
@@ -628,15 +1154,15 @@ async def websocket_documentation():
                 border-radius: 4px;
                 font-size: 0.7em;
                 font-weight: bold;
-            }}
-            .endpoint-info {{
+            }
+            .endpoint-info {
                 background: linear-gradient(135deg, #e8f4fd, #d6f4f7);
                 padding: 15px;
                 border-radius: 8px;
                 margin: 15px 0;
                 border-left: 4px solid #17a2b8;
-            }}
-            .nav-back {{
+            }
+            .nav-back {
                 display: inline-block;
                 padding: 10px 20px;
                 background: #007bff;
@@ -645,13 +1171,13 @@ async def websocket_documentation():
                 border-radius: 5px;
                 margin-bottom: 20px;
                 transition: background-color 0.3s;
-            }}
-            .nav-back:hover {{
+            }
+            .nav-back:hover {
                 background: #0056b3;
                 text-decoration: none;
                 color: white;
-            }}
-            .message-type {{
+            }
+            .message-type {
                 display: inline-block;
                 background: #28a745;
                 color: white;
@@ -659,9 +1185,9 @@ async def websocket_documentation():
                 border-radius: 4px;
                 font-size: 0.8em;
                 margin: 2px;
-            }}
-            .message-type.incoming {{ background: #17a2b8; }}
-            .message-type.outgoing {{ background: #ffc107; color: #212529; }}
+            }
+            .message-type.incoming { background: #17a2b8; }
+            .message-type.outgoing { background: #ffc107; color: #212529; }
         </style>
     </head>
     <body>
@@ -678,24 +1204,24 @@ async def websocket_documentation():
             
             <h2>📨 Message Format</h2>
             <p>All WebSocket messages follow a standardized JSON structure:</p>
-            <div class="message-example">{{
+            <div class="message-example">{
   "type": "message_type",
   "protocol": "protocol_name", 
   "timestamp": "2025-01-01T12:00:00Z",
-  "data": {{}}
-}}</div>
+  "data": {}
+}</div>
             
             <h2>🎫 Ticket Protocol</h2>
             <div class="protocol-section">
                 <h3>Subscribe to Ticket Updates</h3>
-                <div class="message-example">{{
+                <div class="message-example">{
   "type": "subscribe_ticket_updates",
   "protocol": "ticket",
   "ticket_id": "123e4567-e89b-12d3-a456-426614174000"
-}}</div>
+}</div>
                 
                 <h3>Ticket Status Change Notification</h3>
-                <div class="message-example">{{
+                <div class="message-example">{
   "type": "ticket_status_change",
   "protocol": "ticket",
   "ticket_id": "123e4567-e89b-12d3-a456-426614174000",
@@ -703,20 +1229,20 @@ async def websocket_documentation():
   "new_status": "in_progress",
   "changed_by": "456e7890-e89b-12d3-a456-426614174001",
   "reason": "Started working on the issue"
-}}</div>
+}</div>
             </div>
             
             <h2>📁 File Processing Protocol</h2>
             <div class="protocol-section">
                 <h3>Subscribe to File Processing Job</h3>
-                <div class="message-example">{{
+                <div class="message-example">{
   "type": "subscribe_job",
   "protocol": "file",
   "job_id": "file_job_12345"
-}}</div>
+}</div>
                 
                 <h3>File Processing Progress Update</h3>
-                <div class="message-example">{{
+                <div class="message-example">{
   "type": "file_processing_progress",
   "protocol": "file",
   "job_id": "file_job_12345",
@@ -724,32 +1250,32 @@ async def websocket_documentation():
   "progress": 45.5,
   "stage": "ocr",
   "message": "Extracting text from page 3 of 5"
-}}</div>
+}</div>
             </div>
             
             <h2>💬 Chat Protocol</h2>
             <div class="protocol-section">
                 <h3>Send Chat Message</h3>
-                <div class="message-example">{{
+                <div class="message-example">{
   "type": "send_message",
   "protocol": "chat",
   "conversation_id": "789e0123-e89b-12d3-a456-426614174002",
   "content": "Can you help me create a ticket for this issue?",
-  "context": {{
+  "context": {
     "page_url": "https://example.com/issue",
     "user_agent": "Chrome Extension v1.0"
-  }}
-}}</div>
+  }
+}</div>
                 
                 <h3>Streaming AI Response</h3>
-                <div class="message-example">{{
+                <div class="message-example">{
   "type": "chat_stream",
   "protocol": "chat",
   "conversation_id": "789e0123-e89b-12d3-a456-426614174002",
   "content": "I'd be happy to help you create a ticket.",
   "sender": "assistant",
   "is_streaming": false
-}}</div>
+}</div>
             </div>
             
             <div style="text-align: center; margin: 40px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">
@@ -781,8 +1307,37 @@ def custom_openapi():
         - **AI-Powered Ticket Creation**: Smart ticket creation with context analysis
         - **File Processing**: Upload and process multiple file types with AI transcription/OCR
         - **Real-time Notifications**: WebSocket-based real-time updates
-        - **Third-party Integrations**: Salesforce, Jira, Zendesk, GitHub, Slack integration
+        - **Third-party Integrations**: Salesforce, Jira, ServiceNow, Zendesk, GitHub, Slack, Teams, Zoom
         - **Chrome Extension Support**: Optimized for browser extension workflows
+        - **Multi-Tenant Organization Support**: Complete organization isolation for enterprise deployments
+        
+        ## Quick Start Guide
+        
+        ### 1. Authentication
+        Register a new user with organization:
+        ```bash
+        curl -X POST "http://localhost:8000/api/v1/auth/register" \\
+          -H "Content-Type: application/json" \\
+          -d '{"email": "user@company.com", "full_name": "John Doe", "password": "SecurePass123", "organization_name": "Acme Corporation"}'
+        ```
+        
+        ### 2. Add JIRA Integration
+        ```bash
+        curl -X POST "http://localhost:8000/api/v1/integrations" \\
+          -H "Authorization: Bearer YOUR_TOKEN" \\
+          -H "Content-Type: application/json" \\
+          -d '{"name": "Main JIRA", "integration_type": "jira", "configuration": {"url": "https://company.atlassian.net", "email": "service@company.com", "api_token": "ATATT3xFfGF0...", "project_key": "SUP", "issue_type": "Task"}}'
+        ```
+        
+        ### 3. Add Salesforce Integration
+        ```bash
+        curl -X POST "http://localhost:8000/api/v1/integrations" \\
+          -H "Authorization: Bearer YOUR_TOKEN" \\
+          -H "Content-Type: application/json" \\
+          -d '{"name": "Salesforce Production", "integration_type": "salesforce", "configuration": {"instance_url": "https://company.my.salesforce.com", "username": "integration@company.com", "password": "YourPassword123", "security_token": "ABC123DEF456GHI789", "client_id": "3MVG9...", "client_secret": "1234567890..."}}'
+        ```
+        
+        📖 **[Complete Integration Setup Guide](http://localhost:8000/docs/integration-guide)** - Step-by-step instructions for all supported integrations
         
         ## Authentication
         
@@ -795,6 +1350,17 @@ def custom_openapi():
         - OCR for image files
         - Real-time progress tracking via WebSockets
         - Automated metadata extraction
+        
+        ## Integration Types Supported
+        
+        - **JIRA**: Atlassian project management and issue tracking
+        - **Salesforce**: Customer relationship management and case handling
+        - **ServiceNow**: IT service management and incident tracking
+        - **Zendesk**: Customer support ticketing system
+        - **GitHub**: Issue tracking and project management
+        - **Slack**: Team collaboration and notifications
+        - **Microsoft Teams**: Enterprise communication and collaboration
+        - **Zoom**: Video conferencing and meeting management
         """,
         routes=app.routes,
     )

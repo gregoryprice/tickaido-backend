@@ -7,11 +7,10 @@ Implements Redis-based rate limiting with flexible policies and user-specific li
 import logging
 import time
 import hashlib
-from typing import Dict, Optional, Callable, Any
+from typing import Dict, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 
-from fastapi import HTTPException, status, Request, Depends
+from fastapi import HTTPException, status, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 import redis.asyncio as redis
@@ -47,15 +46,26 @@ class RateLimitMiddleware:
         self.redis_url = redis_url or settings.REDIS_URL
         self.redis_client: Optional[redis.Redis] = None
         
-        # Default rate limit rules (relaxed for development and testing)
-        self.default_rules = {
-            # General API requests
-            "default": RateLimitRule(requests=1000, window=3600),  # 1000 requests per hour
-            "auth": RateLimitRule(requests=100, window=300),       # 100 auth requests per 5 minutes
-            "file_upload": RateLimitRule(requests=50, window=300), # 50 file uploads per 5 minutes
-            "websocket": RateLimitRule(requests=2000, window=3600), # 2000 WebSocket messages per hour
-            "ai_requests": RateLimitRule(requests=200, window=3600), # 200 AI requests per hour
-        }
+        # Default rate limit rules (very relaxed for development and testing)
+        settings = get_settings()
+        if settings.environment in ["development", "local", "test"]:
+            # Development/testing: Very permissive limits
+            self.default_rules = {
+                "default": RateLimitRule(requests=10000, window=3600),  # 10,000 requests per hour
+                "auth": RateLimitRule(requests=1000, window=300),       # 1,000 auth requests per 5 minutes
+                "file_upload": RateLimitRule(requests=500, window=300), # 500 file uploads per 5 minutes
+                "websocket": RateLimitRule(requests=20000, window=3600), # 20,000 WebSocket messages per hour
+                "ai_requests": RateLimitRule(requests=5000, window=3600), # 5,000 AI requests per hour
+            }
+        else:
+            # Production: More restrictive limits
+            self.default_rules = {
+                "default": RateLimitRule(requests=1000, window=3600),  # 1000 requests per hour
+                "auth": RateLimitRule(requests=100, window=300),       # 100 auth requests per 5 minutes
+                "file_upload": RateLimitRule(requests=50, window=300), # 50 file uploads per 5 minutes
+                "websocket": RateLimitRule(requests=2000, window=3600), # 2000 WebSocket messages per hour
+                "ai_requests": RateLimitRule(requests=200, window=3600), # 200 AI requests per hour
+            }
         
         # Premium user multipliers
         self.premium_multipliers = {

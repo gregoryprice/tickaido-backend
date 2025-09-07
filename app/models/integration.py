@@ -5,43 +5,37 @@ Integration model for third-party service connections
 
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, Integer
+from typing import Optional, Dict, Any
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
+from app.services.encryption_service import get_encryption_service, mask_credentials
 
 
-class IntegrationType(enum.Enum):
-    """Supported integration types"""
-    JIRA = "jira"
-    SERVICENOW = "servicenow"
-    SALESFORCE = "salesforce"
-    ZENDESK = "zendesk"
-    GITHUB = "github"
-    SLACK = "slack"
-    TEAMS = "teams"
-    ZOOM = "zoom"
-    HUBSPOT = "hubspot"
-    FRESHDESK = "freshdesk"
-    ASANA = "asana"
-    TRELLO = "trello"
+class IntegrationCategory(enum.Enum):
+    """Integration categories based on functionality"""
+    TICKETING = "ticketing"
+    CRM = "crm"
+    MESSAGING = "messaging"
+    COMMUNICATION = "communication"
+    PROJECT_MANAGEMENT = "project_management"
+    CODE_REPOSITORY = "code_repository"
     WEBHOOK = "webhook"
-    EMAIL = "email"
-    SMS = "sms"
 
 
 class IntegrationStatus(enum.Enum):
     """Integration connection status"""
     ACTIVE = "active"
-    INACTIVE = "inactive"
+    INACTIVE = "inactive" 
     PENDING = "pending"
     ERROR = "error"
     EXPIRED = "expired"
     SUSPENDED = "suspended"
 
 
-class DBIntegration(BaseModel):
+class Integration(BaseModel):
     """
     Integration configuration for third-party services.
     Manages connections, credentials, and routing rules.
@@ -56,19 +50,34 @@ class DBIntegration(BaseModel):
         comment="Display name for the integration"
     )
     
-    integration_type = Column(
-        SQLEnum(IntegrationType),
+    integration_category = Column(
+        SQLEnum(IntegrationCategory, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
         index=True,
-        comment="Type of integration service"
+        comment="Functional category of the integration"
+    )
+    
+    platform_name = Column(
+        String(50),
+        nullable=False,
+        index=True,
+        comment="Name of the integration platform (jira, slack, etc.)"
     )
     
     status = Column(
-        SQLEnum(IntegrationStatus),
+        SQLEnum(IntegrationStatus, values_callable=lambda obj: [e.value for e in obj]),
         default=IntegrationStatus.PENDING,
         nullable=False,
         index=True,
         comment="Current integration status"
+    )
+    
+    enabled = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+        index=True,
+        comment="Whether the integration is enabled for use"
     )
     
     description = Column(
@@ -98,10 +107,10 @@ class DBIntegration(BaseModel):
         comment="Authentication type (api_key, oauth2, basic, bearer)"
     )
     
-    credentials = Column(
-        JSON,
+    credentials_encrypted = Column(
+        Text,
         nullable=True,
-        comment="Encrypted authentication credentials"
+        comment="Encrypted authentication credentials (base64 encoded)"
     )
     
     oauth_scopes = Column(
@@ -247,10 +256,10 @@ class DBIntegration(BaseModel):
         comment="Webhook URL for receiving events"
     )
     
-    webhook_secret = Column(
-        String(255),
+    webhook_secret_encrypted = Column(
+        Text,
         nullable=True,
-        comment="Webhook authentication secret"
+        comment="Encrypted webhook authentication secret"
     )
     
     sync_enabled = Column(
@@ -355,8 +364,41 @@ class DBIntegration(BaseModel):
         comment="When integration credentials expire"
     )
     
+    # Activation tracking
+    last_activation_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When integration was last activated"
+    )
+    
+    activation_method = Column(
+        String(20),
+        nullable=True,
+        comment="How integration was activated (manual, automatic)"
+    )
+    
+    # Organization relationship
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('organizations.id'),
+        nullable=True,  # Allow null during migration
+        index=True,
+        comment="Organization/company this integration belongs to"
+    )
+    
+    # Relationships
+    organization = relationship(
+        "Organization",
+        back_populates="integrations"
+    )
+    
+    tickets = relationship(
+        "Ticket",
+        back_populates="integration"
+    )
+    
     def __repr__(self):
-        return f"<DBIntegration(id={self.id}, name={self.name}, type={self.integration_type}, status={self.status})>"
+        return f"<Integration(id={self.id}, name={self.name}, type={self.integration_type}, status={self.status})>"
     
     @property
     def is_healthy(self) -> bool:
@@ -448,7 +490,7 @@ class DBIntegration(BaseModel):
     
     def can_handle_ticket(self, category: str, priority: str, department: str) -> bool:
         """Check if integration can handle a specific ticket"""
-        if self.status != IntegrationStatus.ACTIVE or not self.is_healthy:
+        if not self.enabled or self.status != IntegrationStatus.ACTIVE or not self.is_healthy:
             return False
         
         if self.in_maintenance_window:
@@ -506,11 +548,39 @@ class DBIntegration(BaseModel):
         
         return True
     
-    def activate(self):
+    def set_enabled(self, enabled: bool, reason: Optional[str] = None):
+        """
+        Set enabled status and automatically manage integration status.
+        
+        Args:
+            enabled: Whether to enable or disable the integration
+            reason: Optional reason for the status change
+        """
+        self.enabled = enabled
+        
+        if enabled:
+            # When enabling, set to ACTIVE (if healthy) or PENDING
+            if self.is_healthy:
+                self.status = IntegrationStatus.ACTIVE
+            else:
+                self.status = IntegrationStatus.PENDING
+            self.last_activation_at = datetime.now(timezone.utc)
+            self.activation_method = "enabled"
+        else:
+            # When disabling, set to INACTIVE
+            self.status = IntegrationStatus.INACTIVE
+            if reason:
+                self.last_error_message = f"Disabled: {reason}"
+                self.last_error_at = datetime.now(timezone.utc)
+
+    def activate(self, method: str = "manual"):
         """Activate the integration"""
+        self.enabled = True
         self.status = IntegrationStatus.ACTIVE
         self.consecutive_failures = 0
         self.health_check_error = None
+        self.last_activation_at = datetime.now(timezone.utc)
+        self.activation_method = method
     
     def deactivate(self, reason: Optional[str] = None):
         """Deactivate the integration"""
@@ -526,12 +596,132 @@ class DBIntegration(BaseModel):
             self.last_error_message = reason
             self.last_error_at = datetime.now(timezone.utc)
     
+    # Credential management methods
+    def set_credentials(self, credentials: Dict[str, Any]):
+        """
+        Set and encrypt credentials for the integration.
+        
+        Args:
+            credentials: Dictionary containing sensitive credentials
+        """
+        if not credentials:
+            self.credentials_encrypted = None
+            return
+        
+        encryption_service = get_encryption_service()
+        self.credentials_encrypted = encryption_service.encrypt_credentials(credentials)
+    
+    def get_credentials(self) -> Dict[str, Any]:
+        """
+        Get decrypted credentials for the integration.
+        
+        Returns:
+            Dict[str, Any]: Decrypted credentials dictionary
+        """
+        if not self.credentials_encrypted:
+            return {}
+        
+        encryption_service = get_encryption_service()
+        return encryption_service.decrypt_credentials(self.credentials_encrypted)
+    
+    def get_masked_credentials(self) -> Dict[str, Any]:
+        """
+        Get credentials with sensitive values masked for safe display.
+        
+        Returns:
+            Dict[str, Any]: Credentials with masked sensitive values
+        """
+        credentials = self.get_credentials()
+        return mask_credentials(credentials)
+    
+    def set_webhook_secret(self, secret: str):
+        """
+        Set and encrypt webhook secret.
+        
+        Args:
+            secret: Webhook secret to encrypt
+        """
+        if not secret:
+            self.webhook_secret_encrypted = None
+            return
+        
+        encryption_service = get_encryption_service()
+        self.webhook_secret_encrypted = encryption_service.encrypt_data(secret)
+    
+    def get_webhook_secret(self) -> Optional[str]:
+        """
+        Get decrypted webhook secret.
+        
+        Returns:
+            str: Decrypted webhook secret or None
+        """
+        if not self.webhook_secret_encrypted:
+            return None
+        
+        encryption_service = get_encryption_service()
+        return encryption_service.decrypt_data(self.webhook_secret_encrypted)
+    
+    def has_valid_credentials(self) -> bool:
+        """
+        Check if integration has valid credentials for its auth type.
+        
+        Returns:
+            bool: True if credentials are valid for the auth type
+        """
+        credentials = self.get_credentials()
+        if not credentials:
+            return False
+        
+        # Check based on auth type
+        if self.auth_type == "api_key":
+            return "api_key" in credentials and credentials["api_key"]
+        elif self.auth_type == "oauth2":
+            return all(k in credentials for k in ["client_id", "client_secret"])
+        elif self.auth_type == "basic":
+            return all(k in credentials for k in ["username", "password"]) or \
+                   all(k in credentials for k in ["email", "api_token"])  # JIRA style
+        elif self.auth_type == "bearer":
+            return "token" in credentials and credentials["token"]
+        
+        return True  # For custom auth types
+    
+    @classmethod
+    def get_category_for_platform(cls, platform_name: str) -> Optional[IntegrationCategory]:
+        """
+        Get the integration category for a given platform name.
+        
+        Args:
+            platform_name: Platform name (e.g., 'jira', 'slack')
+            
+        Returns:
+            IntegrationCategory or None if not found
+        """
+        platform_mapping = {
+            'jira': IntegrationCategory.TICKETING,
+            'servicenow': IntegrationCategory.TICKETING,
+            'zendesk': IntegrationCategory.TICKETING,
+            'freshdesk': IntegrationCategory.TICKETING,
+            'salesforce': IntegrationCategory.CRM,
+            'hubspot': IntegrationCategory.CRM,
+            'slack': IntegrationCategory.MESSAGING,
+            'teams': IntegrationCategory.MESSAGING,
+            'email': IntegrationCategory.COMMUNICATION,
+            'sms': IntegrationCategory.COMMUNICATION,
+            'zoom': IntegrationCategory.COMMUNICATION,
+            'github': IntegrationCategory.CODE_REPOSITORY,
+            'asana': IntegrationCategory.PROJECT_MANAGEMENT,
+            'trello': IntegrationCategory.PROJECT_MANAGEMENT,
+            'webhook': IntegrationCategory.WEBHOOK,
+        }
+        return platform_mapping.get(platform_name.lower())
+    
+    
     def to_dict(self, include_credentials: bool = False, include_stats: bool = True) -> dict:
         """
         Convert integration to dictionary with optional credential inclusion.
         
         Args:
-            include_credentials: Include authentication credentials (sensitive)
+            include_credentials: Include authentication credentials (masked for safety)
             include_stats: Include usage statistics
             
         Returns:
@@ -539,13 +729,21 @@ class DBIntegration(BaseModel):
         """
         data = super().to_dict()
         
-        # Remove sensitive fields if not requested
-        if not include_credentials:
-            sensitive_fields = [
-                'credentials', 'webhook_secret', 'oauth_scopes'
-            ]
-            for field in sensitive_fields:
-                data.pop(field, None)
+        # Always remove encrypted fields from output
+        sensitive_fields = [
+            'credentials_encrypted', 'webhook_secret_encrypted'
+        ]
+        for field in sensitive_fields:
+            data.pop(field, None)
+        
+        # Handle credentials based on request
+        if include_credentials:
+            # Include masked credentials for display
+            data['credentials'] = self.get_masked_credentials()
+            data['has_webhook_secret'] = bool(self.webhook_secret_encrypted)
+        else:
+            # Remove any credential information
+            data.pop('credentials', None)
         
         # Remove stats if not requested
         if not include_stats:
@@ -562,5 +760,6 @@ class DBIntegration(BaseModel):
         data['is_rate_limited'] = self.is_rate_limited
         data['is_expired'] = self.is_expired
         data['in_maintenance_window'] = self.in_maintenance_window
+        data['has_valid_credentials'] = self.has_valid_credentials()
         
         return data

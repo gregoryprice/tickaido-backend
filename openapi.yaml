@@ -1,1326 +1,4073 @@
-openapi: 3.0.3
+components:
+  schemas:
+    AvatarDeleteResponse:
+      description: Schema for avatar deletion response
+      properties:
+        deleted:
+          description: Whether avatar was successfully deleted
+          title: Deleted
+          type: boolean
+        message:
+          description: Status message
+          title: Message
+          type: string
+        user_id:
+          description: User ID
+          format: uuid
+          title: User Id
+          type: string
+      required:
+      - user_id
+      - deleted
+      - message
+      title: AvatarDeleteResponse
+      type: object
+    AvatarResponse:
+      description: Schema for avatar response
+      properties:
+        avatar_url:
+          description: Avatar URL
+          title: Avatar Url
+          type: string
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        file_size:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: File size in bytes
+          title: File Size
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Original filename
+          title: Filename
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        thumbnail_sizes:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Available thumbnail sizes with their URLs
+          title: Thumbnail Sizes
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+        upload_date:
+          description: Upload timestamp
+          format: date-time
+          title: Upload Date
+          type: string
+        user_id:
+          description: User ID
+          format: uuid
+          title: User Id
+          type: string
+      required:
+      - created_at
+      - updated_at
+      - id
+      - user_id
+      - avatar_url
+      - upload_date
+      title: AvatarResponse
+      type: object
+    Body_list_tickets_api_v1_tickets__get:
+      properties:
+        category:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/TicketCategorySchema'
+            type: array
+          - type: 'null'
+          title: Category
+        priority:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/TicketPrioritySchema'
+            type: array
+          - type: 'null'
+          title: Priority
+        status:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/TicketStatusSchema'
+            type: array
+          - type: 'null'
+          title: Status
+        tags:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Tags
+        urgency:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/TicketPrioritySchema'
+            type: array
+          - type: 'null'
+          title: Urgency
+      title: Body_list_tickets_api_v1_tickets__get
+      type: object
+    Body_upload_avatar_api_v1_users__user_id__avatar_post:
+      properties:
+        file:
+          format: binary
+          title: File
+          type: string
+      required:
+      - file
+      title: Body_upload_avatar_api_v1_users__user_id__avatar_post
+      type: object
+    ConversationResponse:
+      description: Response schema for conversation data
+      properties:
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        is_archived:
+          default: false
+          description: Whether the conversation is archived
+          title: Is Archived
+          type: boolean
+        is_auditable:
+          default: true
+          description: Whether the conversation should be audited
+          title: Is Auditable
+          type: boolean
+        retention_days:
+          default: 2555
+          description: Data retention period in days (7 years default)
+          title: Retention Days
+          type: integer
+        title:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+          description: Conversation title (auto-generated or user-provided)
+          title: Title
+        total_messages:
+          default: 0
+          description: Total number of messages in this conversation
+          title: Total Messages
+          type: integer
+        total_tokens_used:
+          default: 0
+          description: Total tokens used in this conversation
+          title: Total Tokens Used
+          type: integer
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+        user_id:
+          anyOf:
+          - type: string
+          - format: uuid
+            type: string
+          description: User ID who owns this conversation
+          title: User Id
+      required:
+      - created_at
+      - updated_at
+      - id
+      - user_id
+      title: ConversationResponse
+      type: object
+    ConversationUpdateResponse:
+      description: Unified response schema for conversation updates
+      properties:
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        is_archived:
+          description: Current archive status
+          title: Is Archived
+          type: boolean
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Current conversation title
+          title: Title
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+        updated_fields:
+          description: List of fields that were updated
+          items:
+            type: string
+          title: Updated Fields
+          type: array
+        user_id:
+          anyOf:
+          - type: string
+          - format: uuid
+            type: string
+          description: Owner user ID
+          title: User Id
+      required:
+      - created_at
+      - updated_at
+      - id
+      - user_id
+      - title
+      - is_archived
+      - updated_fields
+      title: ConversationUpdateResponse
+      type: object
+    CreateConversationRequest:
+      description: Request schema for creating a conversation
+      properties:
+        title:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+          description: Optional conversation title
+          title: Title
+      title: CreateConversationRequest
+      type: object
+    EmailCheckRequest:
+      description: Email availability check request
+      properties:
+        email:
+          description: Email to check availability
+          title: Email
+          type: string
+      required:
+      - email
+      title: EmailCheckRequest
+      type: object
+    EmailCheckResponse:
+      description: Email availability check response
+      properties:
+        available:
+          description: Whether email is available for registration
+          title: Available
+          type: boolean
+        email:
+          description: Email that was checked
+          title: Email
+          type: string
+        message:
+          description: Human readable message about availability
+          title: Message
+          type: string
+      required:
+      - email
+      - available
+      - message
+      title: EmailCheckResponse
+      type: object
+    GenerateTitleResponse:
+      description: Response schema for title generation (read-only)
+      properties:
+        confidence:
+          description: AI confidence score (0-1)
+          maximum: 1.0
+          minimum: 0.0
+          title: Confidence
+          type: number
+        current_title:
+          description: Current conversation title
+          title: Current Title
+          type: string
+        generated_at:
+          description: When title was generated
+          format: date-time
+          title: Generated At
+          type: string
+        id:
+          description: Conversation ID
+          format: uuid
+          title: Id
+          type: string
+        title:
+          description: AI-generated title suggestion
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - current_title
+      - generated_at
+      - confidence
+      title: GenerateTitleResponse
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    IntegrationCreateRequest:
+      description: Schema for creating a new integration
+      properties:
+        api_version:
+          anyOf:
+          - maxLength: 20
+            type: string
+          - type: 'null'
+          description: API version
+          title: Api Version
+        auth_type:
+          default: api_key
+          description: Authentication type
+          title: Auth Type
+          type: string
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Base URL for API endpoints
+          title: Base Url
+        credentials:
+          additionalProperties: true
+          description: Authentication credentials
+          title: Credentials
+          type: object
+        custom_fields_mapping:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Custom field mappings
+          title: Custom Fields Mapping
+        default_priority:
+          default: 100
+          description: Routing priority
+          maximum: 1000.0
+          minimum: 1.0
+          title: Default Priority
+          type: integer
+        department_mapping:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Department mappings
+          title: Department Mapping
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Integration description
+          title: Description
+        environment:
+          default: production
+          description: Environment
+          title: Environment
+          type: string
+        integration_type:
+          $ref: '#/components/schemas/IntegrationTypeSchema'
+          description: Type of integration service
+        name:
+          description: Display name for the integration
+          maxLength: 255
+          title: Name
+          type: string
+        notification_channels:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Notification channels
+          title: Notification Channels
+        notification_events:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Events for notifications
+          title: Notification Events
+        oauth_scopes:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: OAuth scopes if applicable
+          title: Oauth Scopes
+        rate_limit_per_hour:
+          anyOf:
+          - minimum: 1.0
+            type: integer
+          - type: 'null'
+          description: Rate limit per hour
+          title: Rate Limit Per Hour
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Service region
+          title: Region
+        routing_rules:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Routing rules
+          title: Routing Rules
+        supports_categories:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Supported categories
+          title: Supports Categories
+        supports_priorities:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Supported priorities
+          title: Supports Priorities
+        sync_enabled:
+          default: false
+          description: Enable bidirectional sync
+          title: Sync Enabled
+          type: boolean
+        sync_frequency_minutes:
+          default: 60
+          description: Sync frequency
+          maximum: 1440.0
+          minimum: 1.0
+          title: Sync Frequency Minutes
+          type: integer
+        webhook_secret:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Webhook secret
+          title: Webhook Secret
+        webhook_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Webhook URL
+          title: Webhook Url
+      required:
+      - name
+      - integration_type
+      - credentials
+      title: IntegrationCreateRequest
+      type: object
+    IntegrationDetailResponse:
+      description: Detailed integration information
+      properties:
+        api_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: API version
+          title: Api Version
+        auth_type:
+          description: Authentication type
+          title: Auth Type
+          type: string
+        auto_disable_on_error:
+          description: Auto-disable on error
+          title: Auto Disable On Error
+          type: boolean
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Base URL
+          title: Base Url
+        consecutive_failures:
+          description: Consecutive failures
+          title: Consecutive Failures
+          type: integer
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        current_hour_requests:
+          description: Current hour requests
+          title: Current Hour Requests
+          type: integer
+        custom_fields_mapping:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Field mapping
+          title: Custom Fields Mapping
+        default_priority:
+          description: Default priority
+          title: Default Priority
+          type: integer
+        department_mapping:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Department mapping
+          title: Department Mapping
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Description
+          title: Description
+        environment:
+          description: Environment
+          title: Environment
+          type: string
+        expires_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Credential expiration
+          title: Expires At
+        failure_threshold:
+          description: Failure threshold
+          title: Failure Threshold
+          type: integer
+        health_info:
+          $ref: '#/components/schemas/IntegrationHealthInfo'
+          description: Health information
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        in_maintenance_window:
+          description: In maintenance window
+          title: In Maintenance Window
+          type: boolean
+        integration_type:
+          $ref: '#/components/schemas/IntegrationTypeSchema'
+          description: Integration type
+        is_expired:
+          description: Credentials expired
+          title: Is Expired
+          type: boolean
+        is_healthy:
+          description: Health status
+          title: Is Healthy
+          type: boolean
+        is_rate_limited:
+          description: Currently rate limited
+          title: Is Rate Limited
+          type: boolean
+        last_sync_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last sync timestamp
+          title: Last Sync At
+        maintenance_window_end:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Maintenance end time
+          title: Maintenance Window End
+        maintenance_window_start:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Maintenance start time
+          title: Maintenance Window Start
+        name:
+          description: Integration name
+          title: Name
+          type: string
+        notification_channels:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Notification channels
+          title: Notification Channels
+        notification_events:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Notification events
+          title: Notification Events
+        oauth_scopes:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: OAuth scopes
+          title: Oauth Scopes
+        rate_limit_per_hour:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Rate limit
+          title: Rate Limit Per Hour
+        rate_limit_reset_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Rate limit reset time
+          title: Rate Limit Reset At
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Service region
+          title: Region
+        routing_rules:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Routing rules
+          title: Routing Rules
+        status:
+          $ref: '#/components/schemas/IntegrationStatusSchema'
+          description: Current status
+        supports_categories:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Supported categories
+          title: Supports Categories
+        supports_priorities:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Supported priorities
+          title: Supports Priorities
+        sync_enabled:
+          description: Sync enabled
+          title: Sync Enabled
+          type: boolean
+        sync_frequency_minutes:
+          description: Sync frequency
+          title: Sync Frequency Minutes
+          type: integer
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+        usage_stats:
+          $ref: '#/components/schemas/IntegrationUsageStats'
+          description: Usage statistics
+        webhook_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Webhook URL
+          title: Webhook Url
+      required:
+      - created_at
+      - updated_at
+      - id
+      - name
+      - integration_type
+      - status
+      - environment
+      - is_healthy
+      - auth_type
+      - health_info
+      - usage_stats
+      - default_priority
+      - sync_enabled
+      - sync_frequency_minutes
+      - current_hour_requests
+      - auto_disable_on_error
+      - failure_threshold
+      - consecutive_failures
+      - is_rate_limited
+      - is_expired
+      - in_maintenance_window
+      title: IntegrationDetailResponse
+      type: object
+    IntegrationHealthInfo:
+      description: Integration health information
+      properties:
+        error_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Error if unhealthy
+          title: Error Message
+        last_check:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last health check
+          title: Last Check
+        response_time_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Response time
+          title: Response Time Ms
+        status:
+          description: Health status
+          title: Status
+          type: string
+      required:
+      - status
+      title: IntegrationHealthInfo
+      type: object
+    IntegrationListResponse:
+      description: Integration information for list views
+      properties:
+        auth_type:
+          description: Authentication type
+          title: Auth Type
+          type: string
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Base URL
+          title: Base Url
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        default_priority:
+          description: Default routing priority
+          title: Default Priority
+          type: integer
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Description
+          title: Description
+        environment:
+          description: Environment
+          title: Environment
+          type: string
+        health_check_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Health check result
+          title: Health Check Status
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        in_maintenance_window:
+          description: Whether in maintenance window
+          title: In Maintenance Window
+          type: boolean
+        integration_type:
+          $ref: '#/components/schemas/IntegrationTypeSchema'
+          description: Integration type
+        is_healthy:
+          description: Health status
+          title: Is Healthy
+          type: boolean
+        is_rate_limited:
+          description: Whether currently rate limited
+          title: Is Rate Limited
+          type: boolean
+        last_health_check_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last health check
+          title: Last Health Check At
+        name:
+          description: Integration name
+          title: Name
+          type: string
+        status:
+          $ref: '#/components/schemas/IntegrationStatusSchema'
+          description: Current status
+        success_rate:
+          description: Success rate
+          title: Success Rate
+          type: number
+        sync_enabled:
+          description: Sync enabled
+          title: Sync Enabled
+          type: boolean
+        total_requests:
+          description: Total requests
+          title: Total Requests
+          type: integer
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+      required:
+      - created_at
+      - updated_at
+      - id
+      - name
+      - integration_type
+      - status
+      - environment
+      - is_healthy
+      - auth_type
+      - default_priority
+      - sync_enabled
+      - total_requests
+      - success_rate
+      - is_rate_limited
+      - in_maintenance_window
+      title: IntegrationListResponse
+      type: object
+    IntegrationStatus:
+      description: Integration connection status
+      enum:
+      - active
+      - inactive
+      - pending
+      - error
+      - expired
+      - suspended
+      title: IntegrationStatus
+      type: string
+    IntegrationStatusSchema:
+      description: Integration status enum schema
+      enum:
+      - active
+      - inactive
+      - pending
+      - error
+      - expired
+      - suspended
+      title: IntegrationStatusSchema
+      type: string
+    IntegrationStatusUpdateRequest:
+      description: Schema for updating integration status
+      properties:
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Reason for status change
+          title: Reason
+        status:
+          $ref: '#/components/schemas/IntegrationStatusSchema'
+          description: New integration status
+      required:
+      - status
+      title: IntegrationStatusUpdateRequest
+      type: object
+    IntegrationSyncRequest:
+      description: Schema for manual sync request
+      properties:
+        direction:
+          default: bidirectional
+          description: Sync direction
+          pattern: ^(inbound|outbound|bidirectional)$
+          title: Direction
+          type: string
+        dry_run:
+          default: false
+          description: Perform dry run without changes
+          title: Dry Run
+          type: boolean
+        filters:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Sync filters
+          title: Filters
+        sync_type:
+          description: Type of sync
+          pattern: ^(full|incremental|test)$
+          title: Sync Type
+          type: string
+      required:
+      - sync_type
+      title: IntegrationSyncRequest
+      type: object
+    IntegrationSyncResponse:
+      description: Integration sync response
+      properties:
+        completed_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Sync completion time
+          title: Completed At
+        direction:
+          description: Sync direction
+          title: Direction
+          type: string
+        dry_run:
+          description: Whether this was a dry run
+          title: Dry Run
+          type: boolean
+        errors:
+          default: []
+          description: Sync errors
+          items:
+            additionalProperties: true
+            type: object
+          title: Errors
+          type: array
+        records_created:
+          description: Records created
+          title: Records Created
+          type: integer
+        records_failed:
+          description: Records failed
+          title: Records Failed
+          type: integer
+        records_processed:
+          description: Records processed
+          title: Records Processed
+          type: integer
+        records_updated:
+          description: Records updated
+          title: Records Updated
+          type: integer
+        started_at:
+          description: Sync start time
+          format: date-time
+          title: Started At
+          type: string
+        status:
+          description: Sync status
+          title: Status
+          type: string
+        sync_id:
+          description: Sync operation ID
+          title: Sync Id
+          type: string
+        sync_type:
+          description: Sync type
+          title: Sync Type
+          type: string
+      required:
+      - sync_id
+      - sync_type
+      - direction
+      - started_at
+      - status
+      - records_processed
+      - records_created
+      - records_updated
+      - records_failed
+      - dry_run
+      title: IntegrationSyncResponse
+      type: object
+    IntegrationTestRequest:
+      description: Schema for testing integration connection
+      properties:
+        auto_activate_on_success:
+          default: true
+          description: Automatically activate integration if all tests pass
+          title: Auto Activate On Success
+          type: boolean
+        test_data:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Test data to use
+          title: Test Data
+        test_types:
+          default:
+          - connection
+          - authentication
+          description: Types of tests to perform
+          items:
+            type: string
+          title: Test Types
+          type: array
+      title: IntegrationTestRequest
+      type: object
+    IntegrationTestResponse:
+      description: Integration test response
+      properties:
+        activation_triggered:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Whether integration was auto-activated
+          title: Activation Triggered
+        details:
+          additionalProperties: true
+          description: Test details
+          title: Details
+          type: object
+        error_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Error message if failed
+          title: Error Message
+        new_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Status after test
+          title: New Status
+        previous_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Status before test
+          title: Previous Status
+        response_time_ms:
+          description: Response time
+          title: Response Time Ms
+          type: integer
+        success:
+          description: Test success
+          title: Success
+          type: boolean
+        suggestions:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Suggestions for fixing issues
+          title: Suggestions
+        test_type:
+          description: Type of test performed
+          title: Test Type
+          type: string
+      required:
+      - test_type
+      - success
+      - response_time_ms
+      - details
+      title: IntegrationTestResponse
+      type: object
+    IntegrationType:
+      description: Supported integration types
+      enum:
+      - jira
+      - servicenow
+      - salesforce
+      - zendesk
+      - github
+      - slack
+      - teams
+      - zoom
+      - hubspot
+      - freshdesk
+      - asana
+      - trello
+      - webhook
+      - email
+      - sms
+      title: IntegrationType
+      type: string
+    IntegrationTypeSchema:
+      description: Integration type enum schema
+      enum:
+      - jira
+      - servicenow
+      - salesforce
+      - zendesk
+      - github
+      - slack
+      - teams
+      - zoom
+      - hubspot
+      - freshdesk
+      - asana
+      - trello
+      - webhook
+      - email
+      - sms
+      title: IntegrationTypeSchema
+      type: string
+    IntegrationUpdateRequest:
+      description: Schema for updating an integration
+      properties:
+        api_version:
+          anyOf:
+          - maxLength: 20
+            type: string
+          - type: 'null'
+          description: API version
+          title: Api Version
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Base URL
+          title: Base Url
+        credentials:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Authentication credentials
+          title: Credentials
+        custom_fields_mapping:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Field mappings
+          title: Custom Fields Mapping
+        default_priority:
+          anyOf:
+          - maximum: 1000.0
+            minimum: 1.0
+            type: integer
+          - type: 'null'
+          description: Default priority
+          title: Default Priority
+        department_mapping:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          description: Department mappings
+          title: Department Mapping
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Description
+          title: Description
+        environment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Environment
+          title: Environment
+        name:
+          anyOf:
+          - maxLength: 255
+            type: string
+          - type: 'null'
+          description: Integration name
+          title: Name
+        notification_channels:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Notification channels
+          title: Notification Channels
+        notification_events:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Notification events
+          title: Notification Events
+        oauth_scopes:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: OAuth scopes
+          title: Oauth Scopes
+        rate_limit_per_hour:
+          anyOf:
+          - minimum: 1.0
+            type: integer
+          - type: 'null'
+          description: Rate limit
+          title: Rate Limit Per Hour
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Region
+          title: Region
+        routing_rules:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Routing rules
+          title: Routing Rules
+        supports_categories:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Supported categories
+          title: Supports Categories
+        supports_priorities:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Supported priorities
+          title: Supports Priorities
+        sync_enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Sync enabled
+          title: Sync Enabled
+        sync_frequency_minutes:
+          anyOf:
+          - maximum: 1440.0
+            minimum: 1.0
+            type: integer
+          - type: 'null'
+          description: Sync frequency
+          title: Sync Frequency Minutes
+        webhook_secret:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Webhook secret
+          title: Webhook Secret
+        webhook_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Webhook URL
+          title: Webhook Url
+      title: IntegrationUpdateRequest
+      type: object
+    IntegrationUsageStats:
+      description: Integration usage statistics
+      properties:
+        avg_response_time_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Average response time
+          title: Avg Response Time Ms
+        failed_requests:
+          description: Failed requests
+          title: Failed Requests
+          type: integer
+        last_error_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last error timestamp
+          title: Last Error At
+        last_request_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last request timestamp
+          title: Last Request At
+        last_success_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last success timestamp
+          title: Last Success At
+        success_rate:
+          description: Success rate percentage
+          title: Success Rate
+          type: number
+        successful_requests:
+          description: Successful requests
+          title: Successful Requests
+          type: integer
+        total_requests:
+          description: Total requests made
+          title: Total Requests
+          type: integer
+      required:
+      - total_requests
+      - successful_requests
+      - failed_requests
+      - success_rate
+      title: IntegrationUsageStats
+      type: object
+    MessageResponse:
+      description: Response schema for message data
+      properties:
+        confidence_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          description: AI confidence score (0-1) for assistant messages
+          title: Confidence Score
+        content:
+          description: Message content
+          title: Content
+          type: string
+        conversation_id:
+          anyOf:
+          - type: string
+          - format: uuid
+            type: string
+          description: ID of the conversation this message belongs to
+          title: Conversation Id
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        model_used:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: AI model used for assistant messages (e.g., 'gpt-4', 'gemini-1.5-pro')
+          title: Model Used
+        response_time_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Response time in milliseconds for assistant messages
+          title: Response Time Ms
+        role:
+          description: Role of the message sender (user or assistant)
+          title: Role
+          type: string
+        tokens_used:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Number of tokens used for this message
+          title: Tokens Used
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+      required:
+      - created_at
+      - updated_at
+      - id
+      - conversation_id
+      - role
+      - content
+      title: MessageResponse
+      type: object
+    PaginatedResponse:
+      description: Standard paginated response wrapper
+      properties:
+        has_next:
+          description: Whether there are more pages
+          title: Has Next
+          type: boolean
+        has_prev:
+          description: Whether there are previous pages
+          title: Has Prev
+          type: boolean
+        items:
+          description: List of items
+          items: {}
+          title: Items
+          type: array
+        page:
+          description: Current page number
+          title: Page
+          type: integer
+        pages:
+          description: Total number of pages
+          title: Pages
+          type: integer
+        size:
+          description: Items per page
+          title: Size
+          type: integer
+        total:
+          description: Total number of items
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - size
+      - pages
+      - has_next
+      - has_prev
+      title: PaginatedResponse
+      type: object
+    RefreshTokenRequest:
+      description: Refresh token request schema
+      properties:
+        refresh_token:
+          description: JWT refresh token
+          title: Refresh Token
+          type: string
+      required:
+      - refresh_token
+      title: RefreshTokenRequest
+      type: object
+    SendMessageRequest:
+      description: Request schema for sending a message
+      properties:
+        message:
+          description: Message content to send
+          minLength: 1
+          title: Message
+          type: string
+      required:
+      - message
+      title: SendMessageRequest
+      type: object
+    TicketAIAnalysis:
+      description: AI analysis information for tickets
+      properties:
+        business_impact:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Business impact assessment
+          title: Business Impact
+        confidence_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          description: AI confidence score
+          title: Confidence Score
+        keywords:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Detected keywords
+          title: Keywords
+        reasoning:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: AI reasoning
+          title: Reasoning
+        sentiment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Sentiment analysis
+          title: Sentiment
+        similar_patterns:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Similar patterns
+          title: Similar Patterns
+        tags:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: AI-generated tags
+          title: Tags
+      title: TicketAIAnalysis
+      type: object
+    TicketAICreateRequest:
+      description: Schema for AI-powered ticket creation
+      properties:
+        conversation_context:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
+          description: Conversation history
+          title: Conversation Context
+        integration:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Integration name for external ticket creation
+          title: Integration
+        uploaded_files:
+          anyOf:
+          - items:
+              format: uuid
+              type: string
+            type: array
+          - type: 'null'
+          description: Uploaded file IDs
+          title: Uploaded Files
+        user_input:
+          description: User's natural language input
+          title: User Input
+          type: string
+        user_preferences:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: User preferences
+          title: User Preferences
+      required:
+      - user_input
+      title: TicketAICreateRequest
+      type: object
+    TicketAICreateResponse:
+      description: Response from AI ticket creation
+      properties:
+        ai_analysis:
+          $ref: '#/components/schemas/TicketAIAnalysis'
+          description: AI analysis results
+        confidence_score:
+          description: Overall confidence score
+          title: Confidence Score
+          type: number
+        file_analysis_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: File analysis summary
+          title: File Analysis Summary
+        suggested_actions:
+          description: Suggested next actions
+          items:
+            type: string
+          title: Suggested Actions
+          type: array
+        ticket:
+          $ref: '#/components/schemas/TicketDetailResponse'
+          description: Created ticket
+      required:
+      - ticket
+      - ai_analysis
+      - confidence_score
+      - suggested_actions
+      title: TicketAICreateResponse
+      type: object
+    TicketAssignmentRequest:
+      description: Schema for ticket assignment
+      properties:
+        assigned_to_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          description: User to assign ticket to (null to unassign)
+          title: Assigned To Id
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Reason for assignment change
+          title: Reason
+      title: TicketAssignmentRequest
+      type: object
+    TicketCategorySchema:
+      description: Ticket category enum schema
+      enum:
+      - technical
+      - billing
+      - feature_request
+      - bug
+      - user_access
+      - general
+      - integration
+      - performance
+      - security
+      title: TicketCategorySchema
+      type: string
+    TicketCreateRequest:
+      description: Schema for creating a new ticket
+      properties:
+        assigned_to_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          description: Assign to specific user
+          title: Assigned To Id
+        category:
+          $ref: '#/components/schemas/TicketCategorySchema'
+          default: general
+          description: Issue category
+        create_externally:
+          default: true
+          description: Create ticket in external system when integration specified
+          title: Create Externally
+          type: boolean
+        custom_fields:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Custom field values
+          title: Custom Fields
+        department:
+          anyOf:
+          - maxLength: 100
+            type: string
+          - type: 'null'
+          description: Target department
+          title: Department
+        description:
+          description: Detailed ticket description
+          title: Description
+          type: string
+        file_ids:
+          anyOf:
+          - items:
+              format: uuid
+              type: string
+            type: array
+          - type: 'null'
+          description: Attached file IDs
+          title: File Ids
+        integration:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Integration name for external ticket creation
+          title: Integration
+        priority:
+          $ref: '#/components/schemas/TicketPrioritySchema'
+          default: medium
+          description: Priority level
+        title:
+          description: Ticket title/subject
+          maxLength: 500
+          title: Title
+          type: string
+        urgency:
+          $ref: '#/components/schemas/TicketPrioritySchema'
+          default: medium
+          description: Urgency level
+      required:
+      - title
+      - description
+      title: TicketCreateRequest
+      type: object
+    TicketDetailResponse:
+      description: Detailed ticket information
+      properties:
+        age_in_hours:
+          description: Ticket age in hours
+          readOnly: true
+          title: Age In Hours
+          type: number
+        ai_analysis:
+          anyOf:
+          - $ref: '#/components/schemas/TicketAIAnalysis'
+          - type: 'null'
+          description: AI analysis results
+        assignee:
+          anyOf:
+          - $ref: '#/components/schemas/TicketUserInfo'
+          - type: 'null'
+          description: Assigned user
+        can_be_closed:
+          description: Whether ticket can be closed
+          readOnly: true
+          title: Can Be Closed
+          type: boolean
+        category:
+          $ref: '#/components/schemas/TicketCategorySchema'
+          description: Issue category
+        closed_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Closure timestamp
+          title: Closed At
+        communication_count:
+          description: Communication count
+          title: Communication Count
+          type: integer
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        creator:
+          $ref: '#/components/schemas/TicketUserInfo'
+          description: Ticket creator
+        custom_fields:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Custom field values
+          title: Custom Fields
+        department:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Assigned department
+          title: Department
+        description:
+          description: Ticket description
+          title: Description
+          type: string
+        display_title:
+          description: Display title (truncated)
+          readOnly: true
+          title: Display Title
+          type: string
+        escalated_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Escalation timestamp
+          title: Escalated At
+        escalation_level:
+          description: Escalation level
+          title: Escalation Level
+          type: integer
+        escalation_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Escalation reason
+          title: Escalation Reason
+        external_ticket_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: External ticket ID
+          title: External Ticket Id
+        external_ticket_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: External ticket URL
+          title: External Ticket Url
+        files:
+          default: []
+          description: Attached files
+          items:
+            $ref: '#/components/schemas/TicketFileInfo'
+          title: Files
+          type: array
+        first_response_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: First response timestamp
+          title: First Response At
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        integration_result:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: External integration creation result
+          title: Integration Result
+        integration_routing:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Integration routing (legacy)
+          title: Integration Routing
+        internal_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Internal notes
+          title: Internal Notes
+        is_high_priority:
+          description: Whether ticket is high priority
+          readOnly: true
+          title: Is High Priority
+          type: boolean
+        is_overdue:
+          description: Whether ticket is overdue
+          readOnly: true
+          title: Is Overdue
+          type: boolean
+        last_activity_at:
+          description: Last activity timestamp
+          format: date-time
+          title: Last Activity At
+          type: string
+        priority:
+          $ref: '#/components/schemas/TicketPrioritySchema'
+          description: Priority level
+        resolution_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Resolution summary
+          title: Resolution Summary
+        resolution_time_hours:
+          anyOf:
+          - type: number
+          - type: 'null'
+          description: Resolution time in hours
+          readOnly: true
+          title: Resolution Time Hours
+        resolution_time_minutes:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Resolution time in minutes
+          title: Resolution Time Minutes
+        resolved_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Resolution timestamp
+          title: Resolved At
+        satisfaction_feedback:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Satisfaction feedback
+          title: Satisfaction Feedback
+        satisfaction_rating:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Customer satisfaction rating
+          title: Satisfaction Rating
+        sla_breached:
+          description: Whether SLA was breached
+          title: Sla Breached
+          type: boolean
+        sla_due_date:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: SLA due date
+          title: Sla Due Date
+        source_channel:
+          description: Source channel
+          title: Source Channel
+          type: string
+        status:
+          $ref: '#/components/schemas/TicketStatusSchema'
+          description: Current status
+        subcategory:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Issue subcategory
+          title: Subcategory
+        title:
+          description: Ticket title
+          title: Title
+          type: string
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+        urgency:
+          $ref: '#/components/schemas/TicketPrioritySchema'
+          description: Urgency level
+      required:
+      - created_at
+      - updated_at
+      - id
+      - title
+      - category
+      - priority
+      - urgency
+      - status
+      - source_channel
+      - creator
+      - assignee
+      - description
+      - last_activity_at
+      - communication_count
+      - sla_breached
+      - escalation_level
+      - display_title
+      - is_overdue
+      - is_high_priority
+      - can_be_closed
+      - age_in_hours
+      - resolution_time_hours
+      title: TicketDetailResponse
+      type: object
+    TicketFileInfo:
+      description: File information for ticket responses
+      properties:
+        created_at:
+          description: Upload timestamp
+          format: date-time
+          title: Created At
+          type: string
+        file_size:
+          description: File size in bytes
+          title: File Size
+          type: integer
+        file_type:
+          description: File type
+          title: File Type
+          type: string
+        filename:
+          description: File name
+          title: Filename
+          type: string
+        id:
+          description: File ID
+          format: uuid
+          title: Id
+          type: string
+        mime_type:
+          description: MIME type
+          title: Mime Type
+          type: string
+        status:
+          description: Processing status
+          title: Status
+          type: string
+      required:
+      - id
+      - filename
+      - file_size
+      - file_type
+      - mime_type
+      - status
+      - created_at
+      title: TicketFileInfo
+      type: object
+    TicketPrioritySchema:
+      description: Ticket priority enum schema
+      enum:
+      - low
+      - medium
+      - high
+      - critical
+      title: TicketPrioritySchema
+      type: string
+    TicketStatsResponse:
+      description: Ticket statistics response
+      properties:
+        avg_first_response_time_hours:
+          anyOf:
+          - type: number
+          - type: 'null'
+          description: Average first response time
+          title: Avg First Response Time Hours
+        avg_resolution_time_hours:
+          anyOf:
+          - type: number
+          - type: 'null'
+          description: Average resolution time
+          title: Avg Resolution Time Hours
+        category_distribution:
+          additionalProperties:
+            type: integer
+          description: Tickets by category
+          title: Category Distribution
+          type: object
+        high_priority_tickets:
+          description: Number of high priority tickets
+          title: High Priority Tickets
+          type: integer
+        open_tickets:
+          description: Number of open tickets
+          title: Open Tickets
+          type: integer
+        overdue_tickets:
+          description: Number of overdue tickets
+          title: Overdue Tickets
+          type: integer
+        priority_distribution:
+          additionalProperties:
+            type: integer
+          description: Tickets by priority
+          title: Priority Distribution
+          type: object
+        resolved_tickets:
+          description: Number of resolved tickets
+          title: Resolved Tickets
+          type: integer
+        satisfaction_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          description: Average satisfaction score
+          title: Satisfaction Score
+        status_distribution:
+          additionalProperties:
+            type: integer
+          description: Tickets by status
+          title: Status Distribution
+          type: object
+        total_tickets:
+          description: Total number of tickets
+          title: Total Tickets
+          type: integer
+      required:
+      - total_tickets
+      - open_tickets
+      - resolved_tickets
+      - overdue_tickets
+      - high_priority_tickets
+      - category_distribution
+      - priority_distribution
+      - status_distribution
+      title: TicketStatsResponse
+      type: object
+    TicketStatusSchema:
+      description: Ticket status enum schema
+      enum:
+      - new
+      - open
+      - in_progress
+      - pending
+      - resolved
+      - closed
+      - cancelled
+      title: TicketStatusSchema
+      type: string
+    TicketStatusUpdateRequest:
+      description: Schema for updating ticket status
+      properties:
+        internal_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Internal notes about status change
+          title: Internal Notes
+        resolution_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Resolution summary for resolved tickets
+          title: Resolution Summary
+        status:
+          $ref: '#/components/schemas/TicketStatusSchema'
+          description: New ticket status
+      required:
+      - status
+      title: TicketStatusUpdateRequest
+      type: object
+    TicketUpdateRequest:
+      description: Schema for updating a ticket
+      properties:
+        assigned_to_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          description: Assigned user ID
+          title: Assigned To Id
+        category:
+          anyOf:
+          - $ref: '#/components/schemas/TicketCategorySchema'
+          - type: 'null'
+          description: Issue category
+        custom_fields:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: Custom field values
+          title: Custom Fields
+        department:
+          anyOf:
+          - maxLength: 100
+            type: string
+          - type: 'null'
+          description: Department
+          title: Department
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Ticket description
+          title: Description
+        integration:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Integration for external ticket routing
+          title: Integration
+        internal_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Internal notes
+          title: Internal Notes
+        priority:
+          anyOf:
+          - $ref: '#/components/schemas/TicketPrioritySchema'
+          - type: 'null'
+          description: Priority level
+        resolution_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Resolution summary
+          title: Resolution Summary
+        status:
+          anyOf:
+          - $ref: '#/components/schemas/TicketStatusSchema'
+          - type: 'null'
+          description: Ticket status
+        title:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+          description: Ticket title
+          title: Title
+        urgency:
+          anyOf:
+          - $ref: '#/components/schemas/TicketPrioritySchema'
+          - type: 'null'
+          description: Urgency level
+      title: TicketUpdateRequest
+      type: object
+    TicketUserInfo:
+      description: User information for ticket responses
+      properties:
+        avatar_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: User avatar URL
+          title: Avatar Url
+        display_name:
+          description: User display name
+          title: Display Name
+          type: string
+        email:
+          description: User email
+          title: Email
+          type: string
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: User full name
+          title: Full Name
+        id:
+          description: User ID
+          format: uuid
+          title: Id
+          type: string
+      required:
+      - id
+      - email
+      - display_name
+      title: TicketUserInfo
+      type: object
+    TokenResponse:
+      description: JWT token response schema
+      properties:
+        access_token:
+          description: JWT access token
+          title: Access Token
+          type: string
+        expires_in:
+          description: Token expiration in seconds
+          title: Expires In
+          type: integer
+        refresh_token:
+          description: JWT refresh token
+          title: Refresh Token
+          type: string
+        token_type:
+          default: bearer
+          description: Token type
+          title: Token Type
+          type: string
+        user:
+          $ref: '#/components/schemas/UserResponse'
+          description: User information
+      required:
+      - access_token
+      - refresh_token
+      - expires_in
+      - user
+      title: TokenResponse
+      type: object
+    UpdateConversationRequest:
+      description: Unified request schema for conversation updates
+      properties:
+        is_archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Archive status - true to archive, false to unarchive
+          title: Is Archived
+        title:
+          anyOf:
+          - maxLength: 500
+            minLength: 1
+            type: string
+          - type: 'null'
+          description: New conversation title
+          title: Title
+      title: UpdateConversationRequest
+      type: object
+    UserCreate:
+      description: Simple user creation schema for auth
+      properties:
+        email:
+          description: User email address
+          title: Email
+          type: string
+        full_name:
+          description: User's full name
+          title: Full Name
+          type: string
+        organization_name:
+          anyOf:
+          - maxLength: 255
+            type: string
+          - type: 'null'
+          description: Organization/company name
+          title: Organization Name
+        password:
+          description: User password
+          minLength: 8
+          title: Password
+          type: string
+      required:
+      - email
+      - full_name
+      - password
+      title: UserCreate
+      type: object
+    UserLogin:
+      description: Simple user login schema
+      properties:
+        email:
+          description: User email
+          title: Email
+          type: string
+        password:
+          description: User password
+          title: Password
+          type: string
+      required:
+      - email
+      - password
+      title: UserLogin
+      type: object
+    UserMeResponse:
+      description: Current user profile information for /me endpoint
+      properties:
+        avatar_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Avatar URL
+          title: Avatar Url
+        created_at:
+          description: Creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        email:
+          description: User email
+          title: Email
+          type: string
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Full name
+          title: Full Name
+        id:
+          description: Unique identifier
+          format: uuid
+          title: Id
+          type: string
+        is_active:
+          description: Whether user is active
+          title: Is Active
+          type: boolean
+        is_verified:
+          description: Whether email is verified
+          title: Is Verified
+          type: boolean
+        language:
+          description: User language
+          title: Language
+          type: string
+        last_login_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last login timestamp
+          title: Last Login At
+        organization_domain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Organization domain
+          title: Organization Domain
+        organization_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          description: Organization ID
+          title: Organization Id
+        organization_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Organization name
+          title: Organization Name
+        organization_plan:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Organization plan
+          title: Organization Plan
+        organization_timezone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Organization timezone
+          title: Organization Timezone
+        preferences:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          description: User preferences
+          title: Preferences
+        role:
+          $ref: '#/components/schemas/UserRoleSchema'
+          description: User role
+        timezone:
+          description: User timezone
+          title: Timezone
+          type: string
+        updated_at:
+          description: Last update timestamp
+          format: date-time
+          title: Updated At
+          type: string
+      required:
+      - created_at
+      - updated_at
+      - id
+      - email
+      - role
+      - is_active
+      - timezone
+      - language
+      - is_verified
+      title: UserMeResponse
+      type: object
+    UserResponse:
+      description: Simple user response schema
+      properties:
+        created_at:
+          description: Account creation timestamp
+          format: date-time
+          title: Created At
+          type: string
+        email:
+          description: User email
+          title: Email
+          type: string
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: User's full name
+          title: Full Name
+        id:
+          description: User ID
+          format: uuid
+          title: Id
+          type: string
+        is_active:
+          description: Whether user is active
+          title: Is Active
+          type: boolean
+        last_login_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Last login timestamp
+          title: Last Login At
+      required:
+      - id
+      - email
+      - full_name
+      - is_active
+      - created_at
+      title: UserResponse
+      type: object
+    UserRoleSchema:
+      description: User roles enum schema
+      enum:
+      - admin
+      - manager
+      - agent
+      - user
+      - api_user
+      title: UserRoleSchema
+      type: string
+    UserUpdate:
+      description: Simple user update schema
+      properties:
+        full_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: User's full name
+          title: Full Name
+        password:
+          anyOf:
+          - minLength: 8
+            type: string
+          - type: 'null'
+          description: New password
+          title: Password
+      title: UserUpdate
+      type: object
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+      type: object
+  securitySchemes:
+    HTTPBearer:
+      scheme: bearer
+      type: http
 info:
+  description: "\n        # AI Ticket Creator Backend API\n        \n        Comprehensive\
+    \ API for AI-powered ticket creation and management with Chrome extension support.\n\
+    \        \n        ## Features\n        \n        - **AI-Powered Ticket Creation**:\
+    \ Smart ticket creation with context analysis\n        - **File Processing**:\
+    \ Upload and process multiple file types with AI transcription/OCR\n        -\
+    \ **Real-time Notifications**: WebSocket-based real-time updates\n        - **Third-party\
+    \ Integrations**: Salesforce, Jira, ServiceNow, Zendesk, GitHub, Slack, Teams,\
+    \ Zoom\n        - **Chrome Extension Support**: Optimized for browser extension\
+    \ workflows\n        - **Multi-Tenant Organization Support**: Complete organization\
+    \ isolation for enterprise deployments\n        \n        ## Quick Start Guide\n\
+    \        \n        ### 1. Authentication\n        Register a new user with organization:\n\
+    \        ```bash\n        curl -X POST \"http://localhost:8000/api/v1/auth/register\"\
+    \ \\\n          -H \"Content-Type: application/json\" \\\n          -d '{\"email\"\
+    : \"user@company.com\", \"full_name\": \"John Doe\", \"password\": \"SecurePass123\"\
+    , \"organization_name\": \"Acme Corporation\"}'\n        ```\n        \n     \
+    \   ### 2. Add JIRA Integration\n        ```bash\n        curl -X POST \"http://localhost:8000/api/v1/integrations\"\
+    \ \\\n          -H \"Authorization: Bearer YOUR_TOKEN\" \\\n          -H \"Content-Type:\
+    \ application/json\" \\\n          -d '{\"name\": \"Main JIRA\", \"integration_type\"\
+    : \"jira\", \"configuration\": {\"url\": \"https://company.atlassian.net\", \"\
+    email\": \"service@company.com\", \"api_token\": \"ATATT3xFfGF0...\", \"project_key\"\
+    : \"SUP\", \"issue_type\": \"Task\"}}'\n        ```\n        \n        ### 3.\
+    \ Add Salesforce Integration\n        ```bash\n        curl -X POST \"http://localhost:8000/api/v1/integrations\"\
+    \ \\\n          -H \"Authorization: Bearer YOUR_TOKEN\" \\\n          -H \"Content-Type:\
+    \ application/json\" \\\n          -d '{\"name\": \"Salesforce Production\", \"\
+    integration_type\": \"salesforce\", \"configuration\": {\"instance_url\": \"https://company.my.salesforce.com\"\
+    , \"username\": \"integration@company.com\", \"password\": \"YourPassword123\"\
+    , \"security_token\": \"ABC123DEF456GHI789\", \"client_id\": \"3MVG9...\", \"\
+    client_secret\": \"1234567890...\"}}'\n        ```\n        \n        \U0001F4D6\
+    \ **[Complete Integration Setup Guide](http://localhost:8000/docs/integration-guide)**\
+    \ - Step-by-step instructions for all supported integrations\n        \n     \
+    \   ## Authentication\n        \n        This API uses JWT-based authentication\
+    \ with role-based access control.\n        \n        ## File Processing\n    \
+    \    \n        Supports comprehensive file processing including:\n        - AI\
+    \ transcription for audio/video files\n        - OCR for image files\n       \
+    \ - Real-time progress tracking via WebSockets\n        - Automated metadata extraction\n\
+    \        \n        ## Integration Types Supported\n        \n        - **JIRA**:\
+    \ Atlassian project management and issue tracking\n        - **Salesforce**: Customer\
+    \ relationship management and case handling\n        - **ServiceNow**: IT service\
+    \ management and incident tracking\n        - **Zendesk**: Customer support ticketing\
+    \ system\n        - **GitHub**: Issue tracking and project management\n      \
+    \  - **Slack**: Team collaboration and notifications\n        - **Microsoft Teams**:\
+    \ Enterprise communication and collaboration\n        - **Zoom**: Video conferencing\
+    \ and meeting management\n        "
   title: AI Ticket Creator Backend API
-  description: |
-    # AI Ticket Creator Backend API
-
-    Comprehensive API for AI-powered ticket creation and management with Chrome extension support.
-
-    ## Features
-
-    - **AI-Powered Ticket Creation**: Smart ticket creation with context analysis using Pydantic AI
-    - **File Processing**: Upload and process multiple file types with AI transcription/OCR
-    - **Real-time Notifications**: WebSocket-based real-time updates and collaboration
-    - **Third-party Integrations**: Salesforce, Jira, ServiceNow, Zendesk, GitHub, Slack, Teams, Zoom integration
-    - **Chrome Extension Support**: Optimized for browser extension workflows
-    - **MCP Integration**: Model Context Protocol for enhanced AI capabilities
-
-    ## Authentication
-
-    This API uses JWT-based authentication with role-based access control.
-
-    ## File Processing
-
-    Supports comprehensive file processing including:
-    - AI transcription for audio/video files
-    - OCR for image files  
-    - Real-time progress tracking via WebSockets
-    - Automated metadata extraction
-    - Virus scanning with ClamAV
-
-    ## Architecture
-
-    Built on modern async Python stack:
-    - **FastAPI** for high-performance API endpoints
-    - **SQLAlchemy 2.0** with async PostgreSQL
-    - **Pydantic AI** for intelligent ticket processing
-    - **Celery** for background task processing
-    - **Redis** for caching and pub/sub
-    - **MCP Server** for AI tool integration
-  version: "1.0.0"
-  contact:
-    name: AI Ticket Creator API Support
-    email: support@aiticketcreator.com
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
+  version: 1.0.0
   x-logo:
     url: https://via.placeholder.com/150x75?text=AI+Ticket+Creator
-
-servers:
-  - url: http://localhost:8000
-    description: Development server
-  - url: https://api.aiticketcreator.com
-    description: Production server
-
+openapi: 3.1.0
 paths:
   /:
     get:
-      tags:
-        - System
-      summary: Root endpoint with system information
-      description: Landing page with API overview and links to documentation
+      description: Root endpoint with comprehensive system information
+      operationId: root__get
       responses:
         '200':
-          description: HTML landing page
           content:
             text/html:
               schema:
                 type: string
-                example: "<!DOCTYPE html>..."
-
-  /health:
-    get:
+          description: Successful Response
+      summary: Root
       tags:
-        - System
-      summary: Health check endpoint
-      description: Check the health status of all system components
-      responses:
-        '200':
-          description: System is healthy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-        '503':
-          description: System is unhealthy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-
-  /api/v1/tickets:
-    get:
-      tags:
-        - Tickets
-      summary: List tickets with search and filtering
-      description: Retrieve a paginated list of tickets with optional search, filtering, and sorting
-      parameters:
-        - name: page
-          in: query
-          description: Page number (1-based)
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: size
-          in: query
-          description: Number of items per page
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-        - name: q
-          in: query
-          description: Search query
-          schema:
-            type: string
-        - name: status
-          in: query
-          description: Filter by ticket status
-          schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/TicketStatus'
-        - name: category
-          in: query
-          description: Filter by ticket category
-          schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/TicketCategory'
-        - name: priority
-          in: query
-          description: Filter by priority level
-          schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/TicketPriority'
-        - name: department
-          in: query
-          description: Filter by department
-          schema:
-            type: string
-        - name: created_by_id
-          in: query
-          description: Filter by creator user ID
-          schema:
-            type: string
-            format: uuid
-        - name: assigned_to_id
-          in: query
-          description: Filter by assigned user ID
-          schema:
-            type: string
-            format: uuid
-        - name: is_overdue
-          in: query
-          description: Filter by overdue status
-          schema:
-            type: boolean
-        - name: created_after
-          in: query
-          description: Filter tickets created after this date
-          schema:
-            type: string
-            format: date-time
-        - name: created_before
-          in: query
-          description: Filter tickets created before this date
-          schema:
-            type: string
-            format: date-time
-        - name: sort_by
-          in: query
-          description: Field to sort by
-          schema:
-            type: string
-            enum: [created_at, updated_at, priority, status, title]
-            default: created_at
-        - name: sort_order
-          in: query
-          description: Sort order
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-      responses:
-        '200':
-          description: List of tickets retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedTicketResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
+      - System
+  /api/v1/auth/check-email:
     post:
-      tags:
-        - Tickets
-      summary: Create a new support ticket
-      description: Create a new support ticket with standard input
+      description: Check if email is available for registration
+      operationId: check_email_availability_api_v1_auth_check_email_post
       requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailCheckRequest'
         required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailCheckResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Check Email Availability
+      tags:
+      - Authentication
+  /api/v1/auth/login:
+    post:
+      description: Authenticate user and return JWT tokens
+      operationId: login_user_api_v1_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Login User
+      tags:
+      - Authentication
+  /api/v1/auth/logout:
+    post:
+      description: Logout user (client-side token invalidation)
+      operationId: logout_user_api_v1_auth_logout_post
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Logout User
+      tags:
+      - Authentication
+  /api/v1/auth/me:
+    get:
+      description: Get current user's profile information
+      operationId: get_current_user_profile_api_v1_auth_me_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMeResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Current User Profile
+      tags:
+      - Authentication
+    put:
+      description: Update current user's profile information
+      operationId: update_user_profile_api_v1_auth_me_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update User Profile
+      tags:
+      - Authentication
+  /api/v1/auth/refresh:
+    post:
+      description: Refresh JWT access token using refresh token
+      operationId: refresh_token_api_v1_auth_refresh_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Refresh Token
+      tags:
+      - Authentication
+  /api/v1/auth/register:
+    post:
+      description: Register a new user account
+      operationId: register_user_api_v1_auth_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Register User
+      tags:
+      - Authentication
+  /api/v1/auth/verify:
+    get:
+      description: Verify if current token is valid
+      operationId: verify_token_api_v1_auth_verify_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Verify Token
+      tags:
+      - Authentication
+  /api/v1/chat/conversations:
+    get:
+      description: List user's chat conversations with optional archive filter
+      operationId: list_conversations_api_v1_chat_conversations_get
+      parameters:
+      - description: Filter by archive status
+        in: query
+        name: archived
+        required: false
+        schema:
+          default: false
+          description: Filter by archive status
+          title: Archived
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ConversationResponse'
+                title: Response List Conversations Api V1 Chat Conversations Get
+                type: array
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Conversations
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+    post:
+      description: Create a new chat conversation
+      operationId: create_conversation_api_v1_chat_conversations_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Conversation
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+  /api/v1/chat/conversations/{conversation_id}:
+    delete:
+      description: Delete a conversation (soft delete)
+      operationId: delete_conversation_api_v1_chat_conversations__conversation_id__delete
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        schema:
+          description: Conversation ID
+          format: uuid
+          title: Conversation Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Conversation
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+    patch:
+      description: Update conversation fields (title, archive status)
+      operationId: update_conversation_api_v1_chat_conversations__conversation_id__patch
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        schema:
+          description: Conversation ID
+          format: uuid
+          title: Conversation Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConversationRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationUpdateResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Conversation
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+  /api/v1/chat/conversations/{conversation_id}/generate_title:
+    get:
+      description: Generate a title suggestion for a conversation (read-only operation)
+      operationId: generate_conversation_title_api_v1_chat_conversations__conversation_id__generate_title_get
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        schema:
+          description: Conversation ID
+          format: uuid
+          title: Conversation Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateTitleResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Generate Conversation Title
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+  /api/v1/chat/conversations/{conversation_id}/messages:
+    get:
+      description: Get all messages for a conversation
+      operationId: get_conversation_messages_api_v1_chat_conversations__conversation_id__messages_get
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        schema:
+          description: Conversation ID
+          format: uuid
+          title: Conversation Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/MessageResponse'
+                title: Response Get Conversation Messages Api V1 Chat Conversations  Conversation
+                  Id  Messages Get
+                type: array
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Conversation Messages
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+    post:
+      description: Send a message to a conversation and get AI response
+      operationId: send_message_api_v1_chat_conversations__conversation_id__messages_post
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        schema:
+          description: Conversation ID
+          format: uuid
+          title: Conversation Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Send Message
+      tags:
+      - Chat Assistant
+      - Chat Assistant
+  /api/v1/integrations/:
+    get:
+      description: List integrations for current user's organization
+      operationId: list_integrations_api_v1_integrations__get
+      parameters:
+      - description: Number of records to skip
+        in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          description: Number of records to skip
+          minimum: 0
+          title: Offset
+          type: integer
+      - description: Maximum number of records to return
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 20
+          description: Maximum number of records to return
+          maximum: 100
+          minimum: 1
+          title: Limit
+          type: integer
+      - description: Filter by integration type
+        in: query
+        name: integration_type
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/IntegrationType'
+          - type: 'null'
+          description: Filter by integration type
+          title: Integration Type
+      - description: Filter by status
+        in: query
+        name: integration_status
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/IntegrationStatus'
+          - type: 'null'
+          description: Filter by status
+          title: Integration Status
+      - description: Filter by enabled status
+        in: query
+        name: is_enabled
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Filter by enabled status
+          title: Is Enabled
+      - description: Filter by name (partial match)
+        in: query
+        name: name
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by name (partial match)
+          title: Name
+      - description: Sort field
+        in: query
+        name: sort_by
+        required: false
+        schema:
+          default: created_at
+          description: Sort field
+          title: Sort By
+          type: string
+      - description: Sort order
+        in: query
+        name: sort_order
+        required: false
+        schema:
+          default: desc
+          description: Sort order
+          pattern: ^(asc|desc)$
+          title: Sort Order
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/IntegrationListResponse'
+                title: Response List Integrations Api V1 Integrations  Get
+                type: array
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Integrations
+      tags:
+      - Integrations
+    post:
+      description: Create a new integration
+      operationId: create_integration_api_v1_integrations__post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationCreateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Integration
+      tags:
+      - Integrations
+  /api/v1/integrations/active:
+    get:
+      description: Get list of active integrations available for ticket creation
+      operationId: get_active_integrations_api_v1_integrations_active_get
+      parameters:
+      - description: Filter by category support
+        in: query
+        name: supports_category
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by category support
+          title: Supports Category
+      - description: Filter by integration type
+        in: query
+        name: integration_type
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/IntegrationType'
+          - type: 'null'
+          description: Filter by integration type
+          title: Integration Type
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  additionalProperties: true
+                  type: object
+                title: Response Get Active Integrations Api V1 Integrations Active
+                  Get
+                type: array
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Active Integrations
+      tags:
+      - Integrations
+  /api/v1/integrations/{integration_id}:
+    delete:
+      description: Soft delete an integration
+      operationId: delete_integration_api_v1_integrations__integration_id__delete
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Integration
+      tags:
+      - Integrations
+    get:
+      description: Get integration details by ID
+      operationId: get_integration_api_v1_integrations__integration_id__get
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      - description: Include usage statistics
+        in: query
+        name: include_stats
+        required: false
+        schema:
+          default: false
+          description: Include usage statistics
+          title: Include Stats
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Integration
+      tags:
+      - Integrations
+    put:
+      description: Update an existing integration
+      operationId: update_integration_api_v1_integrations__integration_id__put
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationUpdateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Integration
+      tags:
+      - Integrations
+  /api/v1/integrations/{integration_id}/activate:
+    post:
+      description: Manually activate an integration that has passed tests
+      operationId: activate_integration_api_v1_integrations__integration_id__activate_post
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Activate Integration
+      tags:
+      - Integrations
+  /api/v1/integrations/{integration_id}/status:
+    patch:
+      description: Update integration status (enable/disable)
+      operationId: update_integration_status_api_v1_integrations__integration_id__status_patch
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationStatusUpdateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Integration Status
+      tags:
+      - Integrations
+  /api/v1/integrations/{integration_id}/sync:
+    post:
+      description: Manually trigger integration synchronization
+      operationId: sync_integration_api_v1_integrations__integration_id__sync_post
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationSyncRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationSyncResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Sync Integration
+      tags:
+      - Integrations
+  /api/v1/integrations/{integration_id}/test:
+    post:
+      description: Test integration connection and functionality
+      operationId: test_integration_api_v1_integrations__integration_id__test_post
+      parameters:
+      - in: path
+        name: integration_id
+        required: true
+        schema:
+          format: uuid
+          title: Integration Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationTestRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationTestResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Test Integration
+      tags:
+      - Integrations
+  /api/v1/tickets/:
+    get:
+      description: List tickets with search, filtering, and pagination.
+      operationId: list_tickets_api_v1_tickets__get
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          minimum: 1
+          title: Page
+          type: integer
+      - in: query
+        name: size
+        required: false
+        schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          title: Size
+          type: integer
+      - in: query
+        name: q
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
+      - in: query
+        name: department
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Department
+      - in: query
+        name: created_by_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Created By Id
+      - in: query
+        name: assigned_to_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Assigned To Id
+      - in: query
+        name: integration
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Integration
+      - in: query
+        name: has_attachments
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Has Attachments
+      - in: query
+        name: is_overdue
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Overdue
+      - in: query
+        name: escalation_level
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Escalation Level
+      - in: query
+        name: satisfaction_rating
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Satisfaction Rating
+      - in: query
+        name: created_after
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Created After
+      - in: query
+        name: created_before
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Created Before
+      - in: query
+        name: updated_after
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Updated After
+      - in: query
+        name: updated_before
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Updated Before
+      - in: query
+        name: resolved_after
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Resolved After
+      - in: query
+        name: resolved_before
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Resolved Before
+      - in: query
+        name: source_channel
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Channel
+      - in: query
+        name: sort_by
+        required: false
+        schema:
+          default: created_at
+          pattern: ^(created_at|updated_at|title|priority|status|last_activity_at|resolution_time_minutes)$
+          title: Sort By
+          type: string
+      - in: query
+        name: sort_order
+        required: false
+        schema:
+          default: desc
+          pattern: ^(asc|desc)$
+          title: Sort Order
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Body_list_tickets_api_v1_tickets__get'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: List Tickets
+      tags:
+      - Tickets
+    post:
+      description: Create a new support ticket.
+      operationId: create_ticket_api_v1_tickets__post
+      requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/TicketCreateRequest'
+        required: true
       responses:
         '201':
-          description: Ticket created successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TicketDetailResponse'
-        '400':
-          description: Bad request - validation error
+          description: Successful Response
+        '422':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
-        - BearerAuth: []
-
+      - HTTPBearer: []
+      summary: Create Ticket
+      tags:
+      - Tickets
   /api/v1/tickets/ai-create:
     post:
-      tags:
-        - Tickets
-        - AI
-      summary: Create ticket using AI analysis
-      description: Create a support ticket using AI analysis of user input, files, and context
+      description: Create a support ticket using AI analysis of user input.
+      operationId: create_ticket_with_ai_api_v1_tickets_ai_create_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/TicketAICreateRequest'
+        required: true
       responses:
         '201':
-          description: Ticket created successfully using AI
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TicketAICreateResponse'
-        '400':
-          description: Bad request - validation error
+          description: Successful Response
+        '422':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
-        - BearerAuth: []
-
-  /api/v1/tickets/{ticket_id}:
-    get:
+      - HTTPBearer: []
+      summary: Create Ticket With Ai
       tags:
-        - Tickets
-      summary: Get ticket by ID
-      description: Retrieve detailed information about a specific ticket
-      parameters:
-        - name: ticket_id
-          in: path
-          required: true
-          description: Unique identifier of the ticket
-          schema:
-            type: string
-            format: uuid
-        - name: include_ai_data
-          in: query
-          description: Include AI analysis data
-          schema:
-            type: boolean
-            default: true
-        - name: include_internal
-          in: query
-          description: Include internal notes
-          schema:
-            type: boolean
-            default: false
-      responses:
-        '200':
-          description: Ticket details retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketDetailResponse'
-        '404':
-          description: Ticket not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
-    put:
-      tags:
-        - Tickets
-      summary: Update ticket
-      description: Update an existing ticket with new information
-      parameters:
-        - name: ticket_id
-          in: path
-          required: true
-          description: Unique identifier of the ticket
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TicketUpdateRequest'
-      responses:
-        '200':
-          description: Ticket updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketDetailResponse'
-        '400':
-          description: Bad request - validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Ticket not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
-    delete:
-      tags:
-        - Tickets
-      summary: Delete ticket (soft delete)
-      description: Soft delete a ticket (marks as deleted but preserves data)
-      parameters:
-        - name: ticket_id
-          in: path
-          required: true
-          description: Unique identifier of the ticket
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '204':
-          description: Ticket deleted successfully
-        '404':
-          description: Ticket not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
-  /api/v1/tickets/{ticket_id}/status:
-    patch:
-      tags:
-        - Tickets
-      summary: Update ticket status
-      description: Update the status of an existing ticket
-      parameters:
-        - name: ticket_id
-          in: path
-          required: true
-          description: Unique identifier of the ticket
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TicketStatusUpdateRequest'
-      responses:
-        '200':
-          description: Ticket status updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketDetailResponse'
-        '400':
-          description: Bad request - validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Ticket not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
-  /api/v1/tickets/{ticket_id}/assign:
-    patch:
-      tags:
-        - Tickets
-      summary: Assign or unassign ticket
-      description: Assign a ticket to a user or unassign it
-      parameters:
-        - name: ticket_id
-          in: path
-          required: true
-          description: Unique identifier of the ticket
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TicketAssignmentRequest'
-      responses:
-        '200':
-          description: Ticket assignment updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketDetailResponse'
-        '400':
-          description: Bad request - validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Ticket not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
+      - Tickets
   /api/v1/tickets/stats/overview:
     get:
-      tags:
-        - Tickets
-        - Analytics
-      summary: Get ticket statistics overview
-      description: Retrieve comprehensive statistics about tickets
+      description: Get ticket statistics overview.
+      operationId: get_ticket_stats_api_v1_tickets_stats_overview_get
       responses:
         '200':
-          description: Statistics retrieved successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TicketStatsResponse'
-        '500':
-          description: Internal server error
+          description: Successful Response
+      summary: Get Ticket Stats
+      tags:
+      - Tickets
+  /api/v1/tickets/{ticket_id}:
+    delete:
+      description: Soft delete a ticket.
+      operationId: delete_ticket_api_v1_tickets__ticket_id__delete
+      parameters:
+      - in: path
+        name: ticket_id
+        required: true
+        schema:
+          format: uuid
+          title: Ticket Id
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      security:
-        - BearerAuth: []
-
-  /ws:
-    get:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Delete Ticket
       tags:
-        - WebSocket
-      summary: WebSocket Connection Endpoint
-      description: |
-        Establish a WebSocket connection for real-time communication.
-        
-        ## Connection
-        
-        Connect to the WebSocket endpoint with authentication:
-        ```
-        ws://localhost:8000/ws?token=your_jwt_token
-        ```
-        
-        ## Message Format
-        
-        All WebSocket messages follow this structure:
-        ```json
-        {
-          "type": "message_type",
-          "data": {},
-          "timestamp": "2025-01-01T12:00:00Z",
-          "protocol": "protocol_name"
-        }
-        ```
-        
-        ## Supported Protocols
-        
-        ### Ticket Protocol
-        - **subscribe_ticket_updates** - Subscribe to updates for a specific ticket
-        - **unsubscribe_ticket_updates** - Unsubscribe from ticket updates
-        - **ticket_status_change** - Notify about ticket status changes
-        
-        ### File Protocol
-        - **subscribe_job** - Subscribe to file processing job updates
-        - **unsubscribe_job** - Unsubscribe from job updates
-        - **get_job_status** - Get current status of a file processing job
-        
-        ### Chat Protocol (AI Interaction)
-        - **send_message** - Send message to AI agent
-        - **stream_request** - Request streaming AI response
-        - **create_conversation** - Create new AI conversation
-        - **get_messages** - Get conversation messages
-        
-        ## Error Handling
-        
-        Error responses follow this format:
-        ```json
-        {
-          "type": "error",
-          "protocol": "protocol_name",
-          "message": "Error description",
-          "original_message_type": "original_type",
-          "timestamp": "2025-01-01T12:00:00Z"
-        }
-        ```
+      - Tickets
+    get:
+      description: Get a specific ticket by ID.
+      operationId: get_ticket_api_v1_tickets__ticket_id__get
       parameters:
-        - name: token
-          in: query
-          description: JWT authentication token
-          required: true
-          schema:
-            type: string
-      responses:
-        '101':
-          description: WebSocket connection established
-        '401':
-          description: Unauthorized - invalid or missing token
-        '403':
-          description: Forbidden - insufficient permissions
-
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: JWT token for API authentication
-
-  schemas:
-    HealthResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [healthy, unhealthy]
-        timestamp:
-          type: number
-          format: float
-        services:
-          type: object
-          properties:
-            database:
-              type: string
-              enum: [healthy, unhealthy]
-            ai_service:
-              type: string
-              enum: [healthy, unhealthy]
-            mcp_server:
-              type: string
-              enum: [healthy, unhealthy]
-        environment:
-          type: string
-        version:
-          type: string
-        error:
-          type: string
-          description: Error message if status is unhealthy
-
-    TicketStatus:
-      type: string
-      enum:
-        - new
-        - open
-        - in_progress
-        - pending
-        - resolved
-        - closed
-        - cancelled
-
-    TicketCategory:
-      type: string
-      enum:
-        - technical
-        - billing
-        - feature_request
-        - bug
-        - user_access
-        - general
-
-    TicketPriority:
-      type: string
-      enum:
-        - low
-        - medium
-        - high
-        - critical
-
-    TicketCreateRequest:
-      type: object
-      required:
-        - title
-        - description
-        - priority
-        - category
-      properties:
-        title:
-          type: string
-          minLength: 1
-          maxLength: 255
-        description:
-          type: string
-          minLength: 1
-        priority:
-          $ref: '#/components/schemas/TicketPriority'
-        category:
-          $ref: '#/components/schemas/TicketCategory'
-        department:
-          type: string
-          nullable: true
-        assigned_to_id:
-          type: string
+      - in: path
+        name: ticket_id
+        required: true
+        schema:
           format: uuid
-          nullable: true
-        due_date:
+          title: Ticket Id
           type: string
-          format: date-time
-          nullable: true
-        tags:
-          type: array
-          items:
-            type: string
-        metadata:
-          type: object
-          additionalProperties: true
-
-    TicketUpdateRequest:
-      type: object
-      properties:
-        title:
-          type: string
-          minLength: 1
-          maxLength: 255
-        description:
-          type: string
-          minLength: 1
-        priority:
-          $ref: '#/components/schemas/TicketPriority'
-        category:
-          $ref: '#/components/schemas/TicketCategory'
-        department:
-          type: string
-          nullable: true
-        assigned_to_id:
-          type: string
-          format: uuid
-          nullable: true
-        due_date:
-          type: string
-          format: date-time
-          nullable: true
-        tags:
-          type: array
-          items:
-            type: string
-        metadata:
-          type: object
-          additionalProperties: true
-
-    TicketStatusUpdateRequest:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          $ref: '#/components/schemas/TicketStatus'
-        resolution_summary:
-          type: string
-          nullable: true
-        internal_notes:
-          type: string
-          nullable: true
-
-    TicketAssignmentRequest:
-      type: object
-      properties:
-        assigned_to_id:
-          type: string
-          format: uuid
-          nullable: true
-        reason:
-          type: string
-          nullable: true
-
-    TicketAICreateRequest:
-      type: object
-      required:
-        - user_input
-      properties:
-        user_input:
-          type: string
-          minLength: 1
-          description: Natural language description of the issue
-        uploaded_files:
-          type: array
-          items:
-            type: string
-          description: List of uploaded file paths for analysis
-        conversation_context:
-          type: array
-          items:
-            type: object
-          description: Previous conversation context
-        user_preferences:
-          type: object
-          additionalProperties: true
-          description: User preferences for ticket creation
-        integration_preference:
-          type: string
-          nullable: true
-          description: Preferred integration for routing
-
-    TicketDetailResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        title:
-          type: string
-        description:
-          type: string
-        status:
-          $ref: '#/components/schemas/TicketStatus'
-        priority:
-          $ref: '#/components/schemas/TicketPriority'
-        category:
-          $ref: '#/components/schemas/TicketCategory'
-        department:
-          type: string
-          nullable: true
-        created_by_id:
-          type: string
-          format: uuid
-          nullable: true
-        assigned_to_id:
-          type: string
-          format: uuid
-          nullable: true
-        due_date:
-          type: string
-          format: date-time
-          nullable: true
-        resolution_summary:
-          type: string
-          nullable: true
-        internal_notes:
-          type: string
-          nullable: true
-        tags:
-          type: array
-          items:
-            type: string
-        metadata:
-          type: object
-          additionalProperties: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        last_activity_at:
-          type: string
-          format: date-time
-        is_deleted:
+      - description: Include AI analysis data
+        in: query
+        name: include_ai_data
+        required: false
+        schema:
+          default: true
+          description: Include AI analysis data
+          title: Include Ai Data
           type: boolean
-        ai_analysis:
-          type: object
-          nullable: true
-          properties:
-            confidence_score:
-              type: number
-              format: float
-            suggested_category:
-              type: string
-            suggested_priority:
-              type: string
-            keywords:
-              type: array
-              items:
-                type: string
-            estimated_effort:
-              type: string
-            business_impact:
-              type: string
-
-    TicketListResponse:
-      type: object
-      properties:
-        id:
-          type: string
+      - description: Include internal notes
+        in: query
+        name: include_internal
+        required: false
+        schema:
+          default: false
+          description: Include internal notes
+          title: Include Internal
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Get Ticket
+      tags:
+      - Tickets
+    put:
+      description: Update a ticket.
+      operationId: update_ticket_api_v1_tickets__ticket_id__put
+      parameters:
+      - in: path
+        name: ticket_id
+        required: true
+        schema:
           format: uuid
-        title:
+          title: Ticket Id
           type: string
-        status:
-          $ref: '#/components/schemas/TicketStatus'
-        priority:
-          $ref: '#/components/schemas/TicketPriority'
-        category:
-          $ref: '#/components/schemas/TicketCategory'
-        department:
-          type: string
-          nullable: true
-        assigned_to_id:
-          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketUpdateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Update Ticket
+      tags:
+      - Tickets
+  /api/v1/tickets/{ticket_id}/assign:
+    patch:
+      description: Assign or unassign a ticket.
+      operationId: assign_ticket_api_v1_tickets__ticket_id__assign_patch
+      parameters:
+      - in: path
+        name: ticket_id
+        required: true
+        schema:
           format: uuid
-          nullable: true
-        created_at:
+          title: Ticket Id
           type: string
-          format: date-time
-        updated_at:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketAssignmentRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Assign Ticket
+      tags:
+      - Tickets
+  /api/v1/tickets/{ticket_id}/status:
+    patch:
+      description: Update ticket status.
+      operationId: update_ticket_status_api_v1_tickets__ticket_id__status_patch
+      parameters:
+      - in: path
+        name: ticket_id
+        required: true
+        schema:
+          format: uuid
+          title: Ticket Id
           type: string
-          format: date-time
-        last_activity_at:
-          type: string
-          format: date-time
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketStatusUpdateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Update Ticket Status
+      tags:
+      - Tickets
+  /api/v1/users/{user_id}/avatar:
+    delete:
+      description: 'Delete a user''s avatar.
 
-    TicketAICreateResponse:
-      type: object
-      properties:
-        ticket:
-          $ref: '#/components/schemas/TicketDetailResponse'
-        ai_analysis:
-          type: object
-          properties:
-            confidence_score:
-              type: number
-              format: float
-            reasoning:
-              type: string
-            suggested_actions:
-              type: array
-              items:
+
+        - **user_id**: ID of the user to delete avatar for
+
+        - Requires authentication
+
+        - Users can only delete their own avatars unless they are admin'
+      operationId: delete_avatar_api_v1_users__user_id__avatar_delete
+      parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          format: uuid
+          title: User Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarDeleteResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Avatar
+      tags:
+      - Users
+    get:
+      description: 'Get a user''s avatar image.
+
+
+        - **user_id**: ID of the user
+
+        - **size**: Avatar size (small, medium, large) - defaults to medium
+
+        - Returns the actual image file
+
+        - No authentication required for viewing avatars'
+      operationId: get_avatar_api_v1_users__user_id__avatar_get
+      parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          format: uuid
+          title: User Id
+          type: string
+      - in: query
+        name: size
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: medium
+          title: Size
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Get Avatar
+      tags:
+      - Users
+    post:
+      description: 'Upload a new avatar for a user.
+
+
+        - **user_id**: ID of the user to upload avatar for
+
+        - **file**: Image file to upload (JPG, PNG, GIF, HEIC, WebP)
+
+        - Requires authentication
+
+        - Users can only upload their own avatars unless they are admin'
+      operationId: upload_avatar_api_v1_users__user_id__avatar_post
+      parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          format: uuid
+          title: User Id
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_avatar_api_v1_users__user_id__avatar_post'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Upload Avatar
+      tags:
+      - Users
+  /api/v1/users/{user_id}/avatar/info:
+    get:
+      description: 'Get avatar information (metadata only, not the image file).
+
+
+        - **user_id**: ID of the user
+
+        - Returns avatar metadata including URLs for different sizes
+
+        - Requires authentication'
+      operationId: get_avatar_info_api_v1_users__user_id__avatar_info_get
+      parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          format: uuid
+          title: User Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Avatar Info
+      tags:
+      - Users
+  /docs/integration-guide:
+    get:
+      description: Integration setup guide with step-by-step instructions for JIRA
+        and Salesforce
+      operationId: integration_guide_docs_integration_guide_get
+      responses:
+        '200':
+          content:
+            text/html:
+              schema:
                 type: string
-            knowledge_base_matches:
-              type: array
-              items:
-                type: object
-            file_analysis_summary:
-              type: string
-        integration_routing:
-          type: object
-          nullable: true
-          properties:
-            recommended_integration:
-              type: string
-            routing_confidence:
-              type: number
-              format: float
-
-    TicketStatsResponse:
-      type: object
-      properties:
-        total_tickets:
-          type: integer
-        open_tickets:
-          type: integer
-        resolved_tickets:
-          type: integer
-        overdue_tickets:
-          type: integer
-        tickets_by_status:
-          type: object
-          additionalProperties:
-            type: integer
-        tickets_by_priority:
-          type: object
-          additionalProperties:
-            type: integer
-        tickets_by_category:
-          type: object
-          additionalProperties:
-            type: integer
-        average_resolution_time:
-          type: number
-          format: float
-        tickets_created_today:
-          type: integer
-        tickets_resolved_today:
-          type: integer
-
-    PaginatedTicketResponse:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/TicketListResponse'
-        total:
-          type: integer
-          description: Total number of items across all pages
-        page:
-          type: integer
-          description: Current page number (1-based)
-        size:
-          type: integer
-          description: Number of items per page
-        pages:
-          type: integer
-          description: Total number of pages
-
-    ErrorResponse:
-      type: object
-      properties:
-        detail:
-          type: string
-          description: Error message describing what went wrong
-        error_code:
-          type: string
-          description: Machine-readable error code
-        timestamp:
-          type: string
-          format: date-time
-          description: When the error occurred
-        request_id:
-          type: string
-          description: Unique identifier for this request
-
-    # WebSocket Message Schemas
-    WebSocketMessage:
-      type: object
-      description: Base WebSocket message structure
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          description: Message type identifier
-        protocol:
-          type: string
-          description: Protocol handler name
-        timestamp:
-          type: string
-          format: date-time
-          description: Message timestamp
-
-    WebSocketErrorMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          properties:
-            type:
-              type: string
-              enum: [error]
-            message:
-              type: string
-              description: Error description
-            original_message_type:
-              type: string
-              description: Original message type that caused the error
-
-    # Ticket Protocol Messages
-    TicketSubscribeMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - ticket_id
-          properties:
-            type:
-              type: string
-              enum: [subscribe_ticket_updates]
-            ticket_id:
-              type: string
-              format: uuid
-              description: Ticket ID to subscribe to
-
-    TicketUnsubscribeMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - ticket_id
-          properties:
-            type:
-              type: string
-              enum: [unsubscribe_ticket_updates]
-            ticket_id:
-              type: string
-              format: uuid
-              description: Ticket ID to unsubscribe from
-
-    TicketStatusChangeNotification:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          properties:
-            type:
-              type: string
-              enum: [ticket_status_change]
-            ticket_id:
-              type: string
-              format: uuid
-            old_status:
-              $ref: '#/components/schemas/TicketStatus'
-            new_status:
-              $ref: '#/components/schemas/TicketStatus'
-            changed_by:
-              type: string
-              format: uuid
-            reason:
-              type: string
-              nullable: true
-
-    # File Protocol Messages
-    FileJobSubscribeMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - job_id
-          properties:
-            type:
-              type: string
-              enum: [subscribe_job]
-            job_id:
-              type: string
-              description: File processing job ID
-
-    FileJobUnsubscribeMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - job_id
-          properties:
-            type:
-              type: string
-              enum: [unsubscribe_job]
-            job_id:
-              type: string
-              description: File processing job ID
-
-    FileJobStatusMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - job_id
-          properties:
-            type:
-              type: string
-              enum: [get_job_status]
-            job_id:
-              type: string
-              description: File processing job ID
-
-    FileProcessingProgressNotification:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          properties:
-            type:
-              type: string
-              enum: [file_processing_progress, file_processing_started, file_processing_completed, file_processing_failed]
-            job_id:
-              type: string
-              description: File processing job ID
-            filename:
-              type: string
-              description: Name of the file being processed
-            progress:
-              type: number
-              format: float
-              minimum: 0
-              maximum: 100
-              description: Progress percentage (0-100)
-            stage:
-              type: string
-              enum: [upload, validation, processing, transcription, ocr, analysis, complete, failed]
-              description: Current processing stage
-            message:
-              type: string
-              description: Status message or error description
-            file_metadata:
-              type: object
-              description: Extracted file metadata
-              additionalProperties: true
-            results:
-              type: object
-              description: Processing results (available when completed)
-              properties:
-                transcription:
-                  type: string
-                  nullable: true
-                ocr_text:
-                  type: string
-                  nullable: true
-                analysis:
-                  type: object
-                  additionalProperties: true
-
-    # Chat Protocol Messages (AI Interaction)
-    ChatSendMessage:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - conversation_id
-            - content
-          properties:
-            type:
-              type: string
-              enum: [send_message]
-            conversation_id:
-              type: string
-              format: uuid
-              description: Conversation ID
-            content:
-              type: string
-              description: Message content
-            context:
-              type: object
-              description: Additional context for AI processing
-              additionalProperties: true
-
-    ChatStreamRequest:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - conversation_id
-            - prompt
-          properties:
-            type:
-              type: string
-              enum: [stream_request]
-            conversation_id:
-              type: string
-              format: uuid
-              description: Conversation ID
-            prompt:
-              type: string
-              description: AI prompt
-            stream_settings:
-              type: object
-              properties:
-                max_tokens:
-                  type: integer
-                  minimum: 1
-                  maximum: 4000
-                temperature:
-                  type: number
-                  format: float
-                  minimum: 0
-                  maximum: 2
-
-    ChatCreateConversation:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          properties:
-            type:
-              type: string
-              enum: [create_conversation]
-            title:
-              type: string
-              nullable: true
-              description: Conversation title
-            initial_message:
-              type: string
-              nullable: true
-              description: Initial message to start conversation
-
-    ChatGetMessages:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          required:
-            - conversation_id
-          properties:
-            type:
-              type: string
-              enum: [get_messages]
-            conversation_id:
-              type: string
-              format: uuid
-            limit:
-              type: integer
-              minimum: 1
-              maximum: 100
-              default: 50
-            offset:
-              type: integer
-              minimum: 0
-              default: 0
-
-    ChatMessageNotification:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          properties:
-            type:
-              type: string
-              enum: [chat_message, chat_response, chat_stream]
-            conversation_id:
-              type: string
-              format: uuid
-            message_id:
-              type: string
-              format: uuid
-            content:
-              type: string
-              description: Message content
-            sender:
-              type: string
-              enum: [user, assistant]
-            is_streaming:
-              type: boolean
-              description: Whether this is part of a streaming response
-            is_complete:
-              type: boolean
-              description: Whether streaming response is complete
-            metadata:
-              type: object
-              description: Additional message metadata
-              additionalProperties: true
-
-    # System Notifications
-    SystemNotification:
-      allOf:
-        - $ref: '#/components/schemas/WebSocketMessage'
-        - type: object
-          properties:
-            type:
-              type: string
-              enum: [system_alert, task_completion, data_update, health_update, performance_alert]
-            level:
-              type: string
-              enum: [info, warning, error, critical]
-              description: Notification severity level
-            title:
-              type: string
-              description: Notification title
-            message:
-              type: string
-              description: Notification message
-            action_url:
-              type: string
-              nullable: true
-              description: URL for follow-up action
-            expires_at:
-              type: string
-              format: date-time
-              nullable: true
-              description: When notification expires
-
-tags:
-  - name: System
-    description: System health and information endpoints
-  - name: Tickets
-    description: Ticket management and CRUD operations
-  - name: AI
-    description: AI-powered functionality and intelligent automation
-  - name: Analytics
-    description: Statistics and reporting endpoints
-  - name: WebSocket
-    description: Real-time WebSocket communication protocols for live updates, file processing, and AI interactions
+          description: Successful Response
+      summary: Integration Guide
+      tags:
+      - System
+  /docs/websocket:
+    get:
+      description: WebSocket API documentation with real-time communication protocols
+      operationId: websocket_documentation_docs_websocket_get
+      responses:
+        '200':
+          content:
+            text/html:
+              schema:
+                type: string
+          description: Successful Response
+      summary: Websocket Documentation
+      tags:
+      - System
+  /health:
+    get:
+      description: Health check endpoint
+      operationId: health_check_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Health Check
+      tags:
+      - System
+  /openapi.yaml:
+    get:
+      description: Serve the OpenAPI specification as YAML
+      operationId: get_openapi_yaml_openapi_yaml_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Openapi Yaml
+      tags:
+      - System

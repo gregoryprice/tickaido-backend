@@ -6,11 +6,10 @@ File schemas for API validation and serialization
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from enum import Enum
 
 from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse
-from app.models.file import FileStatus, FileType
 
 
 class FileStatusSchema(str, Enum):

@@ -5,27 +5,22 @@ File Service - Business logic for file management, processing, and analysis
 
 import os
 import uuid
-import asyncio
 import aiofiles
-from typing import List, Optional, Dict, Any, Tuple, Union
+from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
-from app.models.file import DBFile, FileStatus, FileType
-from app.models.user import DBUser
-from app.models.ticket import DBTicket
+from app.models.file import File, FileStatus, FileType
 from app.schemas.file import (
     FileUploadRequest,
     FileUpdateRequest,
     FileProcessingRequest,
     FileAnalysisRequest,
-    FileDetailResponse,
-    FileListResponse,
     FileProcessingResponse,
     FileAnalysisResponse,
     FileSearchParams,
@@ -52,7 +47,7 @@ class FileService:
         file_request: FileUploadRequest,
         file_content: bytes,
         user_id: UUID
-    ) -> DBFile:
+    ) -> File:
         """
         Upload a new file
         
@@ -84,7 +79,7 @@ class FileService:
             await f.write(file_content)
         
         # Create database record
-        db_file = DBFile(
+        db_file = File(
             id=file_id,
             filename=file_request.filename,
             original_filename=file_request.filename,
@@ -112,7 +107,7 @@ class FileService:
         db: AsyncSession,
         file_id: UUID,
         include_content: bool = False
-    ) -> Optional[DBFile]:
+    ) -> Optional[File]:
         """
         Get file by ID
         
@@ -124,14 +119,14 @@ class FileService:
         Returns:
             File record if found
         """
-        query = select(DBFile).where(
-            and_(DBFile.id == file_id, DBFile.is_deleted == False)
+        query = select(File).where(
+            and_(File.id == file_id, File.is_deleted == False)
         )
         
         if include_content:
             query = query.options(
-                selectinload(DBFile.uploaded_by_user),
-                selectinload(DBFile.ticket)
+                selectinload(File.uploaded_by_user),
+                selectinload(File.ticket)
             )
         
         result = await db.execute(query)
@@ -146,7 +141,7 @@ class FileService:
         sort_params: Optional[FileSortParams] = None,
         user_id: Optional[UUID] = None,
         ticket_id: Optional[UUID] = None
-    ) -> Tuple[List[DBFile], int]:
+    ) -> Tuple[List[File], int]:
         """
         List files with filtering and pagination
         
@@ -163,41 +158,41 @@ class FileService:
             Tuple of (files list, total count)
         """
         # Base query
-        query = select(DBFile).where(DBFile.is_deleted == False)
-        count_query = select(func.count(DBFile.id)).where(DBFile.is_deleted == False)
+        query = select(File).where(File.is_deleted == False)
+        count_query = select(func.count(File.id)).where(File.is_deleted == False)
         
         # Apply filters
         filters = []
         
         if user_id:
-            filters.append(DBFile.uploaded_by == user_id)
+            filters.append(File.uploaded_by == user_id)
         
         if ticket_id:
-            filters.append(DBFile.ticket_id == ticket_id)
+            filters.append(File.ticket_id == ticket_id)
         
         if search_params:
             if search_params.filename:
-                filters.append(DBFile.filename.ilike(f"%{search_params.filename}%"))
+                filters.append(File.filename.ilike(f"%{search_params.filename}%"))
             
             if search_params.mime_type:
-                filters.append(DBFile.mime_type == search_params.mime_type)
+                filters.append(File.mime_type == search_params.mime_type)
             
             if search_params.file_type:
-                filters.append(DBFile.file_type == search_params.file_type)
+                filters.append(File.file_type == search_params.file_type)
             
             if search_params.status:
-                filters.append(DBFile.status == search_params.status)
+                filters.append(File.status == search_params.status)
             
             if search_params.tags:
                 # Filter by tags (PostgreSQL array contains)
                 for tag in search_params.tags:
-                    filters.append(DBFile.tags.contains([tag]))
+                    filters.append(File.tags.contains([tag]))
             
             if search_params.uploaded_after:
-                filters.append(DBFile.created_at >= search_params.uploaded_after)
+                filters.append(File.created_at >= search_params.uploaded_after)
             
             if search_params.uploaded_before:
-                filters.append(DBFile.created_at <= search_params.uploaded_before)
+                filters.append(File.created_at <= search_params.uploaded_before)
         
         if filters:
             query = query.where(and_(*filters))
@@ -205,13 +200,13 @@ class FileService:
         
         # Apply sorting
         if sort_params:
-            sort_field = getattr(DBFile, sort_params.sort_by, DBFile.created_at)
+            sort_field = getattr(File, sort_params.sort_by, File.created_at)
             if sort_params.sort_order == "desc":
                 query = query.order_by(sort_field.desc())
             else:
                 query = query.order_by(sort_field.asc())
         else:
-            query = query.order_by(DBFile.created_at.desc())
+            query = query.order_by(File.created_at.desc())
         
         # Apply pagination
         query = query.offset(offset).limit(limit)
@@ -231,7 +226,7 @@ class FileService:
         file_id: UUID,
         update_request: FileUpdateRequest,
         user_id: UUID
-    ) -> Optional[DBFile]:
+    ) -> Optional[File]:
         """
         Update file metadata
         
@@ -298,7 +293,7 @@ class FileService:
             try:
                 if os.path.exists(db_file.storage_path):
                     os.unlink(db_file.storage_path)
-            except Exception as e:
+            except Exception:
                 # Log error but continue
                 pass
             
@@ -343,7 +338,7 @@ class FileService:
         try:
             async with aiofiles.open(db_file.storage_path, 'rb') as f:
                 return await f.read()
-        except Exception as e:
+        except Exception:
             return None
     
     async def process_file(

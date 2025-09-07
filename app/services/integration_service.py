@@ -3,34 +3,31 @@
 Integration Service - Business logic for third-party integrations
 """
 
-import json
 import httpx
-import asyncio
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timezone
-from urllib.parse import urljoin
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
-from app.models.integration import DBIntegration, IntegrationType, IntegrationStatus
-from app.models.user import DBUser
-from app.models.ticket import DBTicket
+from app.models.integration import Integration, IntegrationStatus
+from app.models.user import User
 from app.schemas.integration import (
     IntegrationCreateRequest,
     IntegrationUpdateRequest,
-    IntegrationStatusUpdateRequest,
     IntegrationTestRequest,
     IntegrationSyncRequest,
-    IntegrationDetailResponse,
     IntegrationTestResponse,
     IntegrationSyncResponse,
+    IntegrationStatusUpdateRequest,
     IntegrationSearchParams,
     IntegrationSortParams
 )
 from app.config.settings import get_settings
+from .integration_interface import IntegrationInterface
+from .jira_integration import JiraIntegration
 
 
 class IntegrationService:
@@ -45,7 +42,7 @@ class IntegrationService:
         db: AsyncSession,
         integration_request: IntegrationCreateRequest,
         user_id: UUID
-    ) -> DBIntegration:
+    ) -> Integration:
         """
         Create a new integration
         
@@ -57,27 +54,54 @@ class IntegrationService:
         Returns:
             Created integration record
         """
-        # Validate configuration based on type
+        # Get user's organization
+        user_result = await db.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+            
+        # Validate credentials based on type
         self._validate_integration_config(
-            integration_request.integration_type,
-            integration_request.configuration
+            integration_request.platform_name,
+            integration_request.credentials
         )
         
-        # Create integration record
-        db_integration = DBIntegration(
+        # Create integration record with organization support
+        db_integration = Integration(
             name=integration_request.name,
-            integration_type=integration_request.integration_type,
-            configuration=integration_request.configuration,
-            status=IntegrationStatus.INACTIVE,
-            is_enabled=False,
-            created_by=user_id,
+            integration_category=integration_request.integration_category,
+            platform_name=integration_request.platform_name,
+            status=IntegrationStatus.PENDING,
+            organization_id=user.organization_id,  # Associate with user's organization
             description=integration_request.description,
+            base_url=integration_request.base_url,
+            api_version=integration_request.api_version,
+            auth_type=integration_request.auth_type,
+            oauth_scopes=integration_request.oauth_scopes,
             webhook_url=integration_request.webhook_url,
+            sync_enabled=integration_request.sync_enabled,
             sync_frequency_minutes=integration_request.sync_frequency_minutes,
-            routing_rules=integration_request.routing_rules or [],
-            field_mappings=integration_request.field_mappings or {},
-            metadata=integration_request.metadata or {}
+            routing_rules=integration_request.routing_rules,
+            default_priority=integration_request.default_priority,
+            supports_categories=integration_request.supports_categories,
+            supports_priorities=integration_request.supports_priorities,
+            department_mapping=integration_request.department_mapping,
+            custom_fields_mapping=integration_request.custom_fields_mapping,
+            rate_limit_per_hour=integration_request.rate_limit_per_hour,
+            notification_events=integration_request.notification_events,
+            notification_channels=integration_request.notification_channels,
+            environment=integration_request.environment,
+            region=integration_request.region
         )
+        
+        # Set credentials securely using the model's encryption method
+        db_integration.set_credentials(integration_request.credentials)
+        
+        # Set webhook secret if provided
+        if integration_request.webhook_secret:
+            db_integration.set_webhook_secret(integration_request.webhook_secret)
         
         db.add(db_integration)
         await db.commit()
@@ -89,27 +113,41 @@ class IntegrationService:
         self,
         db: AsyncSession,
         integration_id: UUID,
+        user_id: UUID,
         include_stats: bool = False
-    ) -> Optional[DBIntegration]:
+    ) -> Optional[Integration]:
         """
-        Get integration by ID
+        Get integration by ID (organization-filtered)
         
         Args:
             db: Database session
             integration_id: Integration ID
+            user_id: User ID for organization filtering
             include_stats: Whether to include usage statistics
             
         Returns:
-            Integration record if found
+            Integration record if found and accessible by user's organization
         """
-        query = select(DBIntegration).where(
-            and_(DBIntegration.id == integration_id, DBIntegration.is_deleted == False)
+        # Get user's organization
+        user_result = await db.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if not user:
+            return None
+            
+        # Query integration filtered by organization
+        query = select(Integration).where(
+            and_(
+                Integration.id == integration_id,
+                Integration.is_deleted == False,
+                Integration.organization_id == user.organization_id
+            )
         )
         
         if include_stats:
             query = query.options(
-                selectinload(DBIntegration.created_by_user),
-                selectinload(DBIntegration.tickets)
+                selectinload(Integration.organization)
             )
         
         result = await db.execute(query)
@@ -118,54 +156,76 @@ class IntegrationService:
     async def list_integrations(
         self,
         db: AsyncSession,
+        user_id: UUID,
         offset: int = 0,
         limit: int = 20,
         search_params: Optional[IntegrationSearchParams] = None,
         sort_params: Optional[IntegrationSortParams] = None,
-        user_id: Optional[UUID] = None
-    ) -> Tuple[List[DBIntegration], int]:
+        created_by_filter: Optional[UUID] = None
+    ) -> Tuple[List[Integration], int]:
         """
-        List integrations with filtering and pagination
+        List integrations with organization filtering and pagination
         
         Args:
             db: Database session
+            user_id: User ID for organization filtering
             offset: Number of records to skip
             limit: Maximum number of records to return
             search_params: Search parameters
             sort_params: Sort parameters
-            user_id: Filter by user ID (for user-specific integrations)
+            created_by_filter: Filter by specific creator user ID
             
         Returns:
             Tuple of (integrations list, total count)
         """
-        # Base query
-        query = select(DBIntegration).where(DBIntegration.is_deleted == False)
-        count_query = select(func.count(DBIntegration.id)).where(DBIntegration.is_deleted == False)
+        # Get user's organization
+        user_result = await db.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if not user:
+            return [], 0
         
-        # Apply filters
+        # Base query with organization filtering
+        base_filter = and_(
+            Integration.is_deleted == False,
+            Integration.organization_id == user.organization_id
+        )
+        
+        query = select(Integration).where(base_filter)
+        count_query = select(func.count(Integration.id)).where(base_filter)
+        
+        # Apply additional filters
         filters = []
         
-        if user_id:
-            filters.append(DBIntegration.created_by == user_id)
+        # TODO: Add created_by filter once user relationship is implemented
+        # if created_by_filter:
+        #     filters.append(Integration.created_by == created_by_filter)
         
         if search_params:
-            if search_params.name:
-                filters.append(DBIntegration.name.ilike(f"%{search_params.name}%"))
+            if search_params.q:
+                filters.append(Integration.name.ilike(f"%{search_params.q}%"))
             
-            if search_params.integration_type:
-                filters.append(DBIntegration.integration_type == search_params.integration_type)
+            if search_params.integration_category:
+                if isinstance(search_params.integration_category, list):
+                    filters.append(Integration.integration_category.in_(search_params.integration_category))
+                else:
+                    filters.append(Integration.integration_category == search_params.integration_category)
             
             if search_params.status:
-                filters.append(DBIntegration.status == search_params.status)
+                if isinstance(search_params.status, list):
+                    filters.append(Integration.status.in_(search_params.status))
+                else:
+                    filters.append(Integration.status == search_params.status)
             
-            if search_params.is_enabled is not None:
-                filters.append(DBIntegration.is_enabled == search_params.is_enabled)
+            if search_params.enabled is not None:
+                filters.append(Integration.enabled == search_params.enabled)
             
             if search_params.created_after:
-                filters.append(DBIntegration.created_at >= search_params.created_after)
+                filters.append(Integration.created_at >= search_params.created_after)
             
             if search_params.created_before:
-                filters.append(DBIntegration.created_at <= search_params.created_before)
+                filters.append(Integration.created_at <= search_params.created_before)
         
         if filters:
             query = query.where(and_(*filters))
@@ -173,13 +233,13 @@ class IntegrationService:
         
         # Apply sorting
         if sort_params:
-            sort_field = getattr(DBIntegration, sort_params.sort_by, DBIntegration.created_at)
+            sort_field = getattr(Integration, sort_params.sort_by, Integration.created_at)
             if sort_params.sort_order == "desc":
                 query = query.order_by(sort_field.desc())
             else:
                 query = query.order_by(sort_field.asc())
         else:
-            query = query.order_by(DBIntegration.created_at.desc())
+            query = query.order_by(Integration.created_at.desc())
         
         # Apply pagination
         query = query.offset(offset).limit(limit)
@@ -199,7 +259,7 @@ class IntegrationService:
         integration_id: UUID,
         update_request: IntegrationUpdateRequest,
         user_id: UUID
-    ) -> Optional[DBIntegration]:
+    ) -> Optional[Integration]:
         """
         Update integration settings
         
@@ -212,14 +272,15 @@ class IntegrationService:
         Returns:
             Updated integration record if found
         """
-        db_integration = await self.get_integration(db, integration_id)
+        db_integration = await self.get_integration(db, integration_id, user_id)
         if not db_integration:
             return None
         
         # Check permissions (owner or admin)
-        if db_integration.created_by != user_id:
-            # TODO: Check if user is admin
-            pass
+        # TODO: Add proper permission checking once user relationship is implemented
+        # if db_integration.created_by != user_id:
+        #     # TODO: Check if user is admin
+        #     pass
         
         # Update fields
         update_data = update_request.model_dump(exclude_unset=True)
@@ -227,7 +288,7 @@ class IntegrationService:
             if field == "configuration" and value:
                 # Validate configuration
                 self._validate_integration_config(
-                    db_integration.integration_type,
+                    db_integration.platform_name,
                     value
                 )
             
@@ -240,56 +301,139 @@ class IntegrationService:
         
         return db_integration
     
+    async def update_integration_status(
+        self,
+        db: AsyncSession,
+        integration_id: UUID,
+        status_update: IntegrationStatusUpdateRequest,
+        user_id: UUID
+    ) -> Optional[Integration]:
+        """
+        Update integration status (enable/disable)
+        
+        Args:
+            db: Database session
+            integration_id: Integration ID
+            status_update: Status update request data
+            user_id: ID of updating user
+            
+        Returns:
+            Updated integration record if found
+        """
+        db_integration = await self.get_integration(db, integration_id, user_id)
+        if not db_integration:
+            return None
+        
+        # Update enabled status and automatically manage integration status
+        if hasattr(status_update, 'enabled') and status_update.enabled is not None:
+            db_integration.set_enabled(status_update.enabled, status_update.reason)
+        elif hasattr(status_update, 'reason') and status_update.reason:
+            # Add the reason to metadata if it exists
+            if not db_integration.metadata:
+                db_integration.metadata = {}
+            db_integration.metadata['status_update_reason'] = status_update.reason
+        
+        db_integration.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(db_integration)
+        
+        return db_integration
+    
     async def test_integration(
         self,
         db: AsyncSession,
         integration_id: UUID,
         test_request: IntegrationTestRequest,
-        user_id: UUID
+        user_id: UUID,
+        auto_activate_on_success: bool = False
     ) -> Optional[IntegrationTestResponse]:
         """
-        Test integration connectivity and configuration
+        Test integration connectivity and configuration using generic interface.
         
         Args:
             db: Database session
             integration_id: Integration ID
             test_request: Test request data
             user_id: ID of requesting user
+            auto_activate_on_success: Whether to auto-activate on successful test
             
         Returns:
             Test results if successful
         """
-        db_integration = await self.get_integration(db, integration_id)
+        db_integration = await self.get_integration(db, integration_id, user_id)
         if not db_integration:
             return None
         
         try:
-            # Test based on integration type
-            test_results = await self._test_integration_by_type(
-                db_integration.integration_type,
-                db_integration.configuration,
-                test_request.test_type
-            )
+            # Get integration implementation
+            integration_impl = self._get_integration_implementation(db_integration)
             
+            # Run requested tests generically
+            test_results = {}
+            overall_success = True
+            previous_status = db_integration.status
+            
+            for test_type in test_request.test_types:
+                try:
+                    if test_type == "connection":
+                        result = await integration_impl.test_connection()
+                    elif test_type == "authentication":
+                        result = await integration_impl.test_authentication()
+                    elif test_type == "permissions" or test_type == "project_access":
+                        # Pass integration-specific test data from credentials
+                        test_data = db_integration.get_credentials()
+                        result = await integration_impl.test_permissions(test_data)
+                    elif test_type == "create_ticket":
+                        # Use provided test data or default credentials
+                        test_data = test_request.test_data or db_integration.get_credentials()
+                        result = await integration_impl.create_ticket(test_data, is_test=True)
+                    else:
+                        result = {"success": False, "message": f"Unknown test type: {test_type}"}
+                    
+                    test_results[test_type] = result
+                    if not result.get("success", False):
+                        overall_success = False
+                        
+                except Exception as e:
+                    test_results[test_type] = {"success": False, "message": str(e)}
+                    overall_success = False
+            
+            # Auto-activate if requested and all tests passed
+            activation_triggered = False
+            if overall_success and auto_activate_on_success and db_integration.status == IntegrationStatus.PENDING:
+                db_integration.activate(method="automatic")
+                activation_triggered = True
+                
             # Update last tested time
-            db_integration.last_tested_at = datetime.now(timezone.utc)
+            if hasattr(db_integration, 'last_health_check_at'):
+                db_integration.last_health_check_at = datetime.now(timezone.utc)
+                db_integration.health_check_status = "healthy" if overall_success else "unhealthy"
+                db_integration.connection_test_count = (db_integration.connection_test_count or 0) + 1
+                
             await db.commit()
+            await integration_impl.close()
             
             return IntegrationTestResponse(
-                integration_id=integration_id,
-                test_type=test_request.test_type,
-                status="success",
-                results=test_results,
-                tested_at=datetime.now(timezone.utc)
+                test_type=", ".join(test_request.test_types),
+                success=overall_success,
+                response_time_ms=0,  # TODO: Track actual response time
+                details=test_results,
+                error_message=None if overall_success else "Some tests failed",
+                suggestions=None,
+                # Add new fields for auto-activation
+                activation_triggered=activation_triggered,
+                previous_status=previous_status.value if previous_status else None,
+                new_status=db_integration.status.value if db_integration.status else None
             )
             
         except Exception as e:
             return IntegrationTestResponse(
-                integration_id=integration_id,
-                test_type=test_request.test_type,
-                status="error",
-                error=str(e),
-                tested_at=datetime.now(timezone.utc)
+                test_type=", ".join(test_request.test_types) if hasattr(test_request, 'test_types') else test_request.test_type,
+                success=False,
+                response_time_ms=0,
+                details={},
+                error_message=str(e),
+                suggestions=None
             )
     
     async def sync_integration(
@@ -311,7 +455,7 @@ class IntegrationService:
         Returns:
             Sync results if successful
         """
-        db_integration = await self.get_integration(db, integration_id)
+        db_integration = await self.get_integration(db, integration_id, user_id)
         if not db_integration:
             return None
         
@@ -326,8 +470,8 @@ class IntegrationService:
             
             # Perform sync based on integration type
             sync_results = await self._sync_integration_by_type(
-                db_integration.integration_type,
-                db_integration.configuration,
+                db_integration.platform_name,
+                db_integration.get_credentials(),
                 sync_request.sync_type,
                 sync_request.since_timestamp
             )
@@ -378,7 +522,7 @@ class IntegrationService:
         Returns:
             True if enabled successfully
         """
-        db_integration = await self.get_integration(db, integration_id)
+        db_integration = await self.get_integration(db, integration_id, user_id)
         if not db_integration:
             return False
         
@@ -413,7 +557,7 @@ class IntegrationService:
         Returns:
             True if disabled successfully
         """
-        db_integration = await self.get_integration(db, integration_id)
+        db_integration = await self.get_integration(db, integration_id, user_id)
         if not db_integration:
             return False
         
@@ -443,14 +587,15 @@ class IntegrationService:
         Returns:
             True if deleted successfully
         """
-        db_integration = await self.get_integration(db, integration_id)
+        db_integration = await self.get_integration(db, integration_id, user_id)
         if not db_integration:
             return False
         
         # Check permissions
-        if db_integration.created_by != user_id:
-            # TODO: Check if user is admin
-            pass
+        # TODO: Add proper permission checking once user relationship is implemented
+        # if db_integration.created_by != user_id:
+        #     # TODO: Check if user is admin
+        #     pass
         
         if hard_delete:
             await db.delete(db_integration)
@@ -462,67 +607,97 @@ class IntegrationService:
     
     def _validate_integration_config(
         self,
-        integration_type: IntegrationType,
+        platform_name: str,
         configuration: Dict[str, Any]
     ) -> None:
-        """Validate integration configuration based on type"""
-        required_fields = self._get_required_config_fields(integration_type)
+        """Validate integration configuration based on platform"""
+        required_fields = self._get_required_config_fields(platform_name)
         
         for field in required_fields:
             if field not in configuration:
                 raise ValueError(f"Missing required configuration field: {field}")
     
-    def _get_required_config_fields(self, integration_type: IntegrationType) -> List[str]:
-        """Get required configuration fields for integration type"""
+    def _get_required_config_fields(self, platform_name: str) -> List[str]:
+        """Get required configuration fields for platform"""
         field_map = {
-            IntegrationType.SALESFORCE: ["client_id", "client_secret", "instance_url"],
-            IntegrationType.JIRA: ["url", "email", "api_token"],
-            IntegrationType.SERVICENOW: ["instance_url", "username", "password"],
-            IntegrationType.ZENDESK: ["subdomain", "email", "api_token"],
-            IntegrationType.GITHUB: ["token", "organization"],
-            IntegrationType.SLACK: ["bot_token", "channel"],
-            IntegrationType.TEAMS: ["webhook_url"],
-            IntegrationType.ZOOM: ["client_id", "client_secret"],
-            IntegrationType.EMAIL: ["smtp_host", "smtp_port", "username", "password"],
-            IntegrationType.WEBHOOK: ["url"]
+            "salesforce": ["client_id", "client_secret", "instance_url"],
+            "jira": ["url", "email", "api_token"],  # JIRA required fields including base URL
+            "servicenow": ["instance_url", "username", "password"],
+            "zendesk": ["subdomain", "email", "api_token"],
+            "github": ["token", "organization"],
+            "slack": ["bot_token", "channel"],
+            "teams": ["webhook_url"],
+            "zoom": ["client_id", "client_secret"],
+            "email": ["smtp_host", "smtp_port", "username", "password"],
+            "webhook": ["url"]
         }
         
-        return field_map.get(integration_type, [])
+        return field_map.get(platform_name.lower(), [])
+    
+    def _get_integration_implementation(self, integration: Integration) -> IntegrationInterface:
+        """
+        Factory method to get integration implementation.
+        
+        Args:
+            integration: Integration model instance
+            
+        Returns:
+            IntegrationInterface implementation for the specific type
+            
+        Raises:
+            ValueError: If integration type is not supported
+        """
+        if integration.platform_name == "jira":
+            credentials = integration.get_credentials()
+            return JiraIntegration(
+                base_url=integration.base_url,
+                email=credentials.get("email"),
+                api_token=credentials.get("api_token")
+            )
+        # elif integration.integration_type == IntegrationType.SALESFORCE:
+        #     credentials = integration.get_credentials()
+        #     return SalesforceIntegration(
+        #         instance_url=integration.base_url,
+        #         client_id=credentials.get("client_id"),
+        #         client_secret=credentials.get("client_secret")
+        #     )
+        else:
+            raise ValueError(f"Unsupported integration type: {integration.platform_name}")
     
     async def _test_integration_by_type(
         self,
-        integration_type: IntegrationType,
+        platform_name: str,
         configuration: Dict[str, Any],
         test_type: str
     ) -> Dict[str, Any]:
-        """Test integration based on type"""
-        if integration_type == IntegrationType.SALESFORCE:
+        """Test integration based on type (DEPRECATED - use generic interface instead)"""
+        if platform_name == "salesforce":
             return await self._test_salesforce(configuration, test_type)
-        elif integration_type == IntegrationType.JIRA:
+        elif platform_name == "jira":
             return await self._test_jira(configuration, test_type)
-        elif integration_type == IntegrationType.SLACK:
+        elif platform_name == "slack":
             return await self._test_slack(configuration, test_type)
-        elif integration_type == IntegrationType.WEBHOOK:
+        elif platform_name == "webhook":
             return await self._test_webhook(configuration, test_type)
         else:
-            return {"message": f"Test not implemented for {integration_type}"}
+            return {"message": f"Test not implemented for {platform_name}"}
     
     async def _sync_integration_by_type(
         self,
-        integration_type: IntegrationType,
+        platform_name: str,
         configuration: Dict[str, Any],
         sync_type: str,
         since_timestamp: Optional[datetime] = None
     ) -> Dict[str, Any]:
         """Sync data based on integration type"""
-        if integration_type == IntegrationType.SALESFORCE:
+        if platform_name == "salesforce":
             return await self._sync_salesforce(configuration, sync_type, since_timestamp)
-        elif integration_type == IntegrationType.JIRA:
+        elif platform_name == "jira":
             return await self._sync_jira(configuration, sync_type, since_timestamp)
-        elif integration_type == IntegrationType.SLACK:
+        elif platform_name == "slack":
             return await self._sync_slack(configuration, sync_type, since_timestamp)
         else:
-            return {"message": f"Sync not implemented for {integration_type}"}
+            return {"message": f"Sync not implemented for {platform_name}"}
     
     async def _test_salesforce(
         self,

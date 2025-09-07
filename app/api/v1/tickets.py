@@ -3,8 +3,8 @@
 Ticket API endpoints
 """
 
-from typing import List, Optional
 from uuid import UUID
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,21 +12,20 @@ from app.database import get_db_session
 from app.schemas.ticket import (
     TicketCreateRequest,
     TicketUpdateRequest,
+    TicketPatchRequest,
     TicketDetailResponse,
     TicketListResponse,
     TicketSearchParams,
     TicketSortParams,
-    TicketStatusUpdateRequest,
-    TicketAssignmentRequest,
     TicketAICreateRequest,
     TicketAICreateResponse,
     TicketStatsResponse
 )
 from app.schemas.base import PaginationParams, PaginatedResponse
-from app.models.ticket import DBTicket
-from app.models.user import DBUser
 from app.services.ticket_service import ticket_service
 from app.services.ai_service import ai_service
+from app.middleware.auth_middleware import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/tickets")
 
@@ -36,6 +35,7 @@ async def list_tickets(
     pagination: PaginationParams = Depends(),
     search_params: TicketSearchParams = Depends(),
     sort_params: TicketSortParams = Depends(),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -69,6 +69,7 @@ async def list_tickets(
         
         tickets, total = await ticket_service.list_tickets(
             db=db,
+            organization_id=current_user.organization_id,
             offset=pagination.offset,
             limit=pagination.size,
             filters=filters,
@@ -76,8 +77,63 @@ async def list_tickets(
             sort_order=sort_params.sort_order
         )
         
+        # Convert Ticket models to TicketListResponse
+        ticket_responses = []
+        for ticket in tickets:
+            # Build created_by user info
+            created_by = None
+            if ticket.creator:
+                created_by = {
+                    "id": ticket.creator.id,
+                    "email": ticket.creator.email,
+                    "full_name": ticket.creator.full_name,
+                    "display_name": ticket.creator.display_name,
+                    "avatar_url": ticket.creator.avatar_url
+                }
+            
+            # Build assigned_to user info
+            assigned_to = None
+            if ticket.assignee:
+                assigned_to = {
+                    "id": ticket.assignee.id,
+                    "email": ticket.assignee.email,
+                    "full_name": ticket.assignee.full_name,
+                    "display_name": ticket.assignee.display_name,
+                    "avatar_url": ticket.assignee.avatar_url
+                }
+            
+            # Calculate computed fields
+            age_in_hours = (datetime.now(timezone.utc) - ticket.created_at).total_seconds() / 3600
+            is_high_priority = ticket.priority.value in ["high", "critical"]
+            is_overdue = False  # TODO: Implement SLA logic
+            
+            ticket_response = TicketListResponse(
+                id=ticket.id,
+                title=ticket.title,
+                display_title=ticket.title[:100] + "..." if len(ticket.title) > 100 else ticket.title,
+                category=ticket.category.value,
+                subcategory=ticket.subcategory,
+                priority=ticket.priority.value,
+                urgency=ticket.urgency.value if hasattr(ticket, 'urgency') else ticket.priority.value,
+                status=ticket.status.value,
+                department=ticket.department,
+                source_channel=ticket.source_channel or "web",
+                created_by=created_by,
+                assigned_to=assigned_to,
+                created_at=ticket.created_at,
+                updated_at=ticket.updated_at,
+                last_activity_at=ticket.updated_at,  # TODO: Track actual last activity
+                communication_count=0,  # TODO: Count communications
+                file_count=len(ticket.files) if ticket.files else 0,
+                is_overdue=is_overdue,
+                is_high_priority=is_high_priority,
+                age_in_hours=age_in_hours,
+                escalation_level=ticket.escalation_level or 0
+            )
+            ticket_responses.append(ticket_response)
+        
         return PaginatedResponse.create(
-            items=[TicketListResponse.model_validate(ticket) for ticket in tickets],
+            items=ticket_responses,
             total=total,
             page=pagination.page,
             size=pagination.size
@@ -93,18 +149,40 @@ async def list_tickets(
 @router.post("/", response_model=TicketDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket(
     ticket_data: TicketCreateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
     Create a new support ticket.
     """
     try:
-        ticket = await ticket_service.create_ticket(
-            db=db,
-            ticket_data=ticket_data.model_dump()
-        )
-        
-        return TicketDetailResponse.model_validate(ticket)
+        # Check if integration is specified for external creation
+        if ticket_data.integration_id and ticket_data.create_externally:
+            # Add organization_id to ticket data
+            ticket_data_dict = ticket_data.model_dump()
+            ticket_data_dict['organization_id'] = current_user.organization_id
+            ticket, integration_result = await ticket_service.create_ticket_with_integration(
+                db=db,
+                ticket_data=ticket_data_dict,
+                created_by_id=current_user.id
+            )
+            
+            # Include integration result in response
+            response_data = TicketDetailResponse.model_validate(ticket)
+            response_data.integration_result = integration_result
+            return response_data
+        else:
+            # Standard internal-only ticket creation
+            # Add organization_id to ticket data
+            ticket_data_dict = ticket_data.model_dump()
+            ticket_data_dict['organization_id'] = current_user.organization_id
+            ticket = await ticket_service.create_ticket(
+                db=db,
+                ticket_data=ticket_data_dict,
+                created_by_id=current_user.id
+            )
+            
+            return TicketDetailResponse.model_validate(ticket)
         
     except ValueError as e:
         raise HTTPException(
@@ -121,6 +199,7 @@ async def create_ticket(
 @router.post("/ai-create", response_model=TicketAICreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket_with_ai(
     ai_request: TicketAICreateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -129,11 +208,12 @@ async def create_ticket_with_ai(
     try:
         result = await ai_service.create_ticket_with_ai(
             db=db,
+            current_user=current_user,
             user_input=ai_request.user_input,
             uploaded_files=ai_request.uploaded_files or [],
             conversation_context=ai_request.conversation_context or [],
             user_preferences=ai_request.user_preferences or {},
-            integration_preference=ai_request.integration_preference
+            integration_preference=ai_request.integration_id
         )
         
         return TicketAICreateResponse.model_validate(result)
@@ -155,6 +235,7 @@ async def get_ticket(
     ticket_id: UUID,
     include_ai_data: bool = Query(True, description="Include AI analysis data"),
     include_internal: bool = Query(False, description="Include internal notes"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -164,6 +245,7 @@ async def get_ticket(
         ticket = await ticket_service.get_ticket(
             db=db,
             ticket_id=ticket_id,
+            organization_id=current_user.organization_id,
             include_ai_data=include_ai_data,
             include_internal=include_internal
         )
@@ -189,6 +271,7 @@ async def get_ticket(
 async def update_ticket(
     ticket_id: UUID,
     update_data: TicketUpdateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -198,6 +281,7 @@ async def update_ticket(
         ticket = await ticket_service.update_ticket(
             db=db,
             ticket_id=ticket_id,
+            organization_id=current_user.organization_id,
             update_data=update_data.model_dump(exclude_none=True)
         )
         
@@ -223,95 +307,72 @@ async def update_ticket(
         )
 
 
-@router.patch("/{ticket_id}/status", response_model=TicketDetailResponse)
-async def update_ticket_status(
+@router.patch("/{ticket_id}", response_model=TicketDetailResponse)
+async def patch_ticket(
     ticket_id: UUID,
-    status_update: TicketStatusUpdateRequest,
+    patch_data: TicketPatchRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
-    Update ticket status.
+    Update specific fields of a ticket with flexible partial updates.
+    
+    Supports updating any combination of ticket fields:
+    - Status: {"status": "in_progress"}
+    - Assignment: {"assigned_to_id": "uuid", "assignment_reason": "reason"}
+    - Priority: {"priority": "high"}
+    - Multiple fields: {"status": "resolved", "priority": "low", "tags": ["fixed"]}
     """
     try:
-        ticket = await ticket_service.update_ticket_status(
-            db=db,
-            ticket_id=ticket_id,
-            new_status=status_update.status.value,
-            resolution_summary=status_update.resolution_summary,
-            internal_notes=status_update.internal_notes
-        )
+        # Get only the fields that were actually provided (exclude None values)
+        update_data = patch_data.model_dump(exclude_unset=True, exclude_none=True)
         
-        if not ticket:
+        if not update_data:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ticket not found"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one field must be provided for update"
             )
         
-        return TicketDetailResponse.model_validate(ticket)
+        # Update ticket with organization context
+        updated_ticket = await ticket_service.patch_ticket(
+            db=db,
+            ticket_id=ticket_id,
+            organization_id=current_user.organization_id,
+            update_data=update_data,
+            updated_by_user=current_user
+        )
+        
+        if not updated_ticket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found or not accessible"
+            )
+        
+        return TicketDetailResponse.model_validate(updated_ticket)
         
     except HTTPException:
         raise
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update ticket status: {str(e)}"
+            detail=f"Failed to update ticket: {str(e)}"
         )
 
 
-@router.patch("/{ticket_id}/assign", response_model=TicketDetailResponse)
-async def assign_ticket(
-    ticket_id: UUID,
-    assignment: TicketAssignmentRequest,
-    db: AsyncSession = Depends(get_db_session)
-):
-    """
-    Assign or unassign a ticket.
-    """
-    try:
-        ticket = await ticket_service.assign_ticket(
-            db=db,
-            ticket_id=ticket_id,
-            assigned_to_id=assignment.assigned_to_id,
-            reason=assignment.reason
-        )
-        
-        if not ticket:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ticket not found"
-            )
-        
-        return TicketDetailResponse.model_validate(ticket)
-        
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to assign ticket: {str(e)}"
-        )
+
 
 
 @router.delete("/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ticket(
     ticket_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
     Soft delete a ticket.
     """
     try:
-        success = await ticket_service.delete_ticket(db=db, ticket_id=ticket_id)
+        success = await ticket_service.delete_ticket(db=db, ticket_id=ticket_id, organization_id=current_user.organization_id)
         
         if not success:
             raise HTTPException(
@@ -330,13 +391,14 @@ async def delete_ticket(
 
 @router.get("/stats/overview", response_model=TicketStatsResponse)
 async def get_ticket_stats(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
     Get ticket statistics overview.
     """
     try:
-        stats = await ticket_service.get_ticket_stats(db=db)
+        stats = await ticket_service.get_ticket_stats(db=db, organization_id=current_user.organization_id)
         return TicketStatsResponse.model_validate(stats)
         
     except Exception as e:

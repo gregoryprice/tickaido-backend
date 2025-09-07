@@ -96,6 +96,30 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             await session.rollback()
             raise
 
+
+class AsyncDatabaseSession:
+    """Async context manager for database sessions"""
+    
+    def __init__(self):
+        self.session = None
+    
+    async def __aenter__(self) -> AsyncSession:
+        self.session = AsyncSessionLocal()
+        return self.session
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            if exc_type:
+                await self.session.rollback()
+            else:
+                await self.session.commit()
+            await self.session.close()
+
+
+def get_async_db_session():
+    """Get an async database session context manager"""
+    return AsyncDatabaseSession()
+
 def check_database_connection() -> bool:
     """
     Check if database connection is working.

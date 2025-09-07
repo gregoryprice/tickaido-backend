@@ -5,8 +5,9 @@ User model for authentication and user management
 
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON
+from typing import List
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, JSON, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
@@ -21,7 +22,7 @@ class UserRole(enum.Enum):
     API_USER = "api_user"
 
 
-class DBUser(BaseModel):
+class User(BaseModel):
     """
     User model for authentication and authorization.
     Supports both human users and API users.
@@ -38,13 +39,6 @@ class DBUser(BaseModel):
         comment="User email address"
     )
     
-    username = Column(
-        String(100),
-        unique=True,
-        nullable=True,
-        index=True,
-        comment="Optional username"
-    )
     
     full_name = Column(
         String(255),
@@ -194,11 +188,6 @@ class DBUser(BaseModel):
         comment="Profile picture URL"
     )
     
-    bio = Column(
-        Text,
-        nullable=True,
-        comment="User bio or description"
-    )
     
     department = Column(
         String(100),
@@ -206,31 +195,45 @@ class DBUser(BaseModel):
         comment="User's department or team"
     )
     
+    # Organization relationship
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('organizations.id'),
+        nullable=True,
+        index=True,
+        comment="Organization/company this user belongs to"
+    )
+    
     # Relationships
     tickets = relationship(
-        "DBTicket",
+        "Ticket",
         back_populates="creator",
-        foreign_keys="DBTicket.created_by_id"
+        foreign_keys="Ticket.created_by_id"
     )
     
     assigned_tickets = relationship(
-        "DBTicket", 
+        "Ticket", 
         back_populates="assignee",
-        foreign_keys="DBTicket.assigned_to_id"
+        foreign_keys="Ticket.assigned_to_id"
     )
     
     uploaded_files = relationship(
-        "DBFile",
+        "File",
         back_populates="uploader"
     )
     
+    organization = relationship(
+        "Organization",
+        back_populates="users"
+    )
+    
     def __repr__(self):
-        return f"<DBUser(id={self.id}, email={self.email}, role={self.role})>"
+        return f"<User(id={self.id}, email={self.email}, role={self.role})>"
     
     @property
     def display_name(self) -> str:
         """Get display name for user"""
-        return self.full_name or self.username or self.email.split('@')[0]
+        return self.full_name or self.email.split('@')[0]
     
     @property
     def is_locked(self) -> bool:

@@ -14,23 +14,21 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
-from ..models.user import DBUser
+from ..models.user import User
 from ..database import get_db_session
 from ..config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Suppress bcrypt version warnings
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, message=".*bcrypt.*")
-
-# Password hashing context
+# Password hashing context with modern configuration
 pwd_context = CryptContext(
     schemes=["bcrypt"], 
     deprecated="auto",
-    bcrypt__default_rounds=12
+    bcrypt__default_rounds=12,
+    # Explicitly avoid deprecated schemes that use crypt module
+    bcrypt__min_rounds=4,
+    bcrypt__max_rounds=31
 )
 
 # JWT Bearer token handler
@@ -100,13 +98,13 @@ class AuthService:
         except JWTError as e:
             raise AuthenticationError(f"Token validation failed: {str(e)}")
     
-    async def authenticate_user(self, email: str, password: str, db: AsyncSession) -> Optional[DBUser]:
+    async def authenticate_user(self, email: str, password: str, db: AsyncSession) -> Optional[User]:
         """Authenticate user using modern async SQLAlchemy 2.0 patterns"""
         try:
             # Query user with proper async SQLAlchemy 2.0 syntax
-            stmt = select(DBUser).where(
-                DBUser.email == email,
-                DBUser.is_deleted == False
+            stmt = select(User).where(
+                User.email == email,
+                User.is_deleted == False
             )
             
             result = await db.execute(stmt)
@@ -137,7 +135,7 @@ class AuthService:
             await db.rollback()
             return None
     
-    async def get_user_by_token(self, token: str, db: AsyncSession) -> Optional[DBUser]:
+    async def get_user_by_token(self, token: str, db: AsyncSession) -> Optional[User]:
         """Get user by JWT token using async SQLAlchemy 2.0"""
         try:
             payload = self.verify_token(token)
@@ -146,10 +144,11 @@ class AuthService:
             if not user_id:
                 raise AuthenticationError("Token missing user ID")
             
+            
             # Query user with proper async patterns - user_id is UUID string
-            stmt = select(DBUser).where(
-                DBUser.id == user_id,
-                DBUser.is_deleted == False
+            stmt = select(User).where(
+                User.id == user_id,
+                User.is_deleted == False
             )
             
             result = await db.execute(stmt)
@@ -177,7 +176,7 @@ auth_service = AuthService()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db_session)
-) -> DBUser:
+) -> User:
     """FastAPI dependency to get current authenticated user"""
     if not credentials:
         raise HTTPException(
@@ -207,7 +206,7 @@ async def get_current_user(
 async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db_session)
-) -> Optional[DBUser]:
+) -> Optional[User]:
     """FastAPI dependency to get current user (optional)"""
     if not credentials:
         return None
@@ -249,7 +248,7 @@ class WebSocketAuthMiddleware:
     def __init__(self):
         self.auth_service = auth_service
     
-    async def authenticate_websocket_token(self, token: str, db: AsyncSession) -> Optional[DBUser]:
+    async def authenticate_websocket_token(self, token: str, db: AsyncSession) -> Optional[User]:
         """Authenticate WebSocket connection using JWT token"""
         try:
             return await self.auth_service.get_user_by_token(token, db)

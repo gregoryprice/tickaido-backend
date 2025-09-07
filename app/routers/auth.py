@@ -5,28 +5,67 @@ Handles user registration, login, token refresh, and profile management
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Dict, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..database import get_db_session
-from ..models.user import DBUser
-from ..schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse, UserUpdate
+from ..models.user import User
+from ..models.organization import Organization
+from ..schemas.user import (
+    UserCreate, UserLogin, UserResponse, TokenResponse, RefreshTokenRequest, 
+    UserUpdate, UserMeResponse, EmailCheckRequest, EmailCheckResponse
+)
 from ..middleware.auth_middleware import (
     auth_middleware, 
     get_current_user, 
-    get_current_user_optional,
-    security
+    get_current_user_optional
 )
 from ..middleware.rate_limiting import auth_rate_limit
+from ..services.ai_agent_service import ai_agent_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post("/check-email", response_model=EmailCheckResponse)
+async def check_email_availability(
+    email_check: EmailCheckRequest,
+    db: AsyncSession = Depends(get_db_session),
+    _rate_limit: Dict[str, Any] = Depends(auth_rate_limit)
+):
+    """Check if email is available for registration"""
+    try:
+        # Check if user with email already exists
+        existing_user = await db.execute(
+            select(User).where(User.email == email_check.email.lower())
+        )
+        user_exists = existing_user.scalar_one_or_none() is not None
+        
+        if user_exists:
+            return EmailCheckResponse(
+                email=email_check.email,
+                available=False,
+                message="Email is already registered"
+            )
+        else:
+            return EmailCheckResponse(
+                email=email_check.email,
+                available=True,
+                message="Email is available for registration"
+            )
+            
+    except Exception as e:
+        logger.error(f"❌ Email check failed for {email_check.email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Email availability check failed"
+        )
 
 
 @router.post("/register", response_model=UserResponse)
@@ -39,7 +78,7 @@ async def register_user(
     try:
         # Check if user already exists
         existing_user = await db.execute(
-            select(DBUser).where(DBUser.email == user_data.email)
+            select(User).where(User.email == user_data.email)
         )
         if existing_user.scalar_one_or_none():
             raise HTTPException(
@@ -50,11 +89,56 @@ async def register_user(
         # Create password hash
         password_hash = auth_middleware.get_password_hash(user_data.password)
         
+        # Handle organization - create or find existing
+        organization_id = None
+        if user_data.organization_name:
+            # Try to find existing organization by name
+            existing_org = await db.execute(
+                select(Organization).where(Organization.name == user_data.organization_name)
+            )
+            organization = existing_org.scalar_one_or_none()
+            
+            # Create new organization if doesn't exist
+            if not organization:
+                organization = Organization(
+                    name=user_data.organization_name,
+                    is_enabled=True,
+                    plan="basic",
+                    timezone="UTC",
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
+                )
+                db.add(organization)
+                # Commit the organization first to ensure it exists for foreign key
+                await db.commit()
+                await db.refresh(organization)
+                logger.info(f"✅ New organization created: {user_data.organization_name}")
+                
+                # Auto-create Customer Support Agent for new organization
+                try:
+                    agent = await ai_agent_service.create_organization_agent(
+                        organization_id=organization.id,
+                        agent_type="customer_support",
+                        name=f"{organization.name} - Customer Support Agent",
+                        auto_created=True,
+                        db=db
+                    )
+                    if agent:
+                        logger.info(f"🤖 Auto-created Customer Support Agent for organization {organization.name}")
+                    else:
+                        logger.warning(f"⚠️ Failed to auto-create agent for organization {organization.name}")
+                except Exception as e:
+                    logger.error(f"❌ Error auto-creating agent for organization {organization.name}: {e}")
+                    # Don't fail registration if agent creation fails
+            
+            organization_id = organization.id
+        
         # Create new user
-        db_user = DBUser(
+        db_user = User(
             email=user_data.email,
             full_name=user_data.full_name,
             password_hash=password_hash,
+            organization_id=organization_id,
             is_active=True,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc)
@@ -142,12 +226,12 @@ async def login_user(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    refresh_data: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db_session),
     _rate_limit: Dict[str, Any] = Depends(auth_rate_limit)
 ):
     """Refresh JWT access token using refresh token"""
-    if not credentials:
+    if not refresh_data.refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing refresh token",
@@ -156,7 +240,7 @@ async def refresh_token(
     
     try:
         # Verify refresh token
-        payload = auth_middleware.verify_token(credentials.credentials, "refresh")
+        payload = auth_middleware.verify_token(refresh_data.refresh_token, "refresh")
         user_id = payload.get("sub")
         
         if not user_id:
@@ -167,7 +251,7 @@ async def refresh_token(
             )
         
         # Get user from database
-        result = await db.execute(select(DBUser).where(DBUser.id == int(user_id)))
+        result = await db.execute(select(User).where(User.id == UUID(user_id)))
         user = result.scalar_one_or_none()
         
         if not user or not user.is_active:
@@ -210,25 +294,47 @@ async def refresh_token(
         )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserMeResponse)
 async def get_current_user_profile(
-    current_user: DBUser = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
 ):
     """Get current user's profile information"""
-    return UserResponse(
+    # Load organization data if user has one
+    organization = None
+    if current_user.organization_id:
+        org_result = await db.execute(
+            select(Organization).where(Organization.id == current_user.organization_id)
+        )
+        organization = org_result.scalar_one_or_none()
+    
+    return UserMeResponse(
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
+        avatar_url=current_user.avatar_url,
+        role=current_user.role.value,
         is_active=current_user.is_active,
+        timezone=current_user.timezone,
+        language=current_user.language,
+        preferences=current_user.preferences,
+        is_verified=current_user.is_verified,
+        last_login_at=current_user.last_login_at,
         created_at=current_user.created_at,
-        last_login_at=current_user.last_login_at
+        updated_at=current_user.updated_at,
+        # Organization fields
+        organization_id=current_user.organization_id,
+        organization_name=organization.name if organization else None,
+        organization_domain=organization.domain if organization else None,
+        organization_plan=organization.plan if organization else None,
+        organization_timezone=organization.timezone if organization else None
     )
 
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserMeResponse)
 async def update_user_profile(
     user_update: UserUpdate,
-    current_user: DBUser = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update current user's profile information"""
@@ -253,13 +359,34 @@ async def update_user_profile(
         
         logger.info(f"✅ User profile updated: {current_user.email}")
         
-        return UserResponse(
+        # Load organization data if user has one
+        organization = None
+        if current_user.organization_id:
+            org_result = await db.execute(
+                select(Organization).where(Organization.id == current_user.organization_id)
+            )
+            organization = org_result.scalar_one_or_none()
+        
+        return UserMeResponse(
             id=current_user.id,
             email=current_user.email,
             full_name=current_user.full_name,
+            avatar_url=current_user.avatar_url,
+            role=current_user.role.value,
             is_active=current_user.is_active,
+            timezone=current_user.timezone,
+            language=current_user.language,
+            preferences=current_user.preferences,
+            is_verified=current_user.is_verified,
+            last_login_at=current_user.last_login_at,
             created_at=current_user.created_at,
-            last_login_at=current_user.last_login_at
+            updated_at=current_user.updated_at,
+            # Organization fields
+            organization_id=current_user.organization_id,
+            organization_name=organization.name if organization else None,
+            organization_domain=organization.domain if organization else None,
+            organization_plan=organization.plan if organization else None,
+            organization_timezone=organization.timezone if organization else None
         )
         
     except Exception as e:
@@ -273,7 +400,7 @@ async def update_user_profile(
 
 @router.post("/logout")
 async def logout_user(
-    current_user: DBUser = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Logout user (client-side token invalidation)"""
     # In a production system, you might want to maintain a blacklist of tokens
@@ -288,7 +415,7 @@ async def logout_user(
 
 @router.get("/verify")
 async def verify_token(
-    current_user: DBUser = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Verify if current token is valid"""
     if current_user:

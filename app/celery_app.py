@@ -3,7 +3,6 @@
 Celery application configuration for background task processing
 """
 
-import os
 from celery import Celery
 from celery.schedules import crontab
 
@@ -21,7 +20,8 @@ celery_app = Celery(
         "app.tasks.file_tasks",
         "app.tasks.ai_tasks", 
         "app.tasks.integration_tasks",
-        "app.tasks.notification_tasks"
+        "app.tasks.notification_tasks",
+        "app.tasks.agent_tasks"
     ]
 )
 
@@ -40,6 +40,7 @@ celery_app.conf.update(
         "app.tasks.ai_tasks.*": {"queue": "ai_processing"},
         "app.tasks.integration_tasks.*": {"queue": "integrations"},
         "app.tasks.notification_tasks.*": {"queue": "notifications"},
+        "app.tasks.agent_tasks.*": {"queue": "agent_processing"},
     },
     
     # Task execution settings
@@ -95,6 +96,13 @@ celery_app.conf.update(
         }
     }
 )
+
+# Import task modules to ensure registration
+try:
+    from app.tasks import file_tasks, ai_tasks, integration_tasks, notification_tasks, agent_tasks
+    print("✅ All task modules imported successfully for Celery registration")
+except ImportError as e:
+    print(f"⚠️ Failed to import some task modules: {e}")
 
 # Task autodiscovery
 celery_app.autodiscover_tasks()

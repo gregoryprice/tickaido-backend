@@ -5,7 +5,7 @@ File model for attachment management and AI processing
 
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, ForeignKey, Integer, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -37,7 +37,7 @@ class FileType(enum.Enum):
     OTHER = "other"
 
 
-class DBFile(BaseModel):
+class File(BaseModel):
     """
     File attachment model with AI processing capabilities.
     Supports transcription, OCR, and content analysis.
@@ -341,17 +341,17 @@ class DBFile(BaseModel):
     
     # Relationships
     ticket = relationship(
-        "DBTicket",
+        "Ticket",
         back_populates="files"
     )
     
     uploader = relationship(
-        "DBUser",
+        "User",
         back_populates="uploaded_files"
     )
     
     def __repr__(self):
-        return f"<DBFile(id={self.id}, filename={self.filename}, status={self.status})>"
+        return f"<File(id={self.id}, filename={self.filename}, status={self.status})>"
     
     @property
     def display_size(self) -> str:

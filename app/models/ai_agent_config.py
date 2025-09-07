@@ -5,7 +5,7 @@ AI Agent Configuration model for dynamic AI system management
 
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -18,6 +18,7 @@ class AIAgentType(enum.Enum):
     CUSTOMER_SUPPORT = "customer_support_agent"
     CATEGORIZATION = "categorization_agent"
     FILE_ANALYSIS = "file_analysis_agent"
+    TITLE_GENERATION = "title_generation"
     SENTIMENT_ANALYSIS = "sentiment_analysis_agent"
     ROUTING = "routing_agent"
     ESCALATION = "escalation_agent"
@@ -25,7 +26,7 @@ class AIAgentType(enum.Enum):
     TRANSLATION = "translation_agent"
 
 
-class DBAIAgentConfig(BaseModel):
+class AIAgentConfig(BaseModel):
     """
     AI Agent Configuration model for managing dynamic AI settings.
     Supports versioning, A/B testing, and configuration inheritance.
@@ -357,23 +358,23 @@ class DBAIAgentConfig(BaseModel):
     
     # Relationships
     parent_config = relationship(
-        "DBAIAgentConfig",
-        remote_side="DBAIAgentConfig.id",
+        "AIAgentConfig",
+        remote_side="AIAgentConfig.id",
         backref="child_configs"
     )
     
     created_by = relationship(
-        "DBUser",
+        "User",
         foreign_keys=[created_by_id]
     )
     
     approved_by = relationship(
-        "DBUser",
+        "User",
         foreign_keys=[approved_by_id]
     )
     
     def __repr__(self):
-        return f"<DBAIAgentConfig(id={self.id}, agent_type={self.agent_type}, version={self.version}, active={self.is_active})>"
+        return f"<AIAgentConfig(id={self.id}, agent_type={self.agent_type}, version={self.version}, active={self.is_active})>"
     
     @property
     def is_deprecated(self) -> bool:
@@ -529,9 +530,9 @@ class DBAIAgentConfig(BaseModel):
         else:
             self.change_log = [change_entry]
     
-    def clone_for_ab_test(self, test_name: str, percentage: int, modifications: Dict[str, Any]) -> 'DBAIAgentConfig':
+    def clone_for_ab_test(self, test_name: str, percentage: int, modifications: Dict[str, Any]) -> 'AIAgentConfig':
         """Clone configuration for A/B testing"""
-        cloned = DBAIAgentConfig(
+        cloned = AIAgentConfig(
             agent_type=self.agent_type,
             name=f"{self.name} - A/B Test: {test_name}",
             version=f"{self.version}-ab-{test_name}",

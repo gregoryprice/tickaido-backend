@@ -1,0 +1,1925 @@
+{
+	"info": {
+		"_postman_id": "ai-ticket-creator-complete-2025",
+		"name": "AI Ticket Creator Backend API - Complete (Agent + Integration Refactor)",
+		"description": "Complete API collection for AI-powered ticket creation and management system with refactored multi-agent architecture and integration system.\n\n## Features\n- **Multi-Agent System**: Multiple agents per organization with embedded configuration\n- **Agent Management**: CRUD operations with change history tracking\n- **User authentication and organization management**\n- **AI-powered ticket creation and management**\n- **Chat Assistant**: Real-time AI chat with conversation management\n- **File processing**: OCR, transcription, and agent context integration\n- **Third-party integrations**: JIRA, Salesforce, etc.\n- **Real-time WebSocket communications**\n\n## Integration Architecture (REFACTORED)\nThe system now uses semantic integration categories:\n1. **Category-Based System**: 7 functional categories (ticketing, crm, messaging, communication, project_management, code_repository, webhook)\n2. **Platform Identification**: Separate platform_name field (jira, slack, salesforce, etc.)\n3. **Automatic Status Management**: enabled=false automatically sets status=inactive\n4. **ID-Based Routing**: Tickets use integration_id instead of integration_name\n5. **Clean Architecture**: All deprecated IntegrationType enum removed\n\n## Agent Architecture\nThe system supports:\n1. **Multiple Agents per Organization**: No singleton constraints\n2. **Embedded Configuration**: 20+ typed fields instead of JSON blob\n3. **Change History Tracking**: Complete audit trail with rollback capabilities\n4. **File Context Processing**: Up to 20 files per agent with text extraction\n5. **Autonomous Task Processing**: Queue-based multi-channel operations\n6. **Simplified API**: 6 CRUD + history endpoints\n\n## Agent-Centric Chat System\nThe chat system is fully agent-centric with:\n1. **Thread Management**: Create, read, update, delete threads per agent\n2. **Message Handling**: Send messages and receive AI responses\n3. **Context Awareness**: Agents use their configuration and file context\n4. **Real-time Processing**: WebSocket support for live conversations\n5. **Title Generation**: AI-powered thread title suggestions\n6. **Search & Filtering**: Find threads by content, archive status, etc.\n\n## Authentication\nAll protected endpoints require JWT authentication. Use the login flow to get access tokens.\n\n## Base URL\nLocal Development: http://localhost:8000",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "ai-ticket-creator"
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Check Email Availability",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{TEST_EMAIL}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/check-email",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "check-email"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Email availability check works\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{USER_EMAIL}}\",\n  \"password\": \"{{USER_PASSWORD}}\",\n  \"full_name\": \"{{USER_FULL_NAME}}\",\n  \"organization_name\": \"{{ORGANIZATION_NAME}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/register",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{USER_EMAIL}}\",\n  \"password\": \"{{USER_PASSWORD}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "login"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Login successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"    pm.environment.set('ACCESS_TOKEN', jsonData.access_token);",
+									"    pm.environment.set('REFRESH_TOKEN', jsonData.refresh_token);",
+									"    pm.environment.set('USER_ID', jsonData.user_id);",
+									"    pm.environment.set('ORGANIZATION_ID', jsonData.organization_id);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/me",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{REFRESH_TOKEN}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/refresh",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "refresh"]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/logout",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "logout"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🤖 Agent Management (NEW ARCHITECTURE)",
+			"item": [
+				{
+					"name": "Create Agent",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Customer Support Specialist\",\n    \"agent_type\": \"customer_support\",\n    \"avatar_url\": \"https://example.com/support-avatar.png\",\n    \"role\": \"Specialized customer support agent for technical inquiries and issue resolution\",\n    \"prompt\": \"You are a helpful customer support specialist with expertise in technical issues. Be professional, thorough, and solution-focused. Always aim to resolve issues efficiently.\",\n    \"initial_context\": \"Welcome! I'm here to help you resolve any issues you may be experiencing. Please describe your problem in detail.\",\n    \"initial_ai_msg\": \"Hello! I'm your customer support specialist. How can I help you today?\",\n    \"tone\": \"helpful\",\n    \"communication_style\": \"professional\",\n    \"use_streaming\": true,\n    \"response_length\": \"detailed\",\n    \"memory_retention\": 10,\n    \"show_suggestions_after_each_message\": true,\n    \"max_context_size\": 150000,\n    \"use_memory_context\": true,\n    \"max_iterations\": 8,\n    \"timeout_seconds\": 120,\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"get_ticket\", \"update_ticket\", \"get_system_health\"]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Agent created successfully\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData.name).to.eql('Customer Support Specialist');",
+									"    pm.environment.set('AGENT_ID', jsonData.id);",
+									"});",
+									"",
+									"pm.test(\"Embedded configuration working\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"    pm.expect(jsonData).to.have.property('prompt');",
+									"    pm.expect(jsonData).to.have.property('avatar_url');",
+									"    pm.expect(jsonData.tools_enabled).to.be.an('array');",
+									"    pm.expect(jsonData.tools_enabled.length).to.be.greaterThan(0);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Agent",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}"]
+						}
+					}
+				},
+				{
+					"name": "List Agents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents?page=1&limit=20",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Agent list structure correct\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('agents');",
+									"    pm.expect(jsonData).to.have.property('total');",
+									"    pm.expect(jsonData.agents).to.be.an('array');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Update Agent Configuration",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tone\": \"friendly\",\n    \"communication_style\": \"casual\",\n    \"response_length\": \"brief\",\n    \"memory_retention\": 15,\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"get_ticket\", \"update_ticket\", \"get_system_health\", \"list_integrations\"]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Agent update with history tracking\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.tone).to.eql('friendly');",
+									"    pm.expect(jsonData.memory_retention).to.eql(15);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Agent Change History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}/history?page=1&limit=10",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}", "history"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "10"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Change history tracking working\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('history');",
+									"    pm.expect(jsonData.history).to.be.an('array');",
+									"    console.log('History records found:', jsonData.history.length);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Second Agent (Multi-Agent Test)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Sales Assistant\",\n    \"agent_type\": \"sales\",\n    \"avatar_url\": \"https://example.com/sales-avatar.png\",\n    \"role\": \"Sales support specialist for lead qualification and customer onboarding\",\n    \"communication_style\": \"persuasive\",\n    \"tone\": \"enthusiastic\",\n    \"response_length\": \"moderate\",\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"list_integrations\"]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Second agent created (multi-agent validation)\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('SECOND_AGENT_ID', jsonData.id);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Delete Agent",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{SECOND_AGENT_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{SECOND_AGENT_ID}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "💬 Agent-Centric Chat",
+			"item": [
+				{
+					"name": "List Threads",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads?page=1&page_size=20&archived=false&q=support",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "page_size", "value": "20"},
+								{"key": "archived", "value": "false"},
+								{"key": "q", "value": "support"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Threads listed successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('threads');",
+									"    pm.expect(jsonData).to.have.property('total');",
+									"    pm.expect(jsonData).to.have.property('agent_id');",
+									"    pm.expect(jsonData.threads).to.be.an('array');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Thread",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Technical Support Thread\",\n    \"thread_metadata\": {\n        \"source\": \"postman_test\",\n        \"priority\": \"normal\",\n        \"category\": \"technical_support\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Thread created\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('THREAD_ID', jsonData.id);",
+									"    pm.test('Response has agent_id', function() {",
+									"        pm.expect(jsonData).to.have.property('agent_id');",
+									"    });",
+									"    pm.test('Response has thread_metadata', function() {",
+									"        pm.expect(jsonData).to.have.property('thread_metadata');",
+									"    });",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Thread",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}?include_messages=true",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}"],
+							"query": [
+								{"key": "include_messages", "value": "true"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Thread retrieved successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('agent_id');",
+									"    pm.expect(jsonData).to.have.property('messages');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Update Thread",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Updated Technical Support Thread\",\n    \"archived\": false,\n    \"thread_metadata\": {\n        \"priority\": \"high\",\n        \"category\": \"technical_support\",\n        \"last_updated\": \"2025-01-01T12:00:00Z\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Thread updated successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('updated_fields');",
+									"    pm.expect(jsonData.title).to.eql('Updated Technical Support Thread');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Delete Thread",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Thread deleted successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.detail).to.eql('Thread deleted successfully');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Send Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"content\": \"The extension shows 'Connection failed' when I try to create tickets. I've checked the API key and it seems correct.\",\n    \"role\": \"user\",\n    \"attachments\": [],\n    \"message_metadata\": {\n        \"source\": \"postman_test\",\n        \"browser\": \"chrome\",\n        \"timestamp\": \"2025-01-01T12:00:00Z\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}/messages",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}", "messages"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Message sent successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('content');",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"    pm.expect(jsonData.thread_id).to.eql(pm.environment.get('THREAD_ID'));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Thread Messages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}/messages?page=1&page_size=100",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}", "messages"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "page_size", "value": "100"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Messages retrieved successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('messages');",
+									"    pm.expect(jsonData).to.have.property('thread_id');",
+									"    pm.expect(jsonData.messages).to.be.an('array');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Generate Thread Title",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}/generate_title",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}", "generate_title"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Title generated successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('title');",
+									"    pm.expect(jsonData).to.have.property('confidence');",
+									"    pm.expect(jsonData).to.have.property('generated_at');",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🎫 Ticket Management",
+			"item": [
+				{
+					"name": "List Tickets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets?page=1&limit=20",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Ticket",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Login Issues with Chrome Extension\",\n    \"description\": \"Users are experiencing authentication failures when trying to log in through the Chrome extension. The error occurs intermittently.\",\n    \"priority\": \"high\",\n    \"category\": \"technical\",\n    \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Ticket created successfully\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('TICKET_ID', jsonData.ticket.id);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Ticket with AI",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"My Chrome extension keeps crashing when I try to create tickets. It shows a 'Network Error' and then stops working. This happens on both Chrome and Edge browsers.\",\n    \"integration_id\": \"{{INTEGRATION_ID}}\",\n    \"metadata\": {\n        \"browser\": \"Chrome/Edge\",\n        \"error_type\": \"Network Error\",\n        \"frequency\": \"Always\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/ai-create",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "ai-create"]
+						}
+					}
+				},
+				{
+					"name": "Get Ticket",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/{{TICKET_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "{{TICKET_ID}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Ticket",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"in_progress\",\n    \"description\": \"Updated: Investigation shows this is related to CORS configuration in the extension manifest.\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/{{TICKET_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "{{TICKET_ID}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Ticket with Integration ID (New)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Integration ID Test Ticket\",\n    \"description\": \"Testing the new integration_id field instead of integration_name\",\n    \"priority\": \"medium\",\n    \"category\": \"technical\",\n    \"integration_id\": \"{{INTEGRATION_ID}}\",\n    \"create_externally\": false\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Ticket created with integration_id\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.ticket).to.have.property('integration_id');",
+									"    pm.expect(jsonData.ticket.integration_id).to.eql(pm.environment.get('INTEGRATION_ID'));",
+									"    pm.environment.set('REFACTOR_TEST_TICKET_ID', jsonData.ticket.id);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Ticket Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/stats/overview",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "stats", "overview"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "👤 User Management",
+			"item": [
+				{
+					"name": "Update User Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"full_name\": \"Updated User Name\",\n    \"notification_preferences\": {\n        \"email_notifications\": true,\n        \"slack_notifications\": false\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/auth/me",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "Upload User Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": "/path/to/avatar.png"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/users/{{USER_ID}}/avatar",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "users", "{{USER_ID}}", "avatar"]
+						}
+					}
+				},
+				{
+					"name": "Get User Avatar",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/users/{{USER_ID}}/avatar",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "users", "{{USER_ID}}", "avatar"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔗 Integrations",
+			"item": [
+				{
+					"name": "Create Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"JIRA Production\",\n    \"integration_category\": \"ticketing\",\n    \"platform_name\": \"jira\",\n    \"enabled\": true,\n    \"base_url\": \"{{JIRA_URL}}\",\n    \"auth_type\": \"api_key\",\n    \"credentials\": {\n        \"email\": \"{{JIRA_EMAIL}}\",\n        \"api_token\": \"{{JIRA_API_TOKEN}}\"\n    },\n    \"configuration\": {\n        \"project_key\": \"{{JIRA_PROJECT_KEY}}\"\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"support\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", ""]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"JIRA integration created with new schema\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('INTEGRATION_ID', jsonData.id);",
+									"    ",
+									"    // Validate new schema structure",
+									"    pm.expect(jsonData).to.have.property('integration_category');", 
+									"    pm.expect(jsonData).to.have.property('platform_name');",
+									"    pm.expect(jsonData).to.have.property('enabled');",
+									"    pm.expect(jsonData.integration_category).to.eql('ticketing');",
+									"    pm.expect(jsonData.platform_name).to.eql('jira');",
+									"    pm.expect(jsonData.enabled).to.be.a('boolean');",
+									"    ",
+									"    // Ensure deprecated fields are not present",
+									"    pm.expect(jsonData).to.not.have.property('integration_type');",
+									"    pm.expect(jsonData).to.not.have.property('is_enabled');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Slack Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Slack Support Channel\",\n    \"integration_category\": \"messaging\",\n    \"platform_name\": \"slack\",\n    \"enabled\": true,\n    \"auth_type\": \"api_key\",\n    \"credentials\": {\n        \"bot_token\": \"{{SLACK_BOT_TOKEN}}\",\n        \"channel\": \"{{SLACK_CHANNEL}}\"\n    },\n    \"configuration\": {\n        \"default_channel\": \"#support\",\n        \"thread_replies\": true\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"support\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", ""]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Slack integration created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.integration_category).to.eql('messaging');",
+									"    pm.expect(jsonData.platform_name).to.eql('slack');",
+									"    pm.environment.set('SLACK_INTEGRATION_ID', jsonData.id);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "List Integrations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/?integration_category=ticketing&enabled=true",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", ""],
+							"query": [
+								{"key": "integration_category", "value": "ticketing"},
+								{"key": "enabled", "value": "true"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration list with category filter works\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"    if (jsonData.length > 0) {",
+									"        pm.expect(jsonData[0]).to.have.property('integration_category');",
+									"        pm.expect(jsonData[0]).to.have.property('platform_name');",
+									"        pm.expect(jsonData[0]).to.have.property('enabled');",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Integration",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Integration",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"JIRA Production Updated\",\n    \"enabled\": true,\n    \"configuration\": {\n        \"jira_url\": \"{{JIRA_URL}}\",\n        \"email\": \"{{JIRA_EMAIL}}\",\n        \"api_token\": \"{{JIRA_API_TOKEN}}\",\n        \"project_key\": \"{{JIRA_PROJECT_KEY}}\"\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"support\",\n        \"last_updated\": \"2025-01-01T12:00:00Z\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Integration",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Test Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/test",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "test"]
+						}
+					}
+				},
+				{
+					"name": "Sync Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sync_type\": \"full\",\n    \"options\": {\n        \"force_update\": false,\n        \"dry_run\": false\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/sync",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "sync"]
+						}
+					}
+				},
+				{
+					"name": "Disable Integration (Auto Status Management)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"enabled\": false,\n    \"reason\": \"Temporarily disabling for maintenance\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "status"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration disabled successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.enabled).to.eql(false);",
+									"    pm.expect(jsonData.status).to.eql('inactive');  // Auto status management",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Enable Integration (Auto Status Management)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"enabled\": true,\n    \"reason\": \"Re-enabling after maintenance completion\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "status"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration enabled successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.enabled).to.eql(true);",
+									"    // Status should be active or pending based on health",
+									"    pm.expect(['active', 'pending']).to.include(jsonData.status);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Update Integration Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"enabled\": true,\n    \"reason\": \"Integration enabled after successful testing\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "status"]
+						}
+					}
+				},
+				{
+					"name": "Get Active Integrations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/active",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "active"]
+						}
+					}
+				},
+				{
+					"name": "Activate Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"activate\": true,\n    \"validation_required\": true\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/activate",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "activate"]
+						}
+					}
+				},
+				{
+					"name": "Get Integration Fields",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/fields",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", "{{integration_id}}", "fields"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🏥 System Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/health",
+							"host": ["{{BASE_URL}}"],
+							"path": ["health"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"System is healthy\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('healthy');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "MCP Server Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{MCP_URL}}/health",
+							"host": ["{{MCP_URL}}"],
+							"path": ["health"]
+						}
+					}
+				},
+				{
+					"name": "API Documentation",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/docs",
+							"host": ["{{BASE_URL}}"],
+							"path": ["docs"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🧪 Agent System Testing",
+			"item": [
+				{
+					"name": "Multi-Agent Organization Test",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// This folder tests the multi-agent capabilities",
+									"console.log('Testing multi-agent system capabilities...');"
+								]
+							}
+						}
+					],
+					"item": [
+						{
+							"name": "Create Customer Support Agent",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Support Bot Alpha\",\n    \"agent_type\": \"customer_support\",\n    \"role\": \"Primary customer support agent\",\n    \"communication_style\": \"formal\",\n    \"tone\": \"professional\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/agents",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "agents"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Support agent created\", function () {",
+											"    pm.response.to.have.status(201);",
+											"    var jsonData = pm.response.json();",
+											"    pm.environment.set('SUPPORT_AGENT_ID', jsonData.id);",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Sales Agent",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Sales Assistant Pro\",\n    \"agent_type\": \"sales\",\n    \"role\": \"Lead qualification and customer onboarding specialist\",\n    \"communication_style\": \"persuasive\",\n    \"tone\": \"enthusiastic\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/agents",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "agents"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Sales agent created\", function () {",
+											"    pm.response.to.have.status(201);",
+											"    var jsonData = pm.response.json();",
+											"    pm.environment.set('SALES_AGENT_ID', jsonData.id);",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Technical Agent",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Tech Specialist\",\n    \"agent_type\": \"technical_support\",\n    \"role\": \"Advanced technical troubleshooting specialist\",\n    \"communication_style\": \"technical\",\n    \"tone\": \"precise\",\n    \"max_iterations\": 15,\n    \"timeout_seconds\": 180\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/agents",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "agents"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Technical agent created\", function () {",
+											"    pm.response.to.have.status(201);",
+											"    var jsonData = pm.response.json();",
+											"    pm.environment.set('TECH_AGENT_ID', jsonData.id);",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Verify Multiple Agents",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/agents",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "agents"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Multiple agents created successfully\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.total).to.be.at.least(3);",
+											"    console.log('Total agents:', jsonData.total);",
+											"    ",
+											"    // Verify different agent types exist",
+											"    var agentTypes = jsonData.agents.map(a => a.agent_type);",
+											"    pm.expect(agentTypes).to.include('customer_support');",
+											"    pm.expect(agentTypes).to.include('sales');",
+											"    pm.expect(agentTypes).to.include('technical_support');",
+											"});",
+											"",
+											"pm.test(\"No singleton constraint validation\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    // Should be able to have multiple agents of same org",
+											"    var orgIds = jsonData.agents.map(a => a.organization_id);",
+											"    pm.expect(orgIds.length).to.be.greaterThan(0);",
+											"});"
+										]
+									}
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🔄 Integration Refactor Validation",
+			"item": [
+				{
+					"name": "Test All Integration Categories",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Test data for different integration categories",
+									"console.log('🧪 Testing Integration Category System...');"
+								]
+							}
+						}
+					],
+					"item": [
+						{
+							"name": "Create CRM Integration (Salesforce)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Salesforce CRM\",\n    \"integration_category\": \"crm\",\n    \"platform_name\": \"salesforce\",\n    \"enabled\": true,\n    \"auth_type\": \"oauth2\",\n    \"credentials\": {\n        \"client_id\": \"{{SALESFORCE_CLIENT_ID}}\",\n        \"client_secret\": \"{{SALESFORCE_CLIENT_SECRET}}\",\n        \"instance_url\": \"{{SALESFORCE_INSTANCE_URL}}\"\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"sales\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/integrations/",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "integrations", ""]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"CRM category integration created\", function () {",
+											"    pm.response.to.have.status(201);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.integration_category).to.eql('crm');",
+											"    pm.expect(jsonData.platform_name).to.eql('salesforce');",
+											"    pm.environment.set('CRM_INTEGRATION_ID', jsonData.id);",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Project Management Integration", 
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Asana Projects\",\n    \"integration_category\": \"project_management\",\n    \"platform_name\": \"asana\",\n    \"enabled\": true,\n    \"auth_type\": \"api_key\",\n    \"credentials\": {\n        \"api_key\": \"{{ASANA_API_KEY}}\"\n    },\n    \"configuration\": {\n        \"workspace_id\": \"{{ASANA_WORKSPACE_ID}}\",\n        \"project_id\": \"{{ASANA_PROJECT_ID}}\"\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"development\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/integrations/",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "integrations", ""]
+								}
+							},
+							"event": [
+								{
+									"listen": "test", 
+									"script": {
+										"exec": [
+											"pm.test(\"Project management integration created\", function () {",
+											"    pm.response.to.have.status(201);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.integration_category).to.eql('project_management');",
+											"    pm.expect(jsonData.platform_name).to.eql('asana');",
+											"    pm.environment.set('PM_INTEGRATION_ID', jsonData.id);",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Test Integration Category Filtering",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/integrations/?integration_category=messaging",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "integrations", ""],
+									"query": [
+										{"key": "integration_category", "value": "messaging"}
+									]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Category filtering works correctly\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.be.an('array');",
+											"    ",
+											"    // All returned integrations should be messaging category",
+											"    jsonData.forEach(function(integration) {",
+											"        pm.expect(integration.integration_category).to.eql('messaging');",
+											"    });",
+											"});"
+										]
+									}
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "📊 Analytics & Monitoring",
+			"item": [
+				{
+					"name": "Get Agent History Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{SUPPORT_AGENT_ID}}/history?change_type=configuration_update&limit=20",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{SUPPORT_AGENT_ID}}", "history"],
+							"query": [
+								{"key": "change_type", "value": "configuration_update"},
+								{"key": "limit", "value": "20"}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Change history with filtering\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.history).to.be.an('array');",
+									"    ",
+									"    // Validate history record structure",
+									"    if (jsonData.history.length > 0) {",
+									"        var record = jsonData.history[0];",
+									"        pm.expect(record).to.have.property('change_type');",
+									"        pm.expect(record).to.have.property('field_changed');",
+									"        pm.expect(record).to.have.property('old_value');",
+									"        pm.expect(record).to.have.property('new_value');",
+									"        pm.expect(record).to.have.property('change_summary');",
+									"        pm.expect(record).to.have.property('change_timestamp');",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script",
+					"console.log('🚀 AI Ticket Creator API - Agent Architecture Refactor');",
+					"console.log('Base URL:', pm.environment.get('BASE_URL'));",
+					"",
+					"// Check if we have an access token",
+					"const token = pm.environment.get('ACCESS_TOKEN');",
+					"if (!token && pm.request.url.path.join('/') !== 'api/v1/auth/login') {",
+					"    console.warn('⚠️  No access token found. Make sure to run Login request first.');",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"pm.test(\"Response time acceptable\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"// Log response for debugging",
+					"if (pm.response.code >= 400) {",
+					"    console.error('❌ Request failed:', {",
+					"        status: pm.response.code,",
+					"        statusText: pm.response.status,",
+					"        body: pm.response.text()",
+					"    });",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "MCP_URL",
+			"value": "http://localhost:8001",
+			"type": "string"
+		},
+		{
+			"key": "JIRA_URL",
+			"value": "https://your-company.atlassian.net",
+			"type": "string"
+		},
+		{
+			"key": "JIRA_EMAIL",
+			"value": "your-email@company.com",
+			"type": "string"
+		},
+		{
+			"key": "JIRA_API_TOKEN",
+			"value": "your-jira-api-token",
+			"type": "string"
+		},
+		{
+			"key": "JIRA_PROJECT_KEY",
+			"value": "SUP",
+			"type": "string"
+		},
+		{
+			"key": "SLACK_BOT_TOKEN",
+			"value": "xoxb-your-slack-bot-token",
+			"type": "string"
+		},
+		{
+			"key": "SLACK_CHANNEL",
+			"value": "#support",
+			"type": "string"
+		},
+		{
+			"key": "SALESFORCE_CLIENT_ID",
+			"value": "your-salesforce-client-id",
+			"type": "string"
+		},
+		{
+			"key": "SALESFORCE_CLIENT_SECRET",
+			"value": "your-salesforce-client-secret",
+			"type": "string"
+		},
+		{
+			"key": "SALESFORCE_INSTANCE_URL",
+			"value": "https://your-company.my.salesforce.com",
+			"type": "string"
+		},
+		{
+			"key": "ASANA_API_KEY",
+			"value": "your-asana-api-key",
+			"type": "string"
+		},
+		{
+			"key": "ASANA_WORKSPACE_ID",
+			"value": "your-asana-workspace-id",
+			"type": "string"
+		},
+		{
+			"key": "ASANA_PROJECT_ID",
+			"value": "your-asana-project-id",
+			"type": "string"
+		}
+	]
+}

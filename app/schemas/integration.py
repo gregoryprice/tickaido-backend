@@ -10,26 +10,17 @@ from pydantic import Field, field_validator, model_validator
 from enum import Enum
 
 from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse, URLStr
-from app.models.integration import IntegrationType, IntegrationStatus
 
 
-class IntegrationTypeSchema(str, Enum):
-    """Integration type enum schema"""
-    JIRA = "jira"
-    SERVICENOW = "servicenow"
-    SALESFORCE = "salesforce"
-    ZENDESK = "zendesk"
-    GITHUB = "github"
-    SLACK = "slack"
-    TEAMS = "teams"
-    ZOOM = "zoom"
-    HUBSPOT = "hubspot"
-    FRESHDESK = "freshdesk"
-    ASANA = "asana"
-    TRELLO = "trello"
+class IntegrationCategorySchema(str, Enum):
+    """Integration category enum schema"""
+    TICKETING = "ticketing"
+    CRM = "crm"
+    MESSAGING = "messaging"
+    COMMUNICATION = "communication"
+    PROJECT_MANAGEMENT = "project_management"
+    CODE_REPOSITORY = "code_repository"
     WEBHOOK = "webhook"
-    EMAIL = "email"
-    SMS = "sms"
 
 
 class IntegrationStatusSchema(str, Enum):
@@ -46,8 +37,10 @@ class IntegrationStatusSchema(str, Enum):
 class IntegrationCreateRequest(BaseCreate):
     """Schema for creating a new integration"""
     name: str = Field(max_length=255, description="Display name for the integration")
-    integration_type: IntegrationTypeSchema = Field(description="Type of integration service")
+    integration_category: IntegrationCategorySchema = Field(description="Functional category of integration")
+    platform_name: str = Field(max_length=50, description="Platform name (jira, slack, etc.)")
     description: Optional[str] = Field(None, description="Integration description")
+    enabled: bool = Field(default=True, description="Whether the integration is enabled")
     
     # Connection configuration
     base_url: Optional[URLStr] = Field(None, description="Base URL for API endpoints")
@@ -104,9 +97,18 @@ class IntegrationCreateRequest(BaseCreate):
     def validate_credentials(self):
         auth_type = self.auth_type
         credentials = self.credentials
+        platform_name = getattr(self, 'platform_name', None)
         
-        if auth_type == "api_key" and "api_key" not in credentials:
-            raise ValueError('API key required for api_key authentication')
+        if auth_type == "api_key":
+            # Handle different integration types that use "api_key" auth differently
+            if platform_name == "jira":
+                # JIRA uses email + api_token for API key authentication
+                if not all(k in credentials for k in ["email", "api_token"]):
+                    raise ValueError('Email and API token required for JIRA api_key authentication')
+            else:
+                # Standard API key authentication
+                if "api_key" not in credentials:
+                    raise ValueError('API key required for api_key authentication')
         elif auth_type == "oauth2" and not all(k in credentials for k in ["client_id", "client_secret"]):
             raise ValueError('Client ID and secret required for OAuth2')
         elif auth_type == "basic" and not all(k in credentials for k in ["username", "password"]):
@@ -121,6 +123,7 @@ class IntegrationUpdateRequest(BaseUpdate):
     """Schema for updating an integration"""
     name: Optional[str] = Field(None, max_length=255, description="Integration name")
     description: Optional[str] = Field(None, description="Description")
+    enabled: Optional[bool] = Field(None, description="Whether the integration is enabled")
     base_url: Optional[URLStr] = Field(None, description="Base URL")
     api_version: Optional[str] = Field(None, max_length=20, description="API version")
     credentials: Optional[Dict[str, Any]] = Field(None, description="Authentication credentials")
@@ -151,7 +154,7 @@ class IntegrationUpdateRequest(BaseUpdate):
 
 class IntegrationStatusUpdateRequest(BaseSchema):
     """Schema for updating integration status"""
-    status: IntegrationStatusSchema = Field(description="New integration status")
+    enabled: Optional[bool] = Field(None, description="Whether integration is enabled")
     reason: Optional[str] = Field(None, description="Reason for status change")
 
 
@@ -162,11 +165,15 @@ class IntegrationTestRequest(BaseSchema):
         description="Types of tests to perform"
     )
     test_data: Optional[Dict[str, Any]] = Field(None, description="Test data to use")
+    auto_activate_on_success: bool = Field(
+        True, 
+        description="Automatically activate integration if all tests pass"
+    )
     
     @field_validator('test_types')
     @classmethod
     def validate_test_types(cls, v):
-        valid_types = {"connection", "authentication", "create_ticket", "search", "webhook"}
+        valid_types = {"connection", "authentication", "create_ticket", "search", "webhook", "project_access"}
         if not all(t in valid_types for t in v):
             raise ValueError(f'Invalid test types. Must be one of: {valid_types}')
         return v
@@ -210,8 +217,10 @@ class IntegrationUsageStats(BaseSchema):
 class IntegrationBaseResponse(BaseResponse):
     """Base integration response with common fields"""
     name: str = Field(description="Integration name")
-    integration_type: IntegrationTypeSchema = Field(description="Integration type")
+    integration_category: IntegrationCategorySchema = Field(description="Integration category")
+    platform_name: str = Field(description="Platform name")
     status: IntegrationStatusSchema = Field(description="Current status")
+    enabled: bool = Field(description="Whether integration is enabled")
     description: Optional[str] = Field(None, description="Description")
     environment: str = Field(description="Environment")
     is_healthy: bool = Field(description="Health status")
@@ -286,7 +295,8 @@ class IntegrationDetailResponse(IntegrationBaseResponse):
 
 class IntegrationConfigResponse(BaseSchema):
     """Integration configuration response (no credentials)"""
-    integration_type: IntegrationTypeSchema = Field(description="Integration type")
+    integration_category: IntegrationCategorySchema = Field(description="Integration category")
+    platform_name: str = Field(description="Platform name")
     auth_type: str = Field(description="Authentication type")
     required_credentials: List[str] = Field(description="Required credential fields")
     optional_credentials: List[str] = Field(description="Optional credential fields")
@@ -305,6 +315,9 @@ class IntegrationTestResponse(BaseSchema):
     details: Dict[str, Any] = Field(description="Test details")
     error_message: Optional[str] = Field(None, description="Error message if failed")
     suggestions: Optional[List[str]] = Field(None, description="Suggestions for fixing issues")
+    activation_triggered: Optional[bool] = Field(None, description="Whether integration was auto-activated")
+    previous_status: Optional[str] = Field(None, description="Status before test")
+    new_status: Optional[str] = Field(None, description="Status after test")
 
 
 class IntegrationSyncResponse(BaseSchema):
@@ -351,11 +364,12 @@ class IntegrationStatsResponse(BaseSchema):
 class IntegrationSearchParams(BaseSchema):
     """Integration search parameters"""
     q: Optional[str] = Field(None, description="Search query (name, description)")
-    integration_type: Optional[List[IntegrationTypeSchema]] = Field(None, description="Filter by type")
+    integration_category: Optional[List[IntegrationCategorySchema]] = Field(None, description="Filter by category")
+    platform_name: Optional[str] = Field(None, description="Filter by platform name")
     status: Optional[List[IntegrationStatusSchema]] = Field(None, description="Filter by status")
     environment: Optional[str] = Field(None, description="Filter by environment")
     auth_type: Optional[str] = Field(None, description="Filter by auth type")
-    is_healthy: Optional[bool] = Field(None, description="Filter by health status")
+    enabled: Optional[bool] = Field(None, description="Filter by enabled status")
     sync_enabled: Optional[bool] = Field(None, description="Filter by sync enabled")
     created_after: Optional[datetime] = Field(None, description="Created after date")
     created_before: Optional[datetime] = Field(None, description="Created before date")

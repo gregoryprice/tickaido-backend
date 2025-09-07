@@ -4,17 +4,14 @@ Celery tasks for AI-powered operations
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from uuid import UUID
 from datetime import datetime, timezone
 
 from celery import current_app as celery_app
 from celery.utils.log import get_task_logger
-from sqlalchemy import select, and_
 
 from app.database import get_db_session
-from app.models.ticket import DBTicket, TicketStatus
-from app.models.file import DBFile
 from app.services.ai_service import AIService
 from app.services.ticket_service import TicketService
 

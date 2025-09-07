@@ -11,11 +11,9 @@ import os
 import yaml
 from typing import Dict, Any, Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 from app.config.settings import get_settings
-from app.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -397,6 +395,149 @@ class AIConfigService:
                 "success": False,
                 "error": str(e)
             }
+    
+    async def load_prompt_template(self, template_name: str) -> str:
+        """
+        Load prompt template from ai_config.yaml
+        
+        Args:
+            template_name: Name of the template (e.g., "customer_support_default")
+            
+        Returns:
+            str: Prompt template content
+        """
+        try:
+            config = self.load_config()
+            prompt_templates = config.get("prompt_templates", {})
+            
+            if template_name not in prompt_templates:
+                logger.warning(f"Prompt template '{template_name}' not found in configuration")
+                
+                # Fallback to CUSTOMER_SUPPORT_CHAT_PROMPT if available
+                if template_name == "customer_support_default":
+                    # Import here to avoid circular imports
+                    from app.agents.prompts import CUSTOMER_SUPPORT_CHAT_PROMPT
+                    logger.info("Using fallback CUSTOMER_SUPPORT_CHAT_PROMPT")
+                    return CUSTOMER_SUPPORT_CHAT_PROMPT
+                    
+                return "You are a helpful AI assistant."
+                
+            template_content = prompt_templates[template_name]
+            logger.debug(f"Loaded prompt template: {template_name}")
+            return template_content
+            
+        except Exception as e:
+            logger.error(f"Error loading prompt template {template_name}: {e}")
+            return "You are a helpful AI assistant."
+    
+    def get_max_iterations(self) -> int:
+        """
+        Get the max iterations from AI configuration.
+        
+        Returns:
+            int: Maximum number of AI agent iterations per request (default: 10)
+        """
+        try:
+            config = self.load_config()
+            ai_strategy = config.get("ai_strategy", {})
+            max_iterations = ai_strategy.get("max_iterations", 10)
+            logger.debug(f"Max iterations from config: {max_iterations}")
+            return max_iterations
+        except Exception as e:
+            logger.warning(f"Error loading max iterations from config: {e}, using default: 10")
+            return 10
+    
+    async def load_default_agent_configuration(self) -> Dict[str, Any]:
+        """
+        Load default agent configuration from ai_config.yaml
+        
+        Returns:
+            Dict[str, Any]: Default agent configuration with all settings
+        """
+        try:
+            config = self.load_config()
+            
+            # Get customer support agent configuration
+            agent_config = await self.get_agent_config("customer_support_agent")
+            if not agent_config:
+                logger.error("Customer support agent configuration not found")
+                return self._get_fallback_agent_configuration()
+            
+            # Load prompt template
+            system_prompt = await self.load_prompt_template(
+                agent_config.get("system_prompt_template", "customer_support_default")
+            )
+            
+            # Build complete configuration
+            default_config = {
+                "system_prompt": system_prompt,
+                "model_provider": agent_config.get("model_provider", "openai"),
+                "model_name": agent_config.get("model_name", "primary"),
+                "temperature": agent_config.get("temperature", 0.2),
+                "max_tokens": agent_config.get("max_tokens", 2000),
+                "timeout": agent_config.get("timeout", 30),
+                "confidence_threshold": agent_config.get("confidence_threshold", 0.7),
+                
+                # Updated tool list (all 13 current tools)
+                "tools_enabled": agent_config.get("tools_enabled", [
+                    "create_ticket", "create_ticket_with_ai", "get_ticket",
+                    "update_ticket", "delete_ticket", "update_ticket_status",
+                    "assign_ticket", "search_tickets", "list_tickets", "get_ticket_stats",
+                    "list_integrations", "get_active_integrations", "get_system_health"
+                ]),
+                "mcp_enabled": agent_config.get("mcp_enabled", True),  # Enable by default
+                
+                # Agent iteration limit from config
+                "max_iterations": self.get_max_iterations(),
+                
+                # Additional behavioral settings
+                "auto_escalation_enabled": True,
+                "integration_routing_enabled": True,
+                "response_style": "professional",
+                "default_priority": "medium",
+                "default_category": "general"
+            }
+            
+            logger.info("✅ Default agent configuration loaded from ai_config.yaml")
+            return default_config
+            
+        except Exception as e:
+            logger.error(f"Error loading default agent configuration: {e}")
+            return self._get_fallback_agent_configuration()
+    
+    def _get_fallback_agent_configuration(self) -> Dict[str, Any]:
+        """
+        Get fallback agent configuration if ai_config.yaml loading fails
+        
+        Returns:
+            Dict[str, Any]: Fallback configuration with all 13 tools
+        """
+        logger.warning("Using fallback agent configuration")
+        
+        return {
+            "system_prompt": "You are an AI Customer Support Assistant.",
+            "model_provider": "openai",
+            "model_name": "primary",
+            "temperature": 0.2,
+            "max_tokens": 2000,
+            "timeout": 30,
+            "confidence_threshold": 0.7,
+            
+            # All 13 current MCP tools
+            "tools_enabled": [
+                "create_ticket", "create_ticket_with_ai", "get_ticket",
+                "update_ticket", "delete_ticket", "update_ticket_status",
+                "assign_ticket", "search_tickets", "list_tickets", "get_ticket_stats",
+                "list_integrations", "get_active_integrations", "get_system_health"
+            ],
+            "mcp_enabled": True,
+            
+            "auto_escalation_enabled": True,
+            "integration_routing_enabled": True,
+            "response_style": "professional",
+            "default_priority": "medium",
+            "default_category": "general"
+        }
 
 
 # Global AI configuration service instance

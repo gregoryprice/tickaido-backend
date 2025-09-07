@@ -10,7 +10,6 @@ from pydantic import Field, field_validator, model_validator
 from enum import Enum
 
 from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse
-from app.models.ai_agent_config import AIAgentType
 
 
 class AIAgentTypeSchema(str, Enum):
@@ -18,6 +17,7 @@ class AIAgentTypeSchema(str, Enum):
     CUSTOMER_SUPPORT = "customer_support_agent"
     CATEGORIZATION = "categorization_agent"
     FILE_ANALYSIS = "file_analysis_agent"
+    TITLE_GENERATION = "title_generation"
     SENTIMENT_ANALYSIS = "sentiment_analysis_agent"
     ROUTING = "routing_agent"
     ESCALATION = "escalation_agent"

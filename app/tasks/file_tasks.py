@@ -5,17 +5,16 @@ Celery tasks for file processing, analysis, and management
 
 import os
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 from celery import current_app as celery_app
 from celery.utils.log import get_task_logger
 from sqlalchemy import select, and_
 
 from app.database import get_db_session
-from app.models.file import DBFile, FileStatus, FileType
+from app.models.file import File, FileStatus, FileType
 from app.services.file_service import FileService
 from app.schemas.file import FileProcessingRequest, FileAnalysisRequest
 
@@ -249,10 +248,10 @@ async def _process_pending_files_async() -> int:
     """Process all pending files"""
     async with get_db_session() as db:
         # Get files with UPLOADED status
-        query = select(DBFile).where(
+        query = select(File).where(
             and_(
-                DBFile.status == FileStatus.UPLOADED,
-                DBFile.is_deleted == False
+                File.status == FileStatus.UPLOADED,
+                File.is_deleted == False
             )
         )
         
@@ -280,11 +279,11 @@ async def _cleanup_failed_uploads_async(older_than_hours: int) -> int:
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
         
         # Get files with ERROR status older than cutoff
-        query = select(DBFile).where(
+        query = select(File).where(
             and_(
-                DBFile.status == FileStatus.ERROR,
-                DBFile.created_at < cutoff_time,
-                DBFile.is_deleted == False
+                File.status == FileStatus.ERROR,
+                File.created_at < cutoff_time,
+                File.is_deleted == False
             )
         )
         
