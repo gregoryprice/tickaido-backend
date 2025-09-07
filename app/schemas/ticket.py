@@ -3,14 +3,13 @@
 Ticket schemas for API validation and serialization
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, computed_field
 from enum import Enum
 
 from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse
-from app.models.ticket import TicketStatus, TicketPriority, TicketCategory
 
 
 class TicketStatusSchema(str, Enum):
@@ -51,11 +50,12 @@ class TicketCreateRequest(BaseCreate):
     title: str = Field(max_length=500, description="Ticket title/subject")
     description: str = Field(description="Detailed ticket description")
     category: TicketCategorySchema = Field(TicketCategorySchema.GENERAL, description="Issue category")
-    priority: TicketPrioritySchema = Field(TicketPrioritySchema.MEDIUM, description="Priority level")
+    priority: Optional[TicketPrioritySchema] = Field(None, description="Priority level")
     urgency: TicketPrioritySchema = Field(TicketPrioritySchema.MEDIUM, description="Urgency level")
     department: Optional[str] = Field(None, max_length=100, description="Target department")
     assigned_to_id: Optional[UUID] = Field(None, description="Assign to specific user")
-    integration_routing: Optional[str] = Field(None, description="Integration for routing")
+    integration_id: Optional[UUID] = Field(None, description="Integration ID for external ticket creation")
+    create_externally: bool = Field(True, description="Create ticket in external system when integration specified")
     custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom field values")
     file_ids: Optional[List[UUID]] = Field(None, description="Attached file IDs")
     
@@ -84,7 +84,7 @@ class TicketUpdateRequest(BaseUpdate):
     status: Optional[TicketStatusSchema] = Field(None, description="Ticket status")
     department: Optional[str] = Field(None, max_length=100, description="Department")
     assigned_to_id: Optional[UUID] = Field(None, description="Assigned user ID")
-    integration_routing: Optional[str] = Field(None, description="Integration routing")
+    integration_id: Optional[UUID] = Field(None, description="Integration ID for external ticket routing")
     custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom field values")
     internal_notes: Optional[str] = Field(None, description="Internal notes")
     resolution_summary: Optional[str] = Field(None, description="Resolution summary")
@@ -155,6 +155,108 @@ class TicketAIAnalysisRequest(BaseSchema):
         return v
 
 
+class TicketPatchRequest(BaseSchema):
+    """
+    Schema for flexible partial ticket updates.
+    Any combination of fields can be updated in a single request.
+    """
+    
+    # Core ticket fields
+    title: Optional[str] = Field(None, min_length=1, max_length=200, description="Update ticket title")
+    description: Optional[str] = Field(None, min_length=1, max_length=10000, description="Update ticket description")
+    status: Optional[TicketStatusSchema] = Field(None, description="Update ticket status")
+    priority: Optional[TicketPrioritySchema] = Field(None, description="Update ticket priority")
+    category: Optional[TicketCategorySchema] = Field(None, description="Update ticket category")
+    
+    # Assignment fields
+    assigned_to_id: Optional[UUID] = Field(None, description="Assign ticket to user (null to unassign)")
+    assignment_reason: Optional[str] = Field(None, max_length=500, description="Reason for assignment change")
+    
+    # Additional fields
+    department: Optional[str] = Field(None, max_length=100, description="Update department")
+    due_date: Optional[datetime] = Field(None, description="Set ticket due date")
+    tags: Optional[List[str]] = Field(None, description="Update ticket tags")
+    
+    # Custom fields support
+    custom_fields: Optional[Dict[str, Any]] = Field(None, description="Update custom field values")
+    internal_notes: Optional[str] = Field(None, description="Add internal notes")
+    resolution_summary: Optional[str] = Field(None, description="Resolution summary")
+    
+    @field_validator('title')
+    @classmethod
+    def validate_title(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('Title cannot be empty')
+        return v.strip() if v else None
+    
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('Description cannot be empty')
+        return v.strip() if v else None
+    
+    @field_validator('assignment_reason')
+    @classmethod
+    def validate_assignment_reason(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('Assignment reason cannot be empty')
+        return v.strip() if v else None
+    
+    @field_validator('tags')
+    @classmethod
+    def validate_tags(cls, v):
+        if v is not None:
+            # Remove duplicates and empty strings
+            return list(set(tag.strip() for tag in v if tag.strip()))
+        return None
+    
+    @model_validator(mode='after')
+    def validate_resolution_summary(self):
+        """Require resolution summary when marking as resolved/closed"""
+        if self.status in [TicketStatusSchema.RESOLVED, TicketStatusSchema.CLOSED]:
+            if not self.resolution_summary or not self.resolution_summary.strip():
+                raise ValueError('Resolution summary required when resolving or closing ticket')
+        return self
+    
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "description": "Update status only",
+                    "value": {"status": "in_progress"}
+                },
+                {
+                    "description": "Assign ticket with reason",
+                    "value": {
+                        "assigned_to_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "assignment_reason": "User has expertise in this area"
+                    }
+                },
+                {
+                    "description": "Multi-field update",
+                    "value": {
+                        "status": "in_progress",
+                        "priority": "high",
+                        "assigned_to_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "assignment_reason": "Escalating priority issue"
+                    }
+                },
+                {
+                    "description": "Update with tags and notes",
+                    "value": {
+                        "status": "resolved",
+                        "priority": "low",
+                        "tags": ["fixed", "tested"],
+                        "resolution_summary": "Issue resolved by updating configuration",
+                        "internal_notes": "Configuration updated in production environment"
+                    }
+                }
+            ]
+        }
+    }
+
+
 # Response schemas
 class TicketUserInfo(BaseSchema):
     """User information for ticket responses"""
@@ -190,7 +292,12 @@ class TicketAIAnalysis(BaseSchema):
 class TicketBaseResponse(BaseResponse):
     """Base ticket response with common fields"""
     title: str = Field(description="Ticket title")
-    display_title: str = Field(description="Display title (truncated)")
+    
+    @computed_field
+    @property  
+    def display_title(self) -> str:
+        """Display title (truncated)"""
+        return self.title[:100] + "..." if len(self.title) > 100 else self.title
     category: TicketCategorySchema = Field(description="Issue category")
     subcategory: Optional[str] = Field(None, description="Issue subcategory")
     priority: TicketPrioritySchema = Field(description="Priority level")
@@ -198,8 +305,8 @@ class TicketBaseResponse(BaseResponse):
     status: TicketStatusSchema = Field(description="Current status")
     department: Optional[str] = Field(None, description="Assigned department")
     source_channel: str = Field(description="Source channel")
-    created_by: TicketUserInfo = Field(description="Ticket creator")
-    assigned_to: Optional[TicketUserInfo] = Field(None, description="Assigned user")
+    created_by: TicketUserInfo = Field(alias="creator", description="Ticket creator")
+    assigned_to: Optional[TicketUserInfo] = Field(alias="assignee", description="Assigned user")
 
 
 class TicketListResponse(TicketBaseResponse):
@@ -229,7 +336,6 @@ class TicketDetailResponse(TicketBaseResponse):
     # Metrics
     communication_count: int = Field(description="Communication count")
     resolution_time_minutes: Optional[int] = Field(None, description="Resolution time in minutes")
-    resolution_time_hours: Optional[float] = Field(None, description="Resolution time in hours")
     
     # SLA and escalation
     sla_due_date: Optional[datetime] = Field(None, description="SLA due date")
@@ -239,7 +345,7 @@ class TicketDetailResponse(TicketBaseResponse):
     escalation_reason: Optional[str] = Field(None, description="Escalation reason")
     
     # External integration
-    integration_routing: Optional[str] = Field(None, description="Integration routing")
+    integration_routing: Optional[str] = Field(None, description="Integration routing (legacy)")
     external_ticket_id: Optional[str] = Field(None, description="External ticket ID")
     external_ticket_url: Optional[str] = Field(None, description="External ticket URL")
     
@@ -253,11 +359,40 @@ class TicketDetailResponse(TicketBaseResponse):
     # AI analysis
     ai_analysis: Optional[TicketAIAnalysis] = Field(None, description="AI analysis results")
     
+    # Integration result
+    integration_result: Optional[Dict[str, Any]] = Field(None, description="External integration creation result")
+    
     # Computed properties
-    is_overdue: bool = Field(description="Whether ticket is overdue")
-    is_high_priority: bool = Field(description="Whether ticket is high priority")
-    can_be_closed: bool = Field(description="Whether ticket can be closed")
-    age_in_hours: float = Field(description="Ticket age in hours")
+    @computed_field
+    @property
+    def is_overdue(self) -> bool:
+        """Whether ticket is overdue"""
+        return False  # TODO: Implement SLA logic
+    
+    @computed_field
+    @property
+    def is_high_priority(self) -> bool:
+        """Whether ticket is high priority"""
+        return self.priority in ["high", "critical"]
+    
+    @computed_field
+    @property
+    def can_be_closed(self) -> bool:
+        """Whether ticket can be closed"""
+        return self.status in ["resolved", "pending"]
+    
+    @computed_field
+    @property
+    def age_in_hours(self) -> float:
+        """Ticket age in hours"""
+        delta = datetime.now(timezone.utc) - self.created_at
+        return delta.total_seconds() / 3600.0
+    
+    @computed_field
+    @property
+    def resolution_time_hours(self) -> Optional[float]:
+        """Resolution time in hours"""
+        return self.resolution_time_minutes / 60.0 if self.resolution_time_minutes else None
 
 
 class TicketPublicResponse(BaseSchema):
@@ -310,7 +445,7 @@ class TicketSearchParams(BaseSchema):
     department: Optional[str] = Field(None, description="Filter by department")
     created_by_id: Optional[UUID] = Field(None, description="Filter by creator")
     assigned_to_id: Optional[UUID] = Field(None, description="Filter by assignee")
-    integration_routing: Optional[str] = Field(None, description="Filter by integration")
+    integration_id: Optional[UUID] = Field(None, description="Filter by integration ID")
     has_attachments: Optional[bool] = Field(None, description="Filter by file attachments")
     is_overdue: Optional[bool] = Field(None, description="Filter by overdue status")
     escalation_level: Optional[int] = Field(None, description="Filter by escalation level")
@@ -373,7 +508,7 @@ class TicketAICreateRequest(BaseSchema):
     uploaded_files: Optional[List[UUID]] = Field(None, description="Uploaded file IDs")
     conversation_context: Optional[List[Dict[str, Any]]] = Field(None, description="Conversation history")
     user_preferences: Optional[Dict[str, Any]] = Field(None, description="User preferences")
-    integration_preference: Optional[str] = Field(None, description="Preferred integration")
+    integration_id: Optional[UUID] = Field(None, description="Integration ID for external ticket creation")
 
 
 class TicketAICreateResponse(BaseSchema):

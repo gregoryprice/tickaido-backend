@@ -5,7 +5,7 @@ Ticket model for support ticket management
 
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -45,7 +45,7 @@ class TicketCategory(enum.Enum):
     SECURITY = "security"
 
 
-class DBTicket(BaseModel):
+class Ticket(BaseModel):
     """
     Support ticket model with AI-powered categorization and routing.
     Supports file attachments, integration routing, and comprehensive metadata.
@@ -69,7 +69,7 @@ class DBTicket(BaseModel):
     
     # Ticket classification
     status = Column(
-        SQLEnum(TicketStatus),
+        SQLEnum(TicketStatus, values_callable=lambda x: [e.value for e in x]),
         default=TicketStatus.NEW,
         nullable=False,
         index=True,
@@ -77,7 +77,7 @@ class DBTicket(BaseModel):
     )
     
     priority = Column(
-        SQLEnum(TicketPriority),
+        SQLEnum(TicketPriority, values_callable=lambda x: [e.value for e in x]),
         default=TicketPriority.MEDIUM,
         nullable=False,
         index=True,
@@ -85,7 +85,7 @@ class DBTicket(BaseModel):
     )
     
     category = Column(
-        SQLEnum(TicketCategory),
+        SQLEnum(TicketCategory, values_callable=lambda x: [e.value for e in x]),
         default=TicketCategory.GENERAL,
         nullable=False,
         index=True,
@@ -115,19 +115,28 @@ class DBTicket(BaseModel):
         comment="User assigned to handle the ticket"
     )
     
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+        comment="Organization to which the ticket belongs"
+    )
+    
+    integration_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("integrations.id"),
+        nullable=True,
+        index=True,
+        comment="Integration platform for routing (jira, servicenow, etc.)"
+    )
+    
     # Department and routing
     department = Column(
         String(100),
         nullable=True,
         index=True,
         comment="Department responsible for ticket"
-    )
-    
-    integration_routing = Column(
-        String(100),
-        nullable=True,
-        index=True,
-        comment="Integration platform for routing (jira, servicenow, etc.)"
     )
     
     external_ticket_id = Column(
@@ -176,7 +185,7 @@ class DBTicket(BaseModel):
     
     # Business impact assessment
     urgency = Column(
-        SQLEnum(TicketPriority),
+        SQLEnum(TicketPriority, values_callable=lambda x: [e.value for e in x]),
         default=TicketPriority.MEDIUM,
         nullable=False,
         comment="Urgency level for resolution"
@@ -348,30 +357,42 @@ class DBTicket(BaseModel):
     
     # Relationships
     creator = relationship(
-        "DBUser",
+        "User",
         back_populates="tickets",
         foreign_keys=[created_by_id]
     )
     
     assignee = relationship(
-        "DBUser",
+        "User",
         back_populates="assigned_tickets", 
         foreign_keys=[assigned_to_id]
     )
     
     escalated_by = relationship(
-        "DBUser",
+        "User",
         foreign_keys=[escalated_by_id]
     )
     
     files = relationship(
-        "DBFile",
+        "File",
         back_populates="ticket",
         cascade="all, delete-orphan"
     )
     
+    integration = relationship(
+        "Integration",
+        back_populates="tickets",
+        foreign_keys=[integration_id]
+    )
+    
+    organization = relationship(
+        "Organization",
+        back_populates="tickets",
+        foreign_keys=[organization_id]
+    )
+    
     def __repr__(self):
-        return f"<DBTicket(id={self.id}, title={self.title[:50]}, status={self.status})>"
+        return f"<Ticket(id={self.id}, title={self.title[:50]}, status={self.status})>"
     
     @property
     def display_title(self) -> str:

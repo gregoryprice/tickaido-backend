@@ -10,7 +10,10 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET_KEY=super-secret-jwt-key-for-development-only-256-bits-long
       - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -19,8 +22,15 @@ services:
       mcp-server:
         condition: service_started
     volumes:
+      - .:/app
       - ./uploads:/app/uploads
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - app-network
+    command: >
+      sh -c "
+        poetry run alembic upgrade head &&
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level info
+      "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -39,9 +49,15 @@ services:
       - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/ai_tickets
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - MCP_LOG_LEVEL=debug
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - app-network
     command: ["python", "mcp_server/start_mcp_server.py", "--port", "8001"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -60,6 +76,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d ai_tickets"]
       interval: 5s
@@ -72,6 +90,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -86,10 +106,14 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
     depends_on:
       - postgres
       - redis
       - mcp-server
+    networks:
+      - app-network
     volumes:
       - ./uploads:/app/uploads
     command: ["celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
@@ -107,6 +131,8 @@ services:
       - REDIS_URL=redis://redis:6379
     depends_on:
       - redis
+    networks:
+      - app-network
     ports:
       - "5555:5555"
     command: ["celery", "-A", "app.celery_app", "flower", "--port=5555"]
@@ -116,6 +142,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
 
   test:
     build: .
@@ -136,6 +163,10 @@ services:
     command: ["python", "-m", "pytest", "tests/", "-v", "--tb=short"]
     profiles:
       - test
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data:

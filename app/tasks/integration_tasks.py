@@ -4,7 +4,7 @@ Celery tasks for third-party integrations
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 
@@ -13,7 +13,7 @@ from celery.utils.log import get_task_logger
 from sqlalchemy import select, and_
 
 from app.database import get_db_session
-from app.models.integration import DBIntegration, IntegrationStatus
+from app.models.integration import Integration, IntegrationStatus
 from app.services.integration_service import IntegrationService
 from app.schemas.integration import IntegrationSyncRequest, IntegrationTestRequest
 
@@ -227,11 +227,11 @@ async def _sync_all_active_integrations_async() -> Dict[str, Any]:
     """Sync all active integrations"""
     async with get_db_session() as db:
         # Get active integrations
-        query = select(DBIntegration).where(
+        query = select(Integration).where(
             and_(
-                DBIntegration.is_enabled == True,
-                DBIntegration.status == IntegrationStatus.ACTIVE,
-                DBIntegration.is_deleted == False
+                Integration.is_enabled == True,
+                Integration.status == IntegrationStatus.ACTIVE,
+                Integration.is_deleted == False
             )
         )
         
@@ -282,10 +282,10 @@ async def _health_check_integrations_async() -> Dict[str, Any]:
     """Health check all integrations"""
     async with get_db_session() as db:
         # Get all integrations to check
-        query = select(DBIntegration).where(
+        query = select(Integration).where(
             and_(
-                DBIntegration.is_enabled == True,
-                DBIntegration.is_deleted == False
+                Integration.is_enabled == True,
+                Integration.is_deleted == False
             )
         )
         
@@ -362,11 +362,11 @@ async def _cleanup_failed_syncs_async(older_than_hours: int) -> Dict[str, Any]:
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
         
         # Get integrations with old failed sync attempts
-        query = select(DBIntegration).where(
+        query = select(Integration).where(
             and_(
-                DBIntegration.status == IntegrationStatus.ERROR,
-                DBIntegration.last_error_at < cutoff_time,
-                DBIntegration.is_deleted == False
+                Integration.status == IntegrationStatus.ERROR,
+                Integration.last_error_at < cutoff_time,
+                Integration.is_deleted == False
             )
         )
         

@@ -4,17 +4,14 @@ Celery tasks for notifications and communications
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from uuid import UUID
 from datetime import datetime, timezone
 
 from celery import current_app as celery_app
 from celery.utils.log import get_task_logger
-from sqlalchemy import select, and_
 
 from app.database import get_db_session
-from app.models.ticket import DBTicket
-from app.models.user import DBUser
 from app.services.ticket_service import TicketService
 from app.services.user_service import UserService
 
@@ -77,11 +74,11 @@ def send_teams_notification(self, webhook_url: str, message: str, card_data: Dic
         message: Message content
         card_data: Optional adaptive card data
     """
-    logger.info(f"Sending Teams notification")
+    logger.info("Sending Teams notification")
     
     try:
         result = asyncio.run(_send_teams_async(webhook_url, message, card_data))
-        logger.info(f"Teams notification sent")
+        logger.info("Teams notification sent")
         return result
         
     except Exception as exc:

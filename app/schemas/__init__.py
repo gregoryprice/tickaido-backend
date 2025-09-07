@@ -152,7 +152,7 @@ from app.schemas.file import (
 # Integration schemas
 from app.schemas.integration import (
     # Enums
-    IntegrationTypeSchema,
+    IntegrationCategorySchema,
     IntegrationStatusSchema,
     
     # Request schemas
@@ -340,7 +340,7 @@ __all__ = [
     "FileSortParams",
     
     # Integration schemas
-    "IntegrationTypeSchema",
+    "IntegrationCategorySchema",
     "IntegrationStatusSchema",
     "IntegrationCreateRequest",
     "IntegrationUpdateRequest",

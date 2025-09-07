@@ -10,25 +10,22 @@ from uuid import UUID
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*crypt.*")
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
-from app.models.user import DBUser, UserRole
-from app.models.ticket import DBTicket
+from app.models.user import User, UserRole
+from app.models.ticket import Ticket
 from app.schemas.user import (
     UserCreateRequest,
     UserUpdateRequest,
     UserPasswordChangeRequest,
-    UserPermissionsUpdateRequest,
     UserAPIKeyRequest,
     UserLoginRequest,
-    UserRegistrationRequest,
-    UserPasswordResetRequest,
     UserPrivateResponse,
-    UserPublicResponse,
-    UserAdminResponse,
     UserLoginResponse,
     UserAPIKeyResponse,
     UserSearchParams,
@@ -79,7 +76,7 @@ class UserService:
         self,
         db: AsyncSession,
         user_request: UserCreateRequest
-    ) -> DBUser:
+    ) -> User:
         """
         Create a new user
         
@@ -99,7 +96,7 @@ class UserService:
         hashed_password = self._hash_password(user_request.password)
         
         # Create user record
-        db_user = DBUser(
+        db_user = User(
             email=user_request.email,
             password_hash=hashed_password,
             full_name=user_request.full_name,
@@ -126,7 +123,7 @@ class UserService:
         db: AsyncSession,
         user_id: UUID,
         include_stats: bool = False
-    ) -> Optional[DBUser]:
+    ) -> Optional[User]:
         """
         Get user by ID
         
@@ -138,12 +135,12 @@ class UserService:
         Returns:
             User record if found
         """
-        query = select(DBUser).where(
-            and_(DBUser.id == user_id, DBUser.is_deleted == False)
+        query = select(User).where(
+            and_(User.id == user_id, User.is_deleted == False)
         )
         
         if include_stats:
-            query = query.options(selectinload(DBUser.tickets))
+            query = query.options(selectinload(User.tickets))
         
         result = await db.execute(query)
         return result.scalar_one_or_none()
@@ -152,7 +149,7 @@ class UserService:
         self,
         db: AsyncSession,
         email: str
-    ) -> Optional[DBUser]:
+    ) -> Optional[User]:
         """
         Get user by email address
         
@@ -163,8 +160,8 @@ class UserService:
         Returns:
             User record if found
         """
-        query = select(DBUser).where(
-            and_(DBUser.email == email, DBUser.is_deleted == False)
+        query = select(User).where(
+            and_(User.email == email, User.is_deleted == False)
         )
         result = await db.execute(query)
         return result.scalar_one_or_none()
@@ -177,7 +174,7 @@ class UserService:
         search_params: Optional[UserSearchParams] = None,
         sort_params: Optional[UserSortParams] = None,
         requesting_user_id: Optional[UUID] = None
-    ) -> Tuple[List[DBUser], int]:
+    ) -> Tuple[List[User], int]:
         """
         List users with filtering and pagination
         
@@ -193,39 +190,39 @@ class UserService:
             Tuple of (users list, total count)
         """
         # Base query
-        query = select(DBUser).where(DBUser.is_deleted == False)
-        count_query = select(func.count(DBUser.id)).where(DBUser.is_deleted == False)
+        query = select(User).where(User.is_deleted == False)
+        count_query = select(func.count(User.id)).where(User.is_deleted == False)
         
         # Apply filters
         filters = []
         
         if search_params:
             if search_params.email:
-                filters.append(DBUser.email.ilike(f"%{search_params.email}%"))
+                filters.append(User.email.ilike(f"%{search_params.email}%"))
             
             if search_params.full_name:
-                filters.append(DBUser.full_name.ilike(f"%{search_params.full_name}%"))
+                filters.append(User.full_name.ilike(f"%{search_params.full_name}%"))
             
             if search_params.role:
-                filters.append(DBUser.role == search_params.role)
+                filters.append(User.role == search_params.role)
             
             if search_params.is_active is not None:
-                filters.append(DBUser.is_active == search_params.is_active)
+                filters.append(User.is_active == search_params.is_active)
             
             if search_params.is_verified is not None:
-                filters.append(DBUser.is_verified == search_params.is_verified)
+                filters.append(User.is_verified == search_params.is_verified)
             
             if search_params.company:
-                filters.append(DBUser.company.ilike(f"%{search_params.company}%"))
+                filters.append(User.company.ilike(f"%{search_params.company}%"))
             
             if search_params.department:
-                filters.append(DBUser.department.ilike(f"%{search_params.department}%"))
+                filters.append(User.department.ilike(f"%{search_params.department}%"))
             
             if search_params.created_after:
-                filters.append(DBUser.created_at >= search_params.created_after)
+                filters.append(User.created_at >= search_params.created_after)
             
             if search_params.created_before:
-                filters.append(DBUser.created_at <= search_params.created_before)
+                filters.append(User.created_at <= search_params.created_before)
         
         if filters:
             query = query.where(and_(*filters))
@@ -233,13 +230,13 @@ class UserService:
         
         # Apply sorting
         if sort_params:
-            sort_field = getattr(DBUser, sort_params.sort_by, DBUser.created_at)
+            sort_field = getattr(User, sort_params.sort_by, User.created_at)
             if sort_params.sort_order == "desc":
                 query = query.order_by(sort_field.desc())
             else:
                 query = query.order_by(sort_field.asc())
         else:
-            query = query.order_by(DBUser.created_at.desc())
+            query = query.order_by(User.created_at.desc())
         
         # Apply pagination
         query = query.offset(offset).limit(limit)
@@ -259,7 +256,7 @@ class UserService:
         user_id: UUID,
         update_request: UserUpdateRequest,
         requesting_user_id: UUID
-    ) -> Optional[DBUser]:
+    ) -> Optional[User]:
         """
         Update user information
         
@@ -383,7 +380,7 @@ class UserService:
         self,
         db: AsyncSession,
         token: str
-    ) -> Optional[DBUser]:
+    ) -> Optional[User]:
         """
         Verify access token and get user
         
@@ -553,10 +550,10 @@ class UserService:
             return {}
         
         # Count user's tickets by status
-        ticket_query = select(func.count(DBTicket.id)).where(
+        ticket_query = select(func.count(Ticket.id)).where(
             and_(
-                DBTicket.created_by == user_id,
-                DBTicket.is_deleted == False
+                Ticket.created_by == user_id,
+                Ticket.is_deleted == False
             )
         )
         total_tickets = await db.execute(ticket_query)

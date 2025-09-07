@@ -6,37 +6,59 @@ This module exports all database models for the application.
 """
 
 from app.models.base import Base
-from app.models.user import DBUser, UserRole
-from app.models.ticket import DBTicket, TicketStatus, TicketPriority, TicketCategory
-from app.models.file import DBFile, FileStatus, FileType
-from app.models.integration import DBIntegration, IntegrationType, IntegrationStatus
-from app.models.ai_agent_config import DBAIAgentConfig, AIAgentType
+from app.models.user import User, UserRole
+from app.models.organization import Organization
+from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketCategory
+from app.models.file import File, FileStatus, FileType
+from app.models.integration import Integration, IntegrationCategory, IntegrationStatus
+from app.models.ai_agent_config import AIAgentConfig, AIAgentType
+from app.models.ai_agent import Agent, AgentUsageStats
+from app.models.agent_history import AgentHistory
+from app.models.agent_file import AgentFile
+from app.models.agent_task import AgentTask
+from app.models.agent_action import AgentAction
+from app.models.chat import Thread, Message
 
 __all__ = [
     # Base
     "Base",
     
     # User models
-    "DBUser",
+    "User",
     "UserRole",
     
+    # Organization models
+    "Organization",
+    
     # Ticket models  
-    "DBTicket",
+    "Ticket",
     "TicketStatus",
     "TicketPriority", 
     "TicketCategory",
     
     # File models
-    "DBFile",
+    "File",
     "FileStatus",
     "FileType",
     
     # Integration models
-    "DBIntegration", 
-    "IntegrationType",
+    "Integration", 
+    "IntegrationCategory",
     "IntegrationStatus",
     
     # AI Agent Config models
-    "DBAIAgentConfig",
-    "AIAgentType"
+    "AIAgentConfig",
+    "AIAgentType",
+    
+    # Agent models
+    "Agent",
+    "AgentUsageStats", 
+    "AgentHistory",
+    "AgentFile",
+    "AgentTask",
+    "AgentAction",
+    
+    # Chat models
+    "Thread",
+    "Message"
 ]

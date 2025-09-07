@@ -25,11 +25,6 @@ if config.config_file_name is not None:
 # Add your model's MetaData object here
 # for 'autogenerate' support
 from app.models.base import Base
-from app.models.user import DBUser
-from app.models.ticket import DBTicket
-from app.models.file import DBFile
-from app.models.integration import DBIntegration
-from app.models.ai_agent_config import DBAIAgentConfig
 
 target_metadata = Base.metadata
 
@@ -92,17 +87,20 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """Run migrations in async mode."""
     
-    # Get configuration from alembic.ini
-    configuration = config.get_section(config.config_ini_section)
-    
-    # Override with environment variable if available
+    # Get database URL
     db_url = get_database_url()
-    if db_url:
-        configuration["sqlalchemy.url"] = db_url
+    if not db_url:
+        db_url = "postgresql+asyncpg://user:pass@localhost:5432/ai_tickets"
+    
+    # Create configuration for async engine
+    configuration = {
+        "url": db_url,
+        "poolclass": pool.NullPool
+    }
     
     connectable = async_engine_from_config(
         configuration,
-        prefix="sqlalchemy.",
+        prefix="",  # No prefix since we're using 'url' directly
         poolclass=pool.NullPool,
     )
 

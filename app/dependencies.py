@@ -7,12 +7,13 @@ import logging
 from typing import Optional, Generator
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
-from app.database import get_db, SessionLocal
+from app.database import get_db_session, SessionLocal
 from app.config.settings import get_settings
-from app.models import DBUser  # Will be created later
+from app.models import User  # Will be created later
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -23,9 +24,9 @@ def get_current_settings():
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db_session),
     settings = Depends(get_current_settings)
-) -> DBUser:
+) -> User:
     """
     Get current authenticated user from JWT token.
     
@@ -35,7 +36,7 @@ async def get_current_user(
         settings: Application settings
         
     Returns:
-        DBUser: Current authenticated user
+        User: Current authenticated user
         
     Raises:
         HTTPException: If authentication fails
@@ -50,7 +51,7 @@ async def get_current_user(
         # Decode JWT token
         payload = jwt.decode(
             credentials.credentials, 
-            settings.secret_key, 
+            settings.jwt_secret_key,  # Use jwt_secret_key instead of secret_key
             algorithms=[settings.algorithm]
         )
         
@@ -63,27 +64,40 @@ async def get_current_user(
         logger.error(f"JWT decode error: {e}")
         raise credentials_exception
     
-    # Get user from database
-    # TODO: Implement when DBUser model is created
-    # user = db.query(DBUser).filter(DBUser.id == user_id).first()
-    # if user is None:
-    #     raise credentials_exception
-    
-    # For now, return a placeholder
-    # This will be updated when the user model is implemented
-    from types import SimpleNamespace
-    user = SimpleNamespace()
-    user.id = user_id
-    user.email = payload.get("email", "unknown@example.com")
-    user.is_active = True
-    
-    return user
+    # Get user from database using async SQLAlchemy 2.0 syntax
+    try:
+        from sqlalchemy import select
+        stmt = select(User).where(
+            User.id == user_id,
+            User.is_deleted == False
+        )
+        
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user is None:
+            logger.warning(f"User not found for token: {user_id}")
+            raise credentials_exception
+        
+        if not user.is_active:
+            logger.warning(f"Inactive user attempted access: {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account is inactive",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        return user
+        
+    except Exception as e:
+        logger.error(f"Database error getting user: {e}")
+        raise credentials_exception
 
 async def get_optional_current_user(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db_session),
     settings = Depends(get_current_settings)
-) -> Optional[DBUser]:
+) -> Optional[User]:
     """
     Get current user if authentication token is provided, otherwise None.
     Used for endpoints that work with or without authentication.
@@ -94,7 +108,7 @@ async def get_optional_current_user(
         settings: Application settings
         
     Returns:
-        Optional[DBUser]: Current user if authenticated, None otherwise
+        Optional[User]: Current user if authenticated, None otherwise
     """
     try:
         # Check for Authorization header
@@ -113,7 +127,7 @@ async def get_optional_current_user(
         logger.debug(f"Optional authentication failed: {e}")
         return None
 
-def get_current_active_user(current_user: DBUser = Depends(get_current_user)) -> DBUser:
+def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """
     Get current active user (must be authenticated and active).
     
@@ -121,7 +135,7 @@ def get_current_active_user(current_user: DBUser = Depends(get_current_user)) ->
         current_user: Current user from authentication
         
     Returns:
-        DBUser: Current active user
+        User: Current active user
         
     Raises:
         HTTPException: If user is inactive
@@ -133,7 +147,7 @@ def get_current_active_user(current_user: DBUser = Depends(get_current_user)) ->
         )
     return current_user
 
-def get_admin_user(current_user: DBUser = Depends(get_current_active_user)) -> DBUser:
+def get_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
     """
     Get current user with admin privileges.
     
@@ -141,7 +155,7 @@ def get_admin_user(current_user: DBUser = Depends(get_current_active_user)) -> D
         current_user: Current active user
         
     Returns:
-        DBUser: Current admin user
+        User: Current admin user
         
     Raises:
         HTTPException: If user is not an admin
@@ -276,3 +290,55 @@ class PaginationParams:
 def get_pagination_params(page: int = 1, page_size: int = 20) -> PaginationParams:
     """Dependency for pagination parameters"""
     return PaginationParams(page=page, page_size=page_size)
+
+
+async def get_current_user_from_token(
+    token: str,
+    db: AsyncSession
+) -> Optional[User]:
+    """
+    Get current user from raw JWT token string.
+    Used for WebSocket authentication where we can't use HTTPBearer.
+    
+    Args:
+        token: JWT token string
+        db: Database session
+        
+    Returns:
+        Optional[User]: Current user if token is valid, None otherwise
+    """
+    try:
+        settings = get_settings()
+        # Decode JWT token
+        payload = jwt.decode(
+            token, 
+            settings.jwt_secret_key,
+            algorithms=[settings.algorithm]
+        )
+        
+        # Extract user ID from token
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        # Get user from database using async SQLAlchemy 2.0 syntax
+        from sqlalchemy import select
+        stmt = select(User).where(
+            User.id == user_id,
+            User.is_deleted == False
+        )
+        
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user is None or not user.is_active:
+            return None
+        
+        return user
+        
+    except JWTError as e:
+        logger.debug(f"WebSocket JWT decode error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Database error in get_current_user_from_token: {e}")
+        return None

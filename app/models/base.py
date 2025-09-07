@@ -6,7 +6,7 @@ Base model class with common fields and functionality
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy import Column, DateTime, Boolean, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import declarative_mixin

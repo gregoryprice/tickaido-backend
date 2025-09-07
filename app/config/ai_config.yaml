@@ -99,6 +99,9 @@ ai_strategy:
     max_generation_time: 15.0  # seconds
     preferred_generation_time: 5.0  # seconds
     auto_fallback_on_timeout: true
+  
+  # Tool execution limits
+  max_iterations: 5  # Maximum number of AI agent iterations per request
     
   # Cost controls
   cost_limits:
@@ -118,7 +121,14 @@ agents:
     max_tokens: 2000
     timeout: 30
     system_prompt_template: "customer_support_default"
-    tools_enabled: ["analyze_file", "create_ticket", "categorize_issue", "search_knowledge_base"]
+    tools_enabled: [
+      # Complete current MCP tool set (13 tools)
+      "create_ticket", "create_ticket_with_ai", "get_ticket",
+      "update_ticket", "delete_ticket", "update_ticket_status",
+      "assign_ticket", "search_tickets", "list_tickets", "get_ticket_stats",
+      "list_integrations", "get_active_integrations", "get_system_health"
+    ]
+    mcp_enabled: true  # Enable MCP integration
     confidence_threshold: 0.7
     
   categorization_agent:
@@ -140,6 +150,16 @@ agents:
     system_prompt_template: "file_analysis_default"
     tools_enabled: ["analyze_file", "extract_text_from_image", "transcribe_audio"]
     confidence_threshold: 0.6
+    
+  title_generation_agent:
+    model_provider: "openai"
+    model_name: "fast"  # Use fast model for cost efficiency
+    temperature: 0.3
+    max_tokens: 50  # Short responses for titles
+    timeout: 15  # Quick timeout for title generation
+    system_prompt_template: "title_generation_default"
+    tools_enabled: []  # No tools needed for title generation
+    confidence_threshold: 0.7
 
 # =============================================================================
 # Caching Configuration
@@ -324,11 +344,37 @@ prompt_templates:
     - Include steps to reproduce if provided
     - Attach processed file analysis (transcriptions, OCR results)
     
-    Available tools via MCP:
-    - analyze_file: Process uploaded files for text/audio extraction  
-    - create_ticket: Create tickets in the system
-    - categorize_issue: Auto-categorize based on content
-    - search_knowledge_base: Find existing solutions
+    **Available MCP Tools (13 tools organized by category):**
+    
+    **🎫 TICKET MANAGEMENT TOOLS (10 tools):**
+    Complete ticket lifecycle management with full API schema support.
+    
+    Ticket Creation:
+      * create_ticket: Create support tickets with full schema (title, description, category, priority, urgency, department, assigned_to_id, integration, create_externally, custom_fields, file_ids)
+      * create_ticket_with_ai: AI-powered ticket creation with automatic categorization
+    
+    Ticket Retrieval & Management:
+      * get_ticket: Retrieve specific ticket details by ID
+      * update_ticket: Update existing ticket fields (title, description, status, priority, category)
+      * delete_ticket: Delete specific tickets by ID
+      * search_tickets: Search and filter tickets with pagination (query, status, category, priority, page, page_size)
+      * list_tickets: List tickets with optional filtering and pagination
+    
+    Ticket Operations:
+      * update_ticket_status: Update ticket status (open, in_progress, resolved, closed)
+      * assign_ticket: Assign tickets to specific users or teams
+      * get_ticket_stats: Retrieve comprehensive ticket statistics and analytics
+    
+    **🔗 INTEGRATION TOOLS (2 tools):**
+    Integration discovery and management for external system routing.
+    
+      * list_integrations: List available integrations (jira, servicenow, salesforce, zendesk, github, slack, teams, zoom, hubspot, freshdesk, asana, trello, webhook, email, sms)
+      * get_active_integrations: Get active integrations with health status and capabilities
+    
+    **🔍 SYSTEM TOOLS (1 tool):**
+    System health monitoring and status reporting.
+    
+      * get_system_health: Check backend system health and status
     
     Always be helpful, thorough, and ensure tickets contain actionable information.
 
@@ -367,3 +413,25 @@ prompt_templates:
     - Include confidence scores for extracted information
     
     Focus on information that would be helpful for support agents and ticket resolution.
+
+  title_generation_default: |
+    You are an expert at creating concise, descriptive titles for customer support conversations.
+    
+    Analyze the conversation and generate a clear, specific title that captures the essence of the discussion.
+    
+    TITLE GENERATION RULES:
+    1. Maximum 8 words, ideally 4-6 words
+    2. Use specific, descriptive terms
+    3. Avoid generic words: "Help", "Support", "Question", "Issue"
+    4. Include technical terms when relevant
+    5. Capture the primary topic/problem
+    6. Use title case formatting
+    
+    EXAMPLES OF GOOD TITLES:
+    - "Password Reset Email Delivery"
+    - "API Authentication Token Expiry"
+    - "Database Connection Pool Timeout" 
+    - "Feature Request: Dark Mode"
+    - "Billing Invoice Payment Error"
+    
+    Focus on the main issue or request being discussed and create a professional, searchable title.

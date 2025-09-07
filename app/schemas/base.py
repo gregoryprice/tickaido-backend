@@ -3,7 +3,7 @@
 Base Pydantic schemas for common validation patterns
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
@@ -122,7 +122,7 @@ class ErrorResponse(BaseSchema):
     error: str = Field(description="Error type or category")
     message: str = Field(description="Human-readable error message")
     details: Optional[List[ErrorDetail]] = Field(None, description="Detailed error information")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Error timestamp")
     request_id: Optional[str] = Field(None, description="Request identifier for tracking")
 
 
@@ -152,7 +152,7 @@ class BulkOperationResponse(BaseSchema):
 class HealthCheckResponse(BaseSchema):
     """Health check response schema"""
     status: str = Field(description="Overall health status")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Check timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Check timestamp")
     services: Dict[str, Dict[str, Any]] = Field(description="Individual service statuses")
     version: Optional[str] = Field(None, description="Application version")
     uptime_seconds: Optional[int] = Field(None, description="Application uptime in seconds")
