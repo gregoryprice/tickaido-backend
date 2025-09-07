@@ -242,11 +242,10 @@ class TestAuthenticatedMCPClientIntegration:
         url = "http://test-server/mcp/"
         auth_token = "real-test-token"
         
-        # Mock the actual HTTP transport to verify headers
-        with patch('httpx.AsyncClient') as MockClient:
-            mock_client_instance = MockClient.return_value.__aenter__.return_value
-            mock_response = Mock()
-            mock_client_instance.request = AsyncMock(return_value=mock_response)
+        # Mock the transport layer to avoid real network calls
+        with patch('httpx.AsyncClient.request', new_callable=AsyncMock) as mock_request:
+            mock_response = Mock(spec=httpx.Response)
+            mock_request.return_value = mock_response
             
             # Create client with authentication
             http_client = AuthenticatedHTTPXClient(auth_token=auth_token)
@@ -255,8 +254,8 @@ class TestAuthenticatedMCPClientIntegration:
             await http_client.request("POST", url, json={"test": "data"})
             
             # Verify the request was made with proper auth headers
-            mock_client_instance.request.assert_called_once()
-            call_args = mock_client_instance.request.call_args
+            mock_request.assert_called_once()
+            call_args = mock_request.call_args
             
             headers = call_args[1]["headers"]
             assert "Authorization" in headers
