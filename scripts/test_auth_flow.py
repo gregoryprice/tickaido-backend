@@ -181,10 +181,20 @@ class AuthFlowTester:
         
         print("=" * 50)
         
-        # Step 4: Send message
-        message = "What are all the tools you can call?"
+        # Step 4: Send first message
+        message = "What can you do?"
         if not self.send_message(message):
-            print("❌ Test failed at send message step")
+            print("❌ Test failed at first message step")
+            return False
+        
+        print("=" * 50)
+        print("⏱️  Waiting 3 seconds before sending second message...")
+        time.sleep(3)
+        
+        # Step 5: Send the same message again to test conversation history
+        print("📨 Sending the same message again to test conversation history...")
+        if not self.send_message(message):
+            print("❌ Test failed at second message step")
             return False
         
         print("=" * 50)

@@ -7,13 +7,14 @@ agents dynamically based on Agent model configuration, with direct MCP integrati
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.usage import UsageLimits
+from pydantic_ai.messages import ModelMessage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_agent import Agent as AgentModel
 from app.schemas.ai_response import ChatResponse, CustomerSupportContext
-from app.services.ai_config_service import ai_config_service
 from mcp_client.client import mcp_client
 
 logger = logging.getLogger(__name__)
@@ -144,16 +145,20 @@ class DynamicAgentFactory:
         agent_model: AgentModel,
         message: str,
         context: CustomerSupportContext,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
+        thread_id: Optional[str] = None,
+        db: Optional[AsyncSession] = None
     ) -> ChatResponse:
         """
-        Process a message using the dynamic agent with optional authentication.
+        Process message with conversation history support.
         
         Args:
             agent_model: Agent configuration
             message: User message
             context: Chat context
             auth_token: JWT token for MCP authentication (optional)
+            thread_id: Thread ID for message history (optional)
+            db: Database session for history retrieval (optional)
             
         Returns:
             ChatResponse: Agent response with tool usage
@@ -171,14 +176,50 @@ class DynamicAgentFactory:
                     tools_used=[]
                 )
             
-            # Process message with agent-specific iteration limits
-            # Use agent.max_iterations instead of global config
+            # Retrieve message history in proper ModelMessage format
+            message_history: List[ModelMessage] = []
+            if thread_id and agent_model.use_memory_context:
+                try:
+                    from app.services.ai_chat_service import ai_chat_service
+                    
+                    # Get user info from context if available
+                    user_id = context.user_metadata.get('user_id', 'system')
+                    
+                    # Use new method that returns ModelMessage format
+                    message_history = await ai_chat_service.get_thread_history_as_model_messages(
+                        thread_id=thread_id,
+                        user_id=user_id,
+                        agent_id=str(agent_model.id),
+                        max_context_size=agent_model.max_context_size,
+                        use_memory_context=agent_model.use_memory_context
+                    )
+                    
+                    logger.info(
+                        f"Loaded {len(message_history)} ModelMessages for context "
+                        f"(thread: {thread_id})"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to load ModelMessages for thread {thread_id}: {e}")
+                    # Continue without history rather than failing completely
+                    message_history = []
+            
+            # Configure usage limits
             usage_limits = UsageLimits(request_limit=agent_model.max_iterations)
             
-            result = await pydantic_agent.run(
-                message,
-                usage_limits=usage_limits
-            )
+            # CORRECT PYDANTIC AI USAGE - Use message_history parameter
+            if message_history:
+                # Run agent with conversation history
+                result = await pydantic_agent.run(
+                    message,
+                    message_history=message_history,  # Correct parameter usage
+                    usage_limits=usage_limits
+                )
+            else:
+                # Run agent without history
+                result = await pydantic_agent.run(
+                    message,
+                    usage_limits=usage_limits
+                )
             
             # Extract response and tools used
             if hasattr(result, 'output'):
@@ -189,6 +230,7 @@ class DynamicAgentFactory:
             tools_used = getattr(result, 'tools_used', []) or []
             if tools_used:
                 logger.info(f"🔧 MCP Tools used: {tools_used}")
+            
             
             # Record usage statistics
             from app.services.ai_agent_service import ai_agent_service
@@ -219,6 +261,7 @@ class DynamicAgentFactory:
                 requires_escalation=True,
                 tools_used=[]
             )
+    
 
 
 # Global dynamic agent factory

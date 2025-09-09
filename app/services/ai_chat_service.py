@@ -213,6 +213,181 @@ class AIChatService:
                 logger.error(f"[AI_CHAT_SERVICE] Error getting thread history: {e}")
                 return []
     
+    async def get_thread_history_for_agent(
+        self, 
+        thread_id: str, 
+        user_id: str, 
+        agent_id: str,
+        max_context_size: Optional[int] = None,
+        use_memory_context: bool = True
+    ) -> List[Dict[str, str]]:
+        """
+        Get thread history formatted for Pydantic AI agent processing.
+        
+        Args:
+            thread_id: ID of the thread
+            user_id: ID of the user (for authorization)
+            agent_id: ID of the agent (for validation)
+            max_context_size: Maximum tokens allowed in context
+            use_memory_context: Whether to include message history
+            
+        Returns:
+            List[Dict[str, str]]: Messages in Pydantic AI format
+        """
+        if not use_memory_context:
+            logger.debug(f"Memory context disabled for thread {thread_id}")
+            return []
+        
+        async with get_async_db_session() as db:
+            try:
+                # Verify user owns thread and agent is valid (existing logic)
+                thread_query = select(Thread).where(
+                    Thread.id == UUID(thread_id),
+                    Thread.user_id == user_id,
+                    Thread.agent_id == UUID(agent_id)
+                )
+                
+                result = await db.execute(thread_query)
+                thread = result.scalar_one_or_none()
+                
+                if not thread:
+                    logger.warning(f"Thread {thread_id} not found for user {user_id} and agent {agent_id}")
+                    return []
+                
+                # Get messages in chronological order
+                messages_query = select(Message).where(
+                    Message.thread_id == UUID(thread_id)
+                ).order_by(Message.created_at)
+                
+                result = await db.execute(messages_query)
+                messages = result.scalars().all()
+                
+                # Apply context limits if specified
+                if max_context_size and max_context_size > 0:
+                    messages = await self._apply_context_limits(messages, max_context_size)
+                
+                # Convert to Pydantic AI format (simple dict with role/content)
+                formatted_messages = []
+                for msg in messages:
+                    # Simple format that works with ModelMessagesTypeAdapter
+                    formatted_messages.append({
+                        "role": msg.role,
+                        "content": msg.content
+                    })
+                
+                logger.info(f"Retrieved {len(formatted_messages)} messages for Pydantic AI agent")
+                return formatted_messages
+                
+            except Exception as e:
+                logger.error(f"Error getting thread history for agent: {e}")
+                return []
+
+    async def _apply_context_limits(
+        self,
+        messages: List[Message],
+        max_context_size: int
+    ) -> List[Message]:
+        """Apply token-based context limits to raw messages."""
+        try:
+            if not messages or max_context_size <= 0:
+                return messages
+            
+            # If we have a reasonable number of messages, just return them
+            if len(messages) <= 10:
+                return messages
+            
+            # Apply token-based filtering (process from newest to oldest)
+            filtered_messages = []
+            total_tokens = 0
+            
+            # Work backwards through messages (newest first)
+            for message in reversed(messages):
+                # Convert to dict format for token counting
+                msg_dict = {
+                    "role": message.role,
+                    "content": message.content,
+                }
+                
+                # Count tokens for this message using existing token service
+                from app.services.token_counter_service import token_counter_service
+                message_tokens = await token_counter_service.count_message_tokens(msg_dict)
+                
+                # Check if adding this message would exceed context limit
+                if total_tokens + message_tokens > max_context_size:
+                    logger.debug(f"Context limit reached at {total_tokens} tokens, skipping older messages")
+                    break
+                
+                filtered_messages.append(message)
+                total_tokens += message_tokens
+            
+            # Return messages in chronological order (oldest first)
+            result = filtered_messages[::-1]
+            
+            logger.info(f"Applied context limits: {len(result)}/{len(messages)} messages, {total_tokens} tokens")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error applying context limits: {e}")
+            # Fallback: return last 10 messages if token counting fails
+            return messages[-10:] if len(messages) > 10 else messages
+    
+    async def get_thread_history_as_model_messages(
+        self,
+        thread_id: str,
+        user_id: str,
+        agent_id: str,
+        max_context_size: Optional[int] = None,
+        use_memory_context: bool = True
+    ) -> List:  # Will be List[ModelMessage] after import
+        """
+        Get thread history as Pydantic AI ModelMessage format.
+        
+        Returns:
+            List[ModelMessage]: Properly formatted messages for Pydantic AI
+        """
+        if not use_memory_context:
+            logger.debug(f"Memory context disabled for thread {thread_id}")
+            return []
+        
+        async with get_async_db_session() as db:
+            try:
+                # Verify user owns thread and agent is valid (existing logic)
+                thread_query = select(Thread).where(
+                    Thread.id == UUID(thread_id),
+                    Thread.user_id == user_id,
+                    Thread.agent_id == UUID(agent_id)
+                )
+                
+                result = await db.execute(thread_query)
+                thread = result.scalar_one_or_none()
+                
+                if not thread:
+                    logger.warning(f"Thread {thread_id} not found for user {user_id} and agent {agent_id}")
+                    return []
+                
+                # Get messages in chronological order
+                messages_query = select(Message).where(
+                    Message.thread_id == UUID(thread_id)
+                ).order_by(Message.created_at)
+                
+                result = await db.execute(messages_query)
+                db_messages = result.scalars().all()
+                
+                # Apply context limits if specified
+                if max_context_size and max_context_size > 0:
+                    db_messages = await self._apply_context_limits(db_messages, max_context_size)
+                
+                # Convert to ModelMessage format
+                from app.services.message_converter_service import message_converter_service
+                model_messages = await message_converter_service.convert_db_messages_to_model_messages(db_messages)
+                
+                logger.info(f"Retrieved {len(model_messages)} ModelMessages for Pydantic AI agent")
+                return model_messages
+                
+            except Exception as e:
+                logger.error(f"Error getting ModelMessages for agent: {e}")
+                return []
+    
     async def send_message_to_thread(
         self, 
         agent_id: str,
@@ -268,120 +443,132 @@ class AIChatService:
         
         logger.info(f"[AI_CHAT_SERVICE] Processing message via task system for thread {context.thread_id}")
         
-        try:
-            # Get agent model
-            agent_model = await self._get_agent_model(UUID(context.agent_id))
-            if not agent_model:
-                logger.error("[AI_CHAT_SERVICE] Agent model not found")
-                return await self._create_fallback_response("Agent not available. Please try again later.")
-            
-            # Use dynamic agent factory for direct MCP integration
-            from app.services.dynamic_agent_factory import dynamic_agent_factory
-            
-            logger.info(f"[AI_CHAT_SERVICE] Processing with dynamic agent for {agent_model.id}")
-            
-            # Create customer support context
-            agent_context = CustomerSupportContext(
-                user_input=message,
-                uploaded_files=[att.get("filename", "") for att in (attachments or [])],
-                conversation_history=context.session_history,
-                user_metadata={
-                    "user_id": context.user_id,
-                    "organization_id": context.organization_id,
-                    "thread_id": context.thread_id
-                },
-                session_id=context.thread_id,
-                organization_id=context.organization_id
-            )
-            
-            # Process message with dynamic agent (direct MCP calls, no tasks)
-            response = await dynamic_agent_factory.process_message_with_agent(
-                agent_model, message, agent_context, auth_token=context._original_token
-            )
-            
-            # Store the interaction
-            await self._store_thread_interaction(context, message, response, attachments)
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"[AI_CHAT_SERVICE] Message processing failed: {e}")
-            return await self._create_fallback_response("I encountered an error processing your request. Please try again.")
-    
-    async def _send_message_internal(self, context: ThreadContext, message: str, attachments: List[dict] = None) -> ChatResponse:
-        """Internal method for processing thread messages - now uses task-based processing"""
-        
-        try:
-            start_time = datetime.now(timezone.utc)
-            logger.info(f"[AI_CHAT_SERVICE] Processing message for thread {context.thread_id}")
-            
-            # Get agent model
-            agent_model = await self._get_agent_model(UUID(context.agent_id))
-            
-            if not agent_model:
-                logger.error(f"[AI_CHAT_SERVICE] Agent {context.agent_id} not available")
-                ai_response = await self._create_fallback_response("I'm currently unavailable. Please try again later.")
-            elif not agent_model.is_active:
-                logger.warning(f"[AI_CHAT_SERVICE] Organization agent {context.agent_id} not active")
-                ai_response = ChatResponse(
-                    content="I'm temporarily unavailable for maintenance. Please try again shortly.",
-                    confidence=0.0,
-                    requires_escalation=True,
-                    tools_used=[]
-                )
-            else:
-                # Process file attachments if provided
-                processed_attachments = []
-                if attachments:
-                    processed_attachments = await self._process_attachments(attachments)
+        async with get_async_db_session() as db:
+            try:
+                # Get agent model
+                agent_model = await self._get_agent_model(UUID(context.agent_id))
+                if not agent_model:
+                    logger.error("[AI_CHAT_SERVICE] Agent model not found")
+                    return await self._create_fallback_response("Agent not available. Please try again later.")
                 
-                # Build context for the organization agent
+                # Use dynamic agent factory for direct MCP integration
+                from app.services.dynamic_agent_factory import dynamic_agent_factory
+                
+                logger.info(f"[AI_CHAT_SERVICE] Processing with dynamic agent for {agent_model.id}")
+                
+                # Create customer support context
                 agent_context = CustomerSupportContext(
                     user_input=message,
-                    uploaded_files=[att.get("filename", "") for att in processed_attachments],
+                    uploaded_files=[att.get("filename", "") for att in (attachments or [])],
                     conversation_history=context.session_history,
                     user_metadata={
                         "user_id": context.user_id,
                         "organization_id": context.organization_id,
                         "thread_id": context.thread_id
                     },
+                    session_id=context.thread_id,
                     organization_id=context.organization_id
                 )
                 
-                # Use dynamic agent factory for direct MCP integration
-                from app.services.dynamic_agent_factory import dynamic_agent_factory
+                # Process message with dynamic agent including message history support
+                response = await dynamic_agent_factory.process_message_with_agent(
+                    agent_model=agent_model, 
+                    message=message, 
+                    context=agent_context, 
+                    auth_token=context._original_token,
+                    thread_id=context.thread_id,  # Enable message history
+                    db=db  # Pass database session
+                )
                 
-                logger.info(f"[AI_CHAT_SERVICE] Processing with dynamic agent for {agent_model.id}")
-                try:
-                    ai_response = await dynamic_agent_factory.process_message_with_agent(
-                        agent_model, message, agent_context
+                # Store the interaction
+                await self._store_thread_interaction(context, message, response, attachments)
+                
+                return response
+                
+            except Exception as e:
+                logger.error(f"[AI_CHAT_SERVICE] Message processing failed: {e}")
+                return await self._create_fallback_response("I encountered an error processing your request. Please try again.")
+    
+    async def _send_message_internal(self, context: ThreadContext, message: str, attachments: List[dict] = None) -> ChatResponse:
+        """Internal method for processing thread messages - now uses task-based processing"""
+        
+        async with get_async_db_session() as db:
+            try:
+                start_time = datetime.now(timezone.utc)
+                logger.info(f"[AI_CHAT_SERVICE] Processing message for thread {context.thread_id}")
+                
+                # Get agent model
+                agent_model = await self._get_agent_model(UUID(context.agent_id))
+                
+                if not agent_model:
+                    logger.error(f"[AI_CHAT_SERVICE] Agent {context.agent_id} not available")
+                    ai_response = await self._create_fallback_response("I'm currently unavailable. Please try again later.")
+                elif not agent_model.is_active:
+                    logger.warning(f"[AI_CHAT_SERVICE] Organization agent {context.agent_id} not active")
+                    ai_response = ChatResponse(
+                        content="I'm temporarily unavailable for maintenance. Please try again shortly.",
+                        confidence=0.0,
+                        requires_escalation=True,
+                        tools_used=[]
                     )
+                else:
+                    # Process file attachments if provided
+                    processed_attachments = []
+                    if attachments:
+                        processed_attachments = await self._process_attachments(attachments)
+                    
+                    # Build context for the organization agent
+                    agent_context = CustomerSupportContext(
+                        user_input=message,
+                        uploaded_files=[att.get("filename", "") for att in processed_attachments],
+                        conversation_history=context.session_history,
+                        user_metadata={
+                            "user_id": context.user_id,
+                            "organization_id": context.organization_id,
+                            "thread_id": context.thread_id
+                        },
+                        organization_id=context.organization_id
+                    )
+                    
+                    # Use dynamic agent factory for direct MCP integration
+                    from app.services.dynamic_agent_factory import dynamic_agent_factory
+                    
+                    logger.info(f"[AI_CHAT_SERVICE] Processing with dynamic agent for {agent_model.id}")
+                    try:
+                        ai_response = await dynamic_agent_factory.process_message_with_agent(
+                            agent_model=agent_model, 
+                            message=message, 
+                            context=agent_context,
+                            auth_token=None,  # No auth token in internal method
+                            thread_id=context.thread_id,  # Enable message history
+                            db=db  # Pass database session
+                        )
                         
-                except Exception as agent_error:
-                    logger.error(f"[AI_CHAT_SERVICE] Dynamic agent processing failed: {agent_error}")
-                    ai_response = await self._create_fallback_response(
-                        "I encountered an error processing your request. Please try again or contact support if the issue persists."
-                    )
-            
-            response_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
-            logger.info(f"[AI_CHAT_SERVICE] ✅ Agent processing completed in {response_time:.2f}ms")
-            
-            # Store the interaction (this is critical and must always happen)
-            await self._store_thread_interaction(context, message, ai_response, attachments, response_time)
-            
-            return ai_response
-            
-        except Exception as e:
-            logger.error(f"[AI_CHAT_SERVICE] Message processing failed: {e}")
-            import traceback
-            logger.error(f"[AI_CHAT_SERVICE] Full traceback: {traceback.format_exc()}")
-            
-            return ChatResponse(
-                content="I encountered an error processing your request. Please try again.",
-                confidence=0.0,
-                requires_escalation=True,
-                tools_used=[]
-            )
+                    except Exception as agent_error:
+                        logger.error(f"[AI_CHAT_SERVICE] Dynamic agent processing failed: {agent_error}")
+                        ai_response = await self._create_fallback_response(
+                            "I encountered an error processing your request. Please try again or contact support if the issue persists."
+                        )
+                
+                response_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+                logger.info(f"[AI_CHAT_SERVICE] ✅ Agent processing completed in {response_time:.2f}ms")
+                
+                # Store the interaction (this is critical and must always happen)
+                await self._store_thread_interaction(context, message, ai_response, attachments, response_time)
+                
+                return ai_response
+                
+            except Exception as e:
+                logger.error(f"[AI_CHAT_SERVICE] Message processing failed: {e}")
+                import traceback
+                logger.error(f"[AI_CHAT_SERVICE] Full traceback: {traceback.format_exc()}")
+                
+                return ChatResponse(
+                    content="I encountered an error processing your request. Please try again.",
+                    confidence=0.0,
+                    requires_escalation=True,
+                    tools_used=[]
+                )
     
     
     async def _process_attachments(self, attachments: List[dict]) -> List[dict]:
