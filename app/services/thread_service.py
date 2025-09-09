@@ -24,8 +24,7 @@ class ThreadService:
         db: AsyncSession,
         agent_id: UUID,
         user_id: str,
-        title: Optional[str] = None,
-        thread_metadata: Optional[dict] = None
+        title: Optional[str] = None
     ) -> Thread:
         """
         Create a new thread for an agent with organization validation.
@@ -35,7 +34,6 @@ class ThreadService:
             agent_id: ID of the agent this thread belongs to
             user_id: ID of the user creating the thread
             title: Optional thread title
-            thread_metadata: Optional thread metadata
             
         Returns:
             Thread: Newly created thread
@@ -64,7 +62,7 @@ class ThreadService:
             logger.debug(f"[THREAD_SERVICE] Agent belongs to organization {organization_id}")
             
             # Use default title if not provided
-            thread_title = title or "New Chat Thread"
+            thread_title = title or "New Thread"
             
             # Create thread
             thread = Thread(
@@ -72,7 +70,7 @@ class ThreadService:
                 user_id=user_id,
                 organization_id=organization_id,
                 title=thread_title,
-                thread_metadata=thread_metadata or {}
+                total_messages=0
             )
             
             db.add(thread)
@@ -305,8 +303,7 @@ class ThreadService:
         thread_id: UUID,
         user_id: str,
         title: Optional[str] = None,
-        archived: Optional[bool] = None,
-        thread_metadata: Optional[dict] = None
+        archived: Optional[bool] = None
     ) -> Optional[tuple[Thread, List[str]]]:
         """
         Update thread fields with ownership validation.
@@ -318,7 +315,6 @@ class ThreadService:
             user_id: User ID for ownership validation
             title: New title (optional)
             archived: Archive status (optional)
-            thread_metadata: Thread metadata updates (optional)
             
         Returns:
             Tuple of (updated thread, list of updated fields) if successful, None otherwise
@@ -327,7 +323,7 @@ class ThreadService:
             logger.debug(f"[THREAD_SERVICE] Updating thread {thread_id} for agent {agent_id}, user {user_id}")
             
             # Validate at least one field is provided
-            if title is None and archived is None and thread_metadata is None:
+            if title is None and archived is None:
                 logger.warning("[THREAD_SERVICE] No fields provided for update")
                 raise ValueError("At least one field must be provided")
             
@@ -357,12 +353,6 @@ class ThreadService:
                     updated_fields.append("archived")
                     logger.debug(f"[THREAD_SERVICE] Updated archive status: {archived}")
             
-            # Update metadata if provided
-            if thread_metadata is not None:
-                if thread_metadata != thread.thread_metadata:
-                    thread.thread_metadata = thread_metadata
-                    updated_fields.append("thread_metadata")
-                    logger.debug("[THREAD_SERVICE] Updated thread metadata")
             
             # Only commit if there are actual changes
             if updated_fields:
@@ -433,6 +423,48 @@ class ThreadService:
             logger.error(f"[THREAD_SERVICE] Full traceback: {traceback.format_exc()}")
             return False
     
+    async def update_message_counters(
+        self,
+        db: AsyncSession,
+        thread_id: UUID,
+        increment_count: int = 1
+    ) -> bool:
+        """
+        Update thread message counters when messages are added.
+        
+        Args:
+            db: Database session
+            thread_id: ID of the thread to update
+            increment_count: Number to add to total_messages (default: 1)
+            
+        Returns:
+            True if updated successfully, False otherwise
+        """
+        try:
+            logger.debug(f"[THREAD_SERVICE] Updating message counters for thread {thread_id}")
+            
+            # Get the thread
+            query = select(Thread).where(Thread.id == thread_id)
+            result = await db.execute(query)
+            thread = result.scalar_one_or_none()
+            
+            if not thread:
+                logger.warning(f"[THREAD_SERVICE] Thread {thread_id} not found for counter update")
+                return False
+            
+            # Update counters
+            thread.total_messages += increment_count
+            thread.last_message_at = func.now()
+            
+            await db.commit()
+            logger.debug(f"[THREAD_SERVICE] Updated message counters for thread {thread_id}: total={thread.total_messages}")
+            return True
+            
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"[THREAD_SERVICE] Error updating message counters for thread {thread_id}: {e}")
+            return False
+
     async def generate_title_suggestion(
         self,
         db: AsyncSession,

@@ -28,8 +28,9 @@ services:
       - app-network
     command: >
       sh -c "
+        poetry install --no-interaction --no-ansi --no-root &&
         poetry run alembic upgrade head &&
-        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level info
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '.venv/*' --log-level info
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -116,7 +117,11 @@ services:
       - app-network
     volumes:
       - ./uploads:/app/uploads
-    command: ["celery", "-A", "app.celery_app", "worker", "--loglevel=info"]
+    command: >
+      sh -c "
+        poetry install --no-interaction --no-ansi --no-root &&
+        poetry run celery -A app.celery_app worker --loglevel=info
+      "
     healthcheck:
       test: ["CMD", "celery", "-A", "app.celery_app", "inspect", "ping"]
       interval: 30s
@@ -135,7 +140,11 @@ services:
       - app-network
     ports:
       - "5555:5555"
-    command: ["celery", "-A", "app.celery_app", "flower", "--port=5555"]
+    command: >
+      sh -c "
+        poetry install --no-interaction --no-ansi --no-root &&
+        poetry run celery -A app.celery_app flower --port=5555
+      "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5555"]
       interval: 30s

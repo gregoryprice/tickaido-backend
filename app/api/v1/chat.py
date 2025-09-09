@@ -17,6 +17,7 @@ from app.schemas.chat import (
     ThreadListResponse, MessageListResponse
 )
 from app.models.user import User
+from app.models.chat import Message
 from app.services.thread_service import thread_service
 from app.services.ai_chat_service import ai_chat_service
 from app.dependencies import get_current_active_user
@@ -94,8 +95,7 @@ async def create_thread(
             db=db,
             agent_id=agent_id,
             user_id=user_id,
-            title=request.title if request else None,
-            thread_metadata=request.thread_metadata if request else None
+            title=request.title if request else None
         )
         
         logger.info(f"[CHAT_API] Created thread {thread.id} for agent {agent_id}")
@@ -216,19 +216,18 @@ async def send_message(
         
         logger.info(f"[CHAT_API] AI response generated with confidence: {getattr(ai_response, 'confidence', 0.0)}")
         
-        # Get the most recent assistant message from the thread
-        messages = await thread_service.get_thread_messages(
-            db=db,
-            agent_id=agent_id,
-            thread_id=thread_id,
-            user_id=user_id,
-            offset=0,
-            limit=10
-        )
+        # Get the most recent messages from the thread (we need a custom query for this)
+        from sqlalchemy import select, desc
+        query = select(Message).where(
+            Message.thread_id == thread_id
+        ).order_by(desc(Message.created_at)).limit(10)
         
-        # Find the most recent assistant message
+        result = await db.execute(query)
+        recent_messages = result.scalars().all()
+        
+        # Find the most recent assistant message (messages are now in reverse chronological order)
         assistant_message = None
-        for msg in reversed(messages):
+        for msg in recent_messages:
             if msg.role == "assistant":
                 assistant_message = msg
                 break
@@ -277,7 +276,7 @@ async def update_thread(
     logger.info(f"[CHAT_API] Updating thread {thread_id} for agent {agent_id}, user: {current_user.id}")
     
     # Validate request has at least one field
-    if request.title is None and request.archived is None and request.thread_metadata is None:
+    if request.title is None and request.archived is None:
         logger.warning(f"[CHAT_API] Empty request body for thread {thread_id}")
         raise HTTPException(status_code=400, detail="At least one field must be provided")
     
@@ -290,8 +289,7 @@ async def update_thread(
             thread_id=thread_id,
             user_id=user_id,
             title=request.title,
-            archived=request.archived,
-            thread_metadata=request.thread_metadata
+            archived=request.archived
         )
         
         if not result:
