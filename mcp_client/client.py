@@ -33,6 +33,7 @@ import hashlib
 from typing import Optional, Dict, Any
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 from .authenticated_client import create_authenticated_mcp_client
+from .tool_filter import create_filtered_mcp_client
 
 logger = logging.getLogger(__name__)
 
@@ -551,25 +552,28 @@ class MCPClient:
             logger.info(f"[MCP_CLIENT] 🎯 Creating agent-specific MCP client for {agent_id}")
             logger.debug(f"[MCP_CLIENT] Agent tools: {tools_enabled}")
             
-            # Create the appropriate MCP client based on authentication
+            # Create the base MCP client (authenticated or not)
             if auth_token:
                 logger.info(f"[MCP_CLIENT] 🔐 Creating authenticated MCP client for agent {agent_id}")
-                agent_client = create_authenticated_mcp_client(mcp_url, auth_token=auth_token)
+                base_client = create_authenticated_mcp_client(mcp_url, auth_token=auth_token)
             else:
                 logger.info(f"[MCP_CLIENT] 🔓 Creating non-authenticated MCP client for agent {agent_id}")
-                agent_client = MCPServerStreamableHTTP(mcp_url)
+                base_client = MCPServerStreamableHTTP(mcp_url)
             
-            # Store agent configuration for tool filtering
-            agent_client._agent_id = agent_id
-            agent_client._enabled_tools = set(tools_enabled)
-            agent_client._organization_id = organization_id
+            # Apply tool filtering wrapper
+            if tools_enabled:
+                filtered_client = create_filtered_mcp_client(base_client, tools_enabled, agent_id)
+                logger.info(f"[MCP_CLIENT] ✅ Created filtered MCP client for agent {agent_id} with {len(tools_enabled)} allowed tools")
+            else:
+                filtered_client = base_client
+                logger.warning(f"[MCP_CLIENT] Agent {agent_id} has no tools_enabled - allowing all tools")
             
-            # Cache the client
-            self._agent_clients[cache_key] = agent_client
+            # Cache the filtered client
+            self._agent_clients[cache_key] = filtered_client
             
             auth_status = "authenticated" if auth_token else "non-authenticated"
             logger.info(f"[MCP_CLIENT] ✅ {auth_status.capitalize()} agent-specific MCP client created for {agent_id} with {len(tools_enabled)} tools")
-            return agent_client
+            return filtered_client
             
         except Exception as e:
             logger.error(f"[MCP_CLIENT] ❌ Failed to create agent MCP client: {e}")

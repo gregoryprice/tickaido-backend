@@ -1,0 +1,11 @@
+services:
+  app:
+    ports:
+      - "5678:5678"
+    environment:
+      - POETRY_VIRTUALENVS_CREATE=false
+      - POETRY_VENV_IN_PROJECT=0
+    command:
+      - sh
+      - -c
+      - "alembic upgrade head && exec python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"
