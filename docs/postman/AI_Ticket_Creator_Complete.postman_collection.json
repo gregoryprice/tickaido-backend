@@ -461,7 +461,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Technical Support Thread\",\n    \"thread_metadata\": {\n        \"source\": \"postman_test\",\n        \"priority\": \"normal\",\n        \"category\": \"technical_support\"\n    }\n}"
+							"raw": "{\n    \"title\": \"Technical Support Thread\"\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads",
@@ -481,8 +481,8 @@
 									"    pm.test('Response has agent_id', function() {",
 									"        pm.expect(jsonData).to.have.property('agent_id');",
 									"    });",
-									"    pm.test('Response has thread_metadata', function() {",
-									"        pm.expect(jsonData).to.have.property('thread_metadata');",
+									"    pm.test('Response has total_messages', function() {",
+									"        pm.expect(jsonData).to.have.property('total_messages');",
 									"    });",
 									"});"
 								]
@@ -542,7 +542,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Updated Technical Support Thread\",\n    \"archived\": false,\n    \"thread_metadata\": {\n        \"priority\": \"high\",\n        \"category\": \"technical_support\",\n        \"last_updated\": \"2025-01-01T12:00:00Z\"\n    }\n}"
+							"raw": "{\n    \"title\": \"Updated Technical Support Thread\",\n    \"archived\": false\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}",

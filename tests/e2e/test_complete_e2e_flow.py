@@ -232,14 +232,7 @@ class TestCompleteE2EFlow:
         """Step 3: Create thread for the customer support agent"""
         
         thread_data = {
-            "title": "E2E Test Support Thread",
-            "thread_metadata": {
-                "test_type": "complete_e2e",
-                "created_by": "automated_test",
-                "priority": "high",
-                "expected_tools": ["create_ticket", "search_tickets"],
-                "timestamp": datetime.now().isoformat()
-            }
+            "title": "E2E Test Support Thread"
         }
         
         agent_id = self.test_data["agent_id"]
@@ -264,7 +257,7 @@ class TestCompleteE2EFlow:
         # CRITICAL: Validate ALL thread response fields
         required_thread_fields = [
             "id", "agent_id", "user_id", "organization_id", "title", 
-            "thread_metadata", "archived", "created_at", "updated_at", "messages"
+            "total_messages", "last_message_at", "archived", "created_at", "updated_at", "messages"
         ]
         
         for field in required_thread_fields:
@@ -279,16 +272,16 @@ class TestCompleteE2EFlow:
         assert isinstance(thread_response["messages"], list), "Messages should be a list"
         assert len(thread_response["messages"]) == 0, "New thread should have no messages"
         
-        # Validate thread metadata was stored
-        assert thread_response["thread_metadata"] is not None, "thread_metadata should not be None"
-        assert thread_response["thread_metadata"]["test_type"] == "complete_e2e", "thread_metadata not preserved"
+        # Validate message tracking fields
+        assert thread_response["total_messages"] == 0, "New thread should have 0 messages"
+        assert thread_response["last_message_at"] is None, "New thread should have no last_message_at"
         
         # Store thread data
         self.test_data["thread_id"] = thread_response["id"]
         
         print(f"   ✅ Thread created: {thread_response['id']}")
         print(f"   ✅ Associated with agent: {thread_response['agent_id']}")
-        print(f"   ✅ Metadata preserved: {bool(thread_response['thread_metadata'])}")
+        print(f"   ✅ Message count initialized: {thread_response['total_messages']}")
     
     def test_05_send_message_and_get_ai_response(self):
         """Step 4: Send message to thread and get AI response with tool calls"""
@@ -517,13 +510,7 @@ class TestCompleteE2EFlow:
         
         new_title = "Updated E2E Test - Login Authentication Issue"
         update_data = {
-            "title": new_title,
-            "thread_metadata": {
-                "test_type": "complete_e2e",
-                "updated_by": "automated_test",
-                "update_timestamp": datetime.now().isoformat(),
-                "resolution_status": "in_progress"
-            }
+            "title": new_title
         }
         
         print("\n✏️  Step 7: Update Thread")

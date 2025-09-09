@@ -636,43 +636,19 @@ class AIChatService:
                 )
                 db.add(ai_msg)
                 
-                # Update thread metadata
-                await self._update_thread_metadata(db, context, user_message, ai_response)
-                
+                # Commit the messages first
                 await db.commit()
+                
+                # Update thread counters (2 messages added: user + assistant)
+                from app.services.thread_service import thread_service
+                await thread_service.update_message_counters(db, UUID(context.thread_id), increment_count=2)
+                
                 logger.debug("[AI_CHAT_SERVICE] Thread interaction stored successfully")
                 
             except Exception as e:
                 await db.rollback()
                 logger.error(f"[AI_CHAT_SERVICE] Error storing thread interaction: {e}")
                 raise
-    
-    async def _update_thread_metadata(self, db, context: ThreadContext, user_message: str, ai_response: ChatResponse):
-        """Update thread metadata and generate title if needed"""
-        
-        thread_query = select(Thread).where(Thread.id == UUID(context.thread_id))
-        result = await db.execute(thread_query)
-        thread = result.scalar_one_or_none()
-        
-        if thread:
-            # Update thread metadata
-            current_metadata = thread.thread_metadata or {}
-            current_metadata.update({
-                "last_message_at": datetime.now(timezone.utc).isoformat(),
-                "total_messages": current_metadata.get("total_messages", 0) + 2,
-                "last_agent_used": context.agent_id,
-                "last_tools_used": ai_response.tools_used if hasattr(ai_response, 'tools_used') else []
-            })
-            thread.thread_metadata = current_metadata
-            
-            # Generate AI title if using default title
-            if thread.title == "New Chat Thread":
-                try:
-                    ai_title = await self.generate_thread_title(user_message)
-                    thread.title = ai_title
-                    logger.info(f"[AI_CHAT_SERVICE] 🎯 Updated thread title to: '{ai_title}'")
-                except Exception as e:
-                    logger.warning(f"[AI_CHAT_SERVICE] Title generation failed: {e}")
     
     async def generate_thread_title(self, message: str, context: Optional[str] = None) -> str:
         """Generate an AI-powered title for a thread"""
@@ -807,6 +783,24 @@ class AIChatService:
                 )
                 db.add(ai_msg)
                 await db.commit()
+
+                # Update thread metadata to reflect this interaction (user + assistant)
+                try:
+                    thread_query = select(Thread).where(Thread.id == UUID(context.thread_id))
+                    result = await db.execute(thread_query)
+                    thread = result.scalar_one_or_none()
+                    if thread:
+                        current_metadata = thread.thread_metadata or {}
+                        current_metadata.update({
+                            "last_message_at": datetime.now(timezone.utc).isoformat(),
+                            "total_messages": current_metadata.get("total_messages", 0) + 2,
+                            "last_agent_used": context.agent_id,
+                            "last_tools_used": response.tools_used if hasattr(response, 'tools_used') else []
+                        })
+                        thread.thread_metadata = current_metadata
+                        await db.commit()
+                except Exception as meta_err:
+                    logger.warning(f"[AI_CHAT_SERVICE] Failed to update thread metadata after streaming response: {meta_err}")
             except Exception as e:
                 await db.rollback()
                 logger.error(f"Error storing AI response: {e}")

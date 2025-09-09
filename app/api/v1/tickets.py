@@ -14,7 +14,6 @@ from app.schemas.ticket import (
     TicketUpdateRequest,
     TicketPatchRequest,
     TicketDetailResponse,
-    TicketListResponse,
     TicketSearchParams,
     TicketSortParams,
     TicketAICreateRequest,
@@ -77,59 +76,10 @@ async def list_tickets(
             sort_order=sort_params.sort_order
         )
         
-        # Convert Ticket models to TicketListResponse
+        # Convert Ticket models to TicketDetailResponse
         ticket_responses = []
         for ticket in tickets:
-            # Build created_by user info
-            created_by = None
-            if ticket.creator:
-                created_by = {
-                    "id": ticket.creator.id,
-                    "email": ticket.creator.email,
-                    "full_name": ticket.creator.full_name,
-                    "display_name": ticket.creator.display_name,
-                    "avatar_url": ticket.creator.avatar_url
-                }
-            
-            # Build assigned_to user info
-            assigned_to = None
-            if ticket.assignee:
-                assigned_to = {
-                    "id": ticket.assignee.id,
-                    "email": ticket.assignee.email,
-                    "full_name": ticket.assignee.full_name,
-                    "display_name": ticket.assignee.display_name,
-                    "avatar_url": ticket.assignee.avatar_url
-                }
-            
-            # Calculate computed fields
-            age_in_hours = (datetime.now(timezone.utc) - ticket.created_at).total_seconds() / 3600
-            is_high_priority = ticket.priority.value in ["high", "critical"]
-            is_overdue = False  # TODO: Implement SLA logic
-            
-            ticket_response = TicketListResponse(
-                id=ticket.id,
-                title=ticket.title,
-                display_title=ticket.title[:100] + "..." if len(ticket.title) > 100 else ticket.title,
-                category=ticket.category.value,
-                subcategory=ticket.subcategory,
-                priority=ticket.priority.value,
-                urgency=ticket.urgency.value if hasattr(ticket, 'urgency') else ticket.priority.value,
-                status=ticket.status.value,
-                department=ticket.department,
-                source_channel=ticket.source_channel or "web",
-                created_by=created_by,
-                assigned_to=assigned_to,
-                created_at=ticket.created_at,
-                updated_at=ticket.updated_at,
-                last_activity_at=ticket.updated_at,  # TODO: Track actual last activity
-                communication_count=0,  # TODO: Count communications
-                file_count=len(ticket.files) if ticket.files else 0,
-                is_overdue=is_overdue,
-                is_high_priority=is_high_priority,
-                age_in_hours=age_in_hours,
-                escalation_level=ticket.escalation_level or 0
-            )
+            ticket_response = TicketDetailResponse.model_validate(ticket)
             ticket_responses.append(ticket_response)
         
         return PaginatedResponse.create(

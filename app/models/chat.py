@@ -25,7 +25,10 @@ class Thread(BaseModel):
     organization_id = Column(UUID(as_uuid=True), ForeignKey('organizations.id'), nullable=False)
     
     title = Column(String(500))  # Thread title
-    thread_metadata = Column("metadata", JSON, nullable=True)  # Thread metadata (DB column: metadata)
+    
+    # Message tracking fields
+    total_messages = Column(Integer, default=0, nullable=False)
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
     
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
@@ -69,8 +72,8 @@ class Message(BaseModel):
     # Attachments support  
     attachments = Column(JSON, nullable=True)  # Array of attachment references
     
-    # Message metadata
-    message_metadata = Column("metadata", JSON, nullable=True)  # DB column: metadata
+    # Message metadata matches migration column
+    message_metadata = Column("message_metadata", JSON, nullable=True)
     
     # Performance tracking (model_used and tokens_used removed)
     response_time_ms = Column(Integer, nullable=True)

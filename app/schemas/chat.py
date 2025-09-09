@@ -35,9 +35,13 @@ class ThreadResponse(BaseResponse):
         description="Thread title (auto-generated or user-provided)",
         max_length=500
     )
-    thread_metadata: Optional[Dict[str, Any]] = Field(
+    total_messages: int = Field(
+        default=0,
+        description="Total number of messages in this thread"
+    )
+    last_message_at: Optional[datetime] = Field(
         None,
-        description="Thread metadata"
+        description="Timestamp of the last message in this thread"
     )
     archived: bool = Field(
         default=False,
@@ -94,10 +98,6 @@ class CreateThreadRequest(BaseSchema):
         None,
         description="Optional thread title",
         max_length=500
-    )
-    thread_metadata: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Optional thread metadata"
     )
 
 
@@ -169,10 +169,6 @@ class UpdateThreadRequest(BaseSchema):
     archived: Optional[bool] = Field(
         None,
         description="Archive status - true to archive, false to unarchive"
-    )
-    thread_metadata: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Thread metadata updates"
     )
 
 

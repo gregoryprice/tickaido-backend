@@ -36,7 +36,8 @@ def test_thread(test_agent):
     thread.user_id = "test_user"
     thread.organization_id = test_agent.organization_id
     thread.title = "Test Thread"
-    thread.thread_metadata = {}
+    thread.total_messages = 0
+    thread.last_message_at = None
     thread.archived = False
     thread.created_at = datetime.now(timezone.utc)
     thread.updated_at = datetime.now(timezone.utc)
@@ -76,7 +77,9 @@ async def test_create_thread_with_agent(test_agent):
     assert thread.user_id == "test_user"
     assert thread.title == "Test Thread"
     assert hasattr(thread, 'archived')  # Just check it exists, default may be None initially
-    assert thread.thread_metadata == {}
+    # Should have default message tracking fields
+    assert thread.total_messages == 0
+    assert thread.last_message_at is None  # No messages yet
     
     # Verify database operations
     mock_db.add.assert_called_once()
