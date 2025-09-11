@@ -127,6 +127,7 @@ class IntegrationUpdateRequest(BaseUpdate):
     base_url: Optional[URLStr] = Field(None, description="Base URL")
     api_version: Optional[str] = Field(None, max_length=20, description="API version")
     credentials: Optional[Dict[str, Any]] = Field(None, description="Authentication credentials")
+    configuration: Optional[Dict[str, Any]] = Field(None, description="Integration-specific configuration values")
     oauth_scopes: Optional[List[str]] = Field(None, description="OAuth scopes")
     routing_rules: Optional[Dict[str, Any]] = Field(None, description="Routing rules")
     default_priority: Optional[int] = Field(None, ge=1, le=1000, description="Default priority")

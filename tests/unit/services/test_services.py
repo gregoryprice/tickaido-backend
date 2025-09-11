@@ -143,7 +143,7 @@ def test_integration_service_config_validation():
     assert "instance_url" in salesforce_fields
     
     jira_fields = service._get_required_config_fields("jira")
-    assert "url" in jira_fields
+    # With base_url standardized at top-level, only credentials are required here
     assert "email" in jira_fields
     assert "api_token" in jira_fields
     
@@ -157,13 +157,13 @@ def test_integration_service_config_validation():
     }
     
     # Should not raise exception
-    service._validate_integration_config("salesforce", valid_config)
+    service._validate_credentials("salesforce", valid_config)
     
     # Invalid config should raise exception
     invalid_config = {"client_id": "test"}  # Missing required fields
     
     try:
-        service._validate_integration_config("salesforce", invalid_config)
+        service._validate_credentials("salesforce", invalid_config)
         assert False, "Should have raised ValueError"
     except ValueError as e:
         assert "Missing required configuration field" in str(e)

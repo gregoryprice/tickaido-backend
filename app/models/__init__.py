@@ -8,6 +8,7 @@ This module exports all database models for the application.
 from app.models.base import Base
 from app.models.user import User, UserRole
 from app.models.organization import Organization
+from app.models.organization_invitation import OrganizationInvitation, OrganizationRole, InvitationStatus
 from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketCategory
 from app.models.file import File, FileStatus, FileType
 from app.models.integration import Integration, IntegrationCategory, IntegrationStatus
@@ -29,6 +30,9 @@ __all__ = [
     
     # Organization models
     "Organization",
+    "OrganizationInvitation",
+    "OrganizationRole", 
+    "InvitationStatus",
     
     # Ticket models  
     "Ticket",

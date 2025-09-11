@@ -151,10 +151,10 @@ class TestCompleteE2EFlow:
         print(f"   ✅ Organization: {organization_id}")
         print(f"   ✅ Token acquired: {login_resp_data['access_token'][:20]}...")
     
-    def test_03_get_auto_created_agent(self):
-        """Step 2: Get the auto-created customer support agent for the organization"""
+    def test_03_get_or_create_agent(self):
+        """Step 2: Get or create customer support agent for the organization"""
         
-        print("\n🤖 Step 2: Get Auto-Created Customer Support Agent")
+        print("\n🤖 Step 2: Get or Create Customer Support Agent")
         print(f"   Organization ID: {self.test_data.get('organization_id', 'Unknown')}")
         
         # List agents for the organization
@@ -170,7 +170,7 @@ class TestCompleteE2EFlow:
         
         print(f"   Agents Response: {json.dumps(agents_data, indent=2)}")
         
-        # Find customer support agent - if organization_id not available, take first customer_support agent
+        # Look for existing customer support agent - if none exists, we'll create one
         customer_support_agent = None
         organization_id = self.test_data.get("organization_id")
         
@@ -186,8 +186,8 @@ class TestCompleteE2EFlow:
                     break
         
         if customer_support_agent is None:
-            # If no auto-created agent found, create one manually
-            print("   No auto-created agent found, creating manually...")
+            # If no existing agent found, create one manually
+            print("   No existing agent found, creating manually...")
             
             agent_data = {
                 "agent_type": "customer_support",

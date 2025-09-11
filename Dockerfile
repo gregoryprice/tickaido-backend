@@ -8,7 +8,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV POETRY_VERSION=2.1.3
 ENV POETRY_HOME="/opt/poetry"
-ENV POETRY_VENV_IN_PROJECT=1
 ENV POETRY_NO_INTERACTION=1
 
 # Add Poetry to PATH
@@ -43,8 +42,9 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 # Copy Poetry files
 COPY pyproject.toml poetry.lock* ./
 
-# Install dependencies via Poetry (with virtualenv)
-RUN poetry install --no-interaction --no-ansi --no-root
+# Install dependencies via Poetry (container-native, no virtualenv)
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --no-root
 
 # Copy application code into /app
 COPY app/ ./app/

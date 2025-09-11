@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "ai-ticket-creator-complete-2025",
-		"name": "AI Ticket Creator Backend API - Complete (Agent + Integration Refactor)",
-		"description": "Complete API collection for AI-powered ticket creation and management system with refactored multi-agent architecture and integration system.\n\n## Features\n- **Multi-Agent System**: Multiple agents per organization with embedded configuration\n- **Agent Management**: CRUD operations with change history tracking\n- **User authentication and organization management**\n- **AI-powered ticket creation and management**\n- **Chat Assistant**: Real-time AI chat with conversation management\n- **File processing**: OCR, transcription, and agent context integration\n- **Third-party integrations**: JIRA, Salesforce, etc.\n- **Real-time WebSocket communications**\n\n## Integration Architecture (REFACTORED)\nThe system now uses semantic integration categories:\n1. **Category-Based System**: 7 functional categories (ticketing, crm, messaging, communication, project_management, code_repository, webhook)\n2. **Platform Identification**: Separate platform_name field (jira, slack, salesforce, etc.)\n3. **Automatic Status Management**: enabled=false automatically sets status=inactive\n4. **ID-Based Routing**: Tickets use integration_id instead of integration_name\n5. **Clean Architecture**: All deprecated IntegrationType enum removed\n\n## Agent Architecture\nThe system supports:\n1. **Multiple Agents per Organization**: No singleton constraints\n2. **Embedded Configuration**: 20+ typed fields instead of JSON blob\n3. **Change History Tracking**: Complete audit trail with rollback capabilities\n4. **File Context Processing**: Up to 20 files per agent with text extraction\n5. **Autonomous Task Processing**: Queue-based multi-channel operations\n6. **Simplified API**: 6 CRUD + history endpoints\n\n## Agent-Centric Chat System\nThe chat system is fully agent-centric with:\n1. **Thread Management**: Create, read, update, delete threads per agent\n2. **Message Handling**: Send messages and receive AI responses\n3. **Context Awareness**: Agents use their configuration and file context\n4. **Real-time Processing**: WebSocket support for live conversations\n5. **Title Generation**: AI-powered thread title suggestions\n6. **Search & Filtering**: Find threads by content, archive status, etc.\n\n## Authentication\nAll protected endpoints require JWT authentication. Use the login flow to get access tokens.\n\n## Base URL\nLocal Development: http://localhost:8000",
+		"name": "AI Ticket Creator Backend API - Complete (Agent + Integration + Member Management)",
+		"description": "Complete API collection for AI-powered ticket creation and management system with refactored multi-agent architecture, integration system, and comprehensive member management.\n\n## Features\n- **Member Management System**: Complete organization member management with role-based access control\n- **Organization Discovery**: Domain-based organization matching during registration\n- **Invitation System**: Secure invitation workflow with email notifications\n- **Multi-Agent System**: Multiple agents per organization with embedded configuration\n- **Agent Management**: CRUD operations with change history tracking\n- **User authentication and organization management**\n- **AI-powered ticket creation and management**\n- **Chat Assistant**: Real-time AI chat with conversation management\n- **File processing**: OCR, transcription, and agent context integration\n- **Third-party integrations**: JIRA, Salesforce, GitHub, Webhooks, etc.\n- **Real-time WebSocket communications**\n\n## Member Management Features\n1. **Role-Based Access**: Admin and Member roles with proper permission enforcement\n2. **Invitation System**: Secure token-based invitations with expiration\n3. **Organization Discovery**: Domain-based organization matching for seamless registration\n4. **Security Controls**: Self-role modification prevention, last admin protection\n5. **Auto-Admin Promotion**: Automatic admin promotion when last admin is removed\n6. **Cross-Organization Isolation**: Complete data isolation between organizations\n\n## Integration Architecture (REFACTORED)\nThe system now uses semantic integration categories:\n1. **Category-Based System**: 7 functional categories (ticketing, crm, messaging, communication, project_management, code_repository, webhook)\n2. **Platform Identification**: Separate platform_name field (jira, slack, salesforce, etc.)\n3. **Automatic Status Management**: enabled=false automatically sets status=inactive\n4. **ID-Based Routing**: Tickets use integration_id instead of integration_name\n5. **Clean Architecture**: All deprecated IntegrationType enum removed\n\n## Agent Architecture\nThe system supports:\n1. **Multiple Agents per Organization**: No singleton constraints\n2. **Embedded Configuration**: 20+ typed fields instead of JSON blob\n3. **Change History Tracking**: Complete audit trail with rollback capabilities\n4. **File Context Processing**: Up to 20 files per agent with text extraction\n5. **Autonomous Task Processing**: Queue-based multi-channel operations\n6. **Simplified API**: 6 CRUD + history endpoints\n\n## Agent-Centric Chat System\nThe chat system is fully agent-centric with:\n1. **Thread Management**: Create, read, update, delete threads per agent\n2. **Message Handling**: Send messages and receive AI responses\n3. **Context Awareness**: Agents use their configuration and file context\n4. **Real-time Processing**: WebSocket support for live conversations\n5. **Title Generation**: AI-powered thread title suggestions\n6. **Search & Filtering**: Find threads by content, archive status, etc.\n\n## Authentication\nAll protected endpoints require JWT authentication. Use the login flow to get access tokens.\n\n## Base URL\nLocal Development: http://localhost:8000",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "ai-ticket-creator"
 	},
@@ -1121,11 +1121,30 @@
 							}
 						],
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration retrieved successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('integration_category');",
+									"    pm.expect(jsonData).to.have.property('platform_name');",
+									"    pm.expect(jsonData).to.have.property('enabled');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Update Integration",
@@ -1143,14 +1162,32 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"JIRA Production Updated\",\n    \"enabled\": true,\n    \"configuration\": {\n        \"jira_url\": \"{{JIRA_URL}}\",\n        \"email\": \"{{JIRA_EMAIL}}\",\n        \"api_token\": \"{{JIRA_API_TOKEN}}\",\n        \"project_key\": \"{{JIRA_PROJECT_KEY}}\"\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"support\",\n        \"last_updated\": \"2025-01-01T12:00:00Z\"\n    }\n}"
+							"raw": "{\n    \"name\": \"JIRA Production Updated\",\n    \"enabled\": true,\n    \"auth_type\": \"api_key\",\n    \"credentials\": {\n        \"email\": \"{{JIRA_EMAIL}}\",\n        \"api_token\": \"{{JIRA_API_TOKEN}}\"\n    },\n    \"configuration\": {\n        \"project_key\": \"{{JIRA_PROJECT_KEY}}\",\n        \"issue_type_mapping\": {\n            \"bug\": \"Bug\",\n            \"feature\": \"Story\",\n            \"task\": \"Task\"\n        }\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"support\",\n        \"last_updated\": \"2025-01-01T12:00:00Z\"\n    }\n}"
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration updated successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('enabled');",
+									"    pm.expect(jsonData).to.have.property('integration_category');",
+									"    pm.expect(jsonData).to.have.property('platform_name');",
+									"    pm.expect(jsonData.name).to.eql('JIRA Production Updated');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Delete Integration",
@@ -1163,11 +1200,26 @@
 							}
 						],
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration deleted successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('deleted');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Test Integration",
@@ -1175,16 +1227,39 @@
 						"method": "POST",
 						"header": [
 							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
 								"key": "Authorization",
 								"value": "Bearer {{ACCESS_TOKEN}}"
 							}
 						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"test_connection\": true,\n    \"validate_credentials\": true,\n    \"check_permissions\": true\n}"
+						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/test",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/test",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "test"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "test"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration test completed\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('test_result');",
+									"    pm.expect(jsonData).to.have.property('connection_status');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Sync Integration",
@@ -1205,11 +1280,26 @@
 							"raw": "{\n    \"sync_type\": \"full\",\n    \"options\": {\n        \"force_update\": false,\n        \"dry_run\": false\n    }\n}"
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/sync",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/sync",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "sync"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "sync"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration sync completed\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('sync_status');",
+									"    pm.expect(jsonData).to.have.property('sync_timestamp');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Disable Integration (Auto Status Management)",
@@ -1230,9 +1320,9 @@
 							"raw": "{\n    \"enabled\": false,\n    \"reason\": \"Temporarily disabling for maintenance\"\n}"
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/status",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/status",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "status"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "status"]
 						}
 					},
 					"event": [
@@ -1270,9 +1360,9 @@
 							"raw": "{\n    \"enabled\": true,\n    \"reason\": \"Re-enabling after maintenance completion\"\n}"
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/status",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/status",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "status"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "status"]
 						}
 					},
 					"event": [
@@ -1311,11 +1401,27 @@
 							"raw": "{\n    \"enabled\": true,\n    \"reason\": \"Integration enabled after successful testing\"\n}"
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/status",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/status",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "status"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "status"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration status updated successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('enabled');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData).to.have.property('reason');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Get Active Integrations",
@@ -1332,7 +1438,29 @@
 							"host": ["{{BASE_URL}}"],
 							"path": ["api", "v1", "integrations", "active"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Active integrations retrieved\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"    ",
+									"    jsonData.forEach(function(integration) {",
+									"        pm.expect(integration).to.have.property('enabled');",
+									"        pm.expect(integration.enabled).to.eql(true);",
+									"        pm.expect(integration).to.have.property('status');",
+									"        pm.expect(integration).to.have.property('integration_category');",
+									"        pm.expect(integration).to.have.property('platform_name');",
+									"    });",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Activate Integration",
@@ -1353,11 +1481,26 @@
 							"raw": "{\n    \"activate\": true,\n    \"validation_required\": true\n}"
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/activate",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/activate",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "activate"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "activate"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration activated successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('activation_status');",
+									"    pm.expect(jsonData).to.have.property('validation_result');",
+									"});"
+								]
+							}
+						}
+					]
 				},
 				{
 					"name": "Get Integration Fields",
@@ -1370,11 +1513,115 @@
 							}
 						],
 						"url": {
-							"raw": "{{BASE_URL}}/api/v1/integrations/{{integration_id}}/fields",
+							"raw": "{{BASE_URL}}/api/v1/integrations/{{INTEGRATION_ID}}/fields",
 							"host": ["{{BASE_URL}}"],
-							"path": ["api", "v1", "integrations", "{{integration_id}}", "fields"]
+							"path": ["api", "v1", "integrations", "{{INTEGRATION_ID}}", "fields"]
 						}
-					}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Integration fields retrieved\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('fields');",
+									"    pm.expect(jsonData.fields).to.be.an('array');",
+									"    ",
+									"    if (jsonData.fields.length > 0) {",
+									"        var field = jsonData.fields[0];",
+									"        pm.expect(field).to.have.property('field_name');",
+									"        pm.expect(field).to.have.property('field_type');",
+									"        pm.expect(field).to.have.property('required');",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Webhook Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Support Webhook\",\n    \"integration_category\": \"webhook\",\n    \"platform_name\": \"generic_webhook\",\n    \"enabled\": true,\n    \"auth_type\": \"bearer_token\",\n    \"base_url\": \"https://hooks.example.com/webhook\",\n    \"credentials\": {\n        \"bearer_token\": \"{{WEBHOOK_TOKEN}}\",\n        \"secret_key\": \"{{WEBHOOK_SECRET}}\"\n    },\n    \"configuration\": {\n        \"event_types\": [\"ticket.created\", \"ticket.updated\", \"ticket.resolved\"],\n        \"include_attachments\": false,\n        \"retry_attempts\": 3,\n        \"timeout_seconds\": 30\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"support\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", ""]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Webhook integration created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.integration_category).to.eql('webhook');",
+									"    pm.expect(jsonData.platform_name).to.eql('generic_webhook');",
+									"    pm.environment.set('WEBHOOK_INTEGRATION_ID', jsonData.id);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create GitHub Integration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"GitHub Repository\",\n    \"integration_category\": \"code_repository\",\n    \"platform_name\": \"github\",\n    \"enabled\": true,\n    \"auth_type\": \"oauth2\",\n    \"credentials\": {\n        \"access_token\": \"{{GITHUB_ACCESS_TOKEN}}\",\n        \"refresh_token\": \"{{GITHUB_REFRESH_TOKEN}}\"\n    },\n    \"configuration\": {\n        \"repository\": \"{{GITHUB_REPO}}\",\n        \"owner\": \"{{GITHUB_OWNER}}\",\n        \"default_branch\": \"main\",\n        \"issue_labels\": [\"bug\", \"enhancement\", \"support\"]\n    },\n    \"metadata\": {\n        \"environment\": \"production\",\n        \"team\": \"development\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/integrations/",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "integrations", ""]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"GitHub integration created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.integration_category).to.eql('code_repository');",
+									"    pm.expect(jsonData.platform_name).to.eql('github');",
+									"    pm.environment.set('GITHUB_INTEGRATION_ID', jsonData.id);",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
@@ -1759,6 +2006,645 @@
 			]
 		},
 		{
+			"name": "👥 Member Management (NEW)",
+			"item": [
+				{
+					"name": "Organization Discovery",
+					"item": [
+						{
+							"name": "Get Organization by Domain (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/by-domain/{{TEST_DOMAIN}}",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "by-domain", "{{TEST_DOMAIN}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Organization discovery works\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('organization');",
+											"        pm.expect(jsonData.organization).to.have.property('domain');",
+											"        pm.expect(jsonData.organization).to.have.property('name');",
+											"        pm.expect(jsonData.organization).to.have.property('member_count');",
+											"    } else {",
+											"        pm.expect(pm.response.code).to.eql(404);",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Registration Options (Public)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"{{USER_EMAIL}}\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/registration-options",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "registration-options"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Registration options provided\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('suggested_action');",
+											"    pm.expect(jsonData).to.have.property('options');",
+											"    pm.expect(jsonData).to.have.property('message');",
+											"    pm.expect(jsonData.options).to.be.an('array');",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Check Domain Availability (Public)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"domain\": \"{{TEST_DOMAIN}}\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/check-domain",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "check-domain"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Domain availability check works\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('domain');",
+											"    pm.expect(jsonData).to.have.property('available');",
+											"    pm.expect(jsonData).to.have.property('existing_count');",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Organization Directory (Admin Only)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/directory?search={{TEST_SEARCH}}&page=1&limit=50",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "directory"],
+									"query": [
+										{"key": "search", "value": "{{TEST_SEARCH}}"},
+										{"key": "page", "value": "1"},
+										{"key": "limit", "value": "50"}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Member Management",
+					"item": [
+						{
+							"name": "List Organization Members",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/members?role=admin&active=true&page=1&limit=50",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "members"],
+									"query": [
+										{"key": "role", "value": "admin"},
+										{"key": "active", "value": "true"},
+										{"key": "page", "value": "1"},
+										{"key": "limit", "value": "50"}
+									]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Members listed successfully\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('data');",
+											"    pm.expect(jsonData).to.have.property('pagination');",
+											"    pm.expect(jsonData.data).to.be.an('array');",
+											"    ",
+											"    if (jsonData.data.length > 0) {",
+											"        var member = jsonData.data[0];",
+											"        pm.expect(member).to.have.property('id');",
+											"        pm.expect(member).to.have.property('email');",
+											"        pm.expect(member).to.have.property('organization_role');",
+											"        pm.expect(member).to.have.property('joined_organization_at');",
+											"        pm.expect(member).to.have.property('is_active');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Invite Organization Member",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"{{INVITE_EMAIL}}\",\n    \"role\": \"member\",\n    \"send_email\": true,\n    \"message\": \"Welcome to our organization! We're excited to have you join our team.\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/members/invite",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "members", "invite"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Member invitation sent successfully\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('invitation_id');",
+											"    pm.expect(jsonData).to.have.property('email');",
+											"    pm.expect(jsonData).to.have.property('role');",
+											"    pm.expect(jsonData).to.have.property('invitation_url');",
+											"    pm.expect(jsonData).to.have.property('expires_at');",
+											"    pm.environment.set('INVITATION_ID', jsonData.invitation_id);",
+											"    pm.environment.set('INVITATION_TOKEN', jsonData.invitation_url.split('/').pop());",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Update Member Role",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"organization_role\": \"admin\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/members/{{MEMBER_USER_ID}}/role",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "members", "{{MEMBER_USER_ID}}", "role"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Member role updated successfully\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('message');",
+											"    pm.expect(jsonData.message).to.include('role updated successfully');",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Remove Organization Member",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/members/{{MEMBER_USER_ID}}",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "members", "{{MEMBER_USER_ID}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Member removed successfully\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('message');",
+											"    pm.expect(jsonData.message).to.include('removed from organization successfully');",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Organization Member Stats",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/members/stats",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "members", "stats"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Member stats retrieved successfully\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('total_members');",
+											"    pm.expect(jsonData).to.have.property('admin_count');",
+											"    pm.expect(jsonData).to.have.property('member_count');",
+											"    pm.expect(jsonData).to.have.property('pending_invitations');",
+											"    pm.expect(jsonData).to.have.property('has_admin');",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete User Account",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"delete_organization\": false,\n    \"reason\": \"User requested account deletion\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/users/{{USER_ID}}",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "users", "{{USER_ID}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"User account deletion handled correctly\", function () {",
+											"    if (pm.response.code === 400) {",
+											"        // Expected if user is last member",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData.detail).to.have.property('action_required');",
+											"    } else {",
+											"        pm.response.to.have.status(200);",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('message');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Invitation Management", 
+					"item": [
+						{
+							"name": "Get Invitation Details (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/invitations/{{INVITATION_TOKEN}}",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "invitations", "{{INVITATION_TOKEN}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Invitation details retrieved\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('email');",
+											"        pm.expect(jsonData).to.have.property('role');",
+											"        pm.expect(jsonData).to.have.property('organization');",
+											"        pm.expect(jsonData).to.have.property('invited_by');",
+											"        pm.expect(jsonData).to.have.property('expires_at');",
+											"        pm.expect(jsonData).to.have.property('is_pending');",
+											"    } else {",
+											"        pm.expect(pm.response.code).to.eql(404);",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Accept Invitation (Public)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"{{NEW_USER_PASSWORD}}\",\n    \"full_name\": \"{{NEW_USER_FULL_NAME}}\"\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/invitations/{{INVITATION_TOKEN}}/accept",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "invitations", "{{INVITATION_TOKEN}}", "accept"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Invitation accepted successfully\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('user');",
+											"        pm.expect(jsonData).to.have.property('organization');",
+											"        pm.expect(jsonData).to.have.property('is_new_user');",
+											"        pm.expect(jsonData).to.have.property('access_token');",
+											"        pm.environment.set('NEW_MEMBER_TOKEN', jsonData.access_token);",
+											"    } else {",
+											"        console.log('Invitation acceptance failed - might be expired or invalid');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Decline Invitation (Public)",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/invitations/{{INVITATION_TOKEN}}/decline",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "invitations", "{{INVITATION_TOKEN}}", "decline"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Invitation decline handled\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('message');",
+											"        pm.expect(jsonData).to.have.property('invitation_id');",
+											"        pm.expect(jsonData).to.have.property('declined_at');",
+											"    } else {",
+											"        console.log('Invitation decline failed - might be expired or invalid');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Invitation Status (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/invitations/{{INVITATION_TOKEN}}/status",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "invitations", "{{INVITATION_TOKEN}}", "status"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Invitation status retrieved\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('status');",
+											"        pm.expect(jsonData).to.have.property('is_expired');",
+											"        pm.expect(jsonData).to.have.property('is_pending');",
+											"        pm.expect(jsonData).to.have.property('organization_name');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "List Organization Invitations",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/invitations?status=pending&page=1&limit=50",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "invitations"],
+									"query": [
+										{"key": "status", "value": "pending"},
+										{"key": "page", "value": "1"},
+										{"key": "limit", "value": "50"}
+									]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Organization invitations listed\", function () {",
+											"    pm.response.to.have.status(200);",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property('data');",
+											"    pm.expect(jsonData).to.have.property('pagination');",
+											"    pm.expect(jsonData.data).to.be.an('array');",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Cancel Organization Invitation",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/organizations/{{ORGANIZATION_ID}}/invitations/{{INVITATION_ID}}",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "organizations", "{{ORGANIZATION_ID}}", "invitations", "{{INVITATION_ID}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Invitation cancelled successfully\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('message');",
+											"        pm.expect(jsonData).to.have.property('invitation_id');",
+											"        pm.expect(jsonData).to.have.property('cancelled_at');",
+											"    } else {",
+											"        console.log('Invitation cancellation failed - might not exist or be invalid');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Resend Invitation Email",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/invitations/resend/{{INVITATION_ID}}",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "invitations", "resend", "{{INVITATION_ID}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Invitation resend handled\", function () {",
+											"    if (pm.response.code === 200) {",
+											"        var jsonData = pm.response.json();",
+											"        pm.expect(jsonData).to.have.property('message');",
+											"        pm.expect(jsonData).to.have.property('invitation_id');",
+											"        pm.expect(jsonData).to.have.property('email');",
+											"    }",
+											"});"
+										]
+									}
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
 			"name": "📊 Analytics & Monitoring",
 			"item": [
 				{
@@ -1919,6 +2805,76 @@
 		{
 			"key": "ASANA_PROJECT_ID",
 			"value": "your-asana-project-id",
+			"type": "string"
+		},
+		{
+			"key": "TEST_DOMAIN",
+			"value": "example.com",
+			"type": "string"
+		},
+		{
+			"key": "TEST_SEARCH",
+			"value": "test",
+			"type": "string"
+		},
+		{
+			"key": "INVITE_EMAIL",
+			"value": "newmember@example.com",
+			"type": "string"
+		},
+		{
+			"key": "NEW_USER_PASSWORD",
+			"value": "SecurePassword123!",
+			"type": "string"
+		},
+		{
+			"key": "NEW_USER_FULL_NAME",
+			"value": "New Team Member",
+			"type": "string"
+		},
+		{
+			"key": "MEMBER_USER_ID",
+			"value": "member-user-id-placeholder",
+			"type": "string"
+		},
+		{
+			"key": "INVITATION_ID",
+			"value": "invitation-id-placeholder",
+			"type": "string"
+		},
+		{
+			"key": "INVITATION_TOKEN",
+			"value": "invitation-token-placeholder",
+			"type": "string"
+		},
+		{
+			"key": "WEBHOOK_TOKEN",
+			"value": "your-webhook-bearer-token",
+			"type": "string"
+		},
+		{
+			"key": "WEBHOOK_SECRET",
+			"value": "your-webhook-secret-key",
+			"type": "string"
+		},
+		{
+			"key": "GITHUB_ACCESS_TOKEN",
+			"value": "ghp_your-github-access-token",
+			"type": "string"
+		},
+		{
+			"key": "GITHUB_REFRESH_TOKEN",
+			"value": "your-github-refresh-token",
+			"type": "string"
+		},
+		{
+			"key": "GITHUB_REPO",
+			"value": "your-repository-name",
+			"type": "string"
+		},
+		{
+			"key": "GITHUB_OWNER",
+			"value": "your-github-username-or-org",
 			"type": "string"
 		}
 	]

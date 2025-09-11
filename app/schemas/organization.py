@@ -199,6 +199,11 @@ class OrganizationDetailResponse(OrganizationBaseResponse):
     user_count: int = Field(description="Number of users")
     integration_count: int = Field(description="Number of integrations")
     is_enterprise: bool = Field(description="Is enterprise plan")
+    
+    # Member management statistics
+    admin_count: Optional[int] = Field(None, description="Number of admin members")
+    member_count: Optional[int] = Field(None, description="Number of regular members")
+    pending_invitations_count: Optional[int] = Field(None, description="Number of pending invitations")
 
 
 class OrganizationAdminResponse(OrganizationDetailResponse):

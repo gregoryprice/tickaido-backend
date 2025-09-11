@@ -2,9 +2,6 @@ services:
   app:
     ports:
       - "5678:5678"
-    environment:
-      - POETRY_VIRTUALENVS_CREATE=false
-      - POETRY_VENV_IN_PROJECT=0
     command:
       - sh
       - -c
