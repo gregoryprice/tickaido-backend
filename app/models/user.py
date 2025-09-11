@@ -13,6 +13,10 @@ from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
 
+# Import OrganizationRole from organization_invitation module
+from app.models.organization_invitation import OrganizationRole
+
+
 class UserRole(enum.Enum):
     """User roles for access control"""
     ADMIN = "admin"
@@ -199,9 +203,37 @@ class User(BaseModel):
     organization_id = Column(
         UUID(as_uuid=True),
         ForeignKey('organizations.id'),
-        nullable=True,
+        nullable=True,  # Users can exist without organization during invitation
         index=True,
         comment="Organization/company this user belongs to"
+    )
+    
+    # Organization membership tracking
+    organization_role = Column(
+        SQLEnum(OrganizationRole),
+        default=OrganizationRole.MEMBER,
+        nullable=True,  # Null when not part of any organization
+        comment="Role within the user's organization"
+    )
+    
+    # Membership tracking
+    invited_by_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('users.id'),
+        nullable=True,
+        comment="User who invited this member"
+    )
+    
+    invited_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When user was invited to organization"
+    )
+    
+    joined_organization_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When user joined the organization"
     )
     
     # Relationships
@@ -225,6 +257,25 @@ class User(BaseModel):
     organization = relationship(
         "Organization",
         back_populates="users"
+    )
+    
+    # Member management relationships
+    invited_by = relationship(
+        "User", 
+        remote_side="User.id",
+        back_populates="invited_members"
+    )
+    
+    invited_members = relationship(
+        "User", 
+        remote_side="User.invited_by_id",
+        back_populates="invited_by"
+    )
+    
+    sent_invitations = relationship(
+        "OrganizationInvitation",
+        back_populates="invited_by",
+        foreign_keys="OrganizationInvitation.invited_by_id"
     )
     
     def __repr__(self):
@@ -328,6 +379,43 @@ class User(BaseModel):
     def update_api_key_usage(self):
         """Update API key last used timestamp"""
         self.api_key_last_used_at = datetime.now(timezone.utc)
+    
+    # Organization membership methods
+    def is_organization_admin(self) -> bool:
+        """Check if user is an admin in their organization"""
+        return self.organization_role == OrganizationRole.ADMIN
+    
+    def is_organization_member(self) -> bool:
+        """Check if user is a member of an organization"""
+        return self.organization_id is not None and self.organization_role is not None
+    
+    
+    def join_organization(self, organization_id: UUID, role: OrganizationRole = OrganizationRole.MEMBER, invited_by_id: UUID = None):
+        """Join an organization with specified role"""
+        self.organization_id = organization_id
+        self.organization_role = role
+        self.joined_organization_at = datetime.now(timezone.utc)
+        if invited_by_id:
+            self.invited_by_id = invited_by_id
+            # invited_at should already be set when invitation was created
+    
+    def leave_organization(self):
+        """Leave current organization"""
+        self.organization_id = None
+        self.organization_role = None
+        self.invited_by_id = None
+        self.invited_at = None
+        self.joined_organization_at = None
+    
+    def promote_to_admin(self):
+        """Promote user to organization admin"""
+        if self.is_organization_member():
+            self.organization_role = OrganizationRole.ADMIN
+    
+    def demote_to_member(self):
+        """Demote user to organization member"""
+        if self.is_organization_member():
+            self.organization_role = OrganizationRole.MEMBER
     
     def to_dict(self, include_sensitive: bool = False) -> dict:
         """

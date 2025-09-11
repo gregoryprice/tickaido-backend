@@ -29,9 +29,8 @@ class Organization(BaseModel):
     domain = Column(
         String(255),
         nullable=True,
-        unique=True,
         index=True,
-        comment="Primary domain for the organization (e.g., company.com)"
+        comment="Primary domain for the organization (e.g., company.com) - multiple orgs can share domains"
     )
     
     display_name = Column(
@@ -194,6 +193,12 @@ class Organization(BaseModel):
         cascade="all, delete-orphan"
     )
     
+    invitations = relationship(
+        "OrganizationInvitation",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    
     def __repr__(self):
         return f"<Organization(id={self.id}, name={self.name}, domain={self.domain})>"
     
@@ -303,6 +308,43 @@ class Organization(BaseModel):
         current_limits: Dict[str, int] = self.limits or {}  # type: ignore
         current_limits[limit_name] = limit_value
         self.limits = current_limits  # type: ignore
+    
+    # Member management helper methods
+    @property 
+    def admin_count(self) -> int:
+        """Get count of admin users in organization"""
+        if not hasattr(self, 'users') or self.users is None:
+            return 0
+        from app.models.organization_invitation import OrganizationRole
+        return len([user for user in self.users 
+                   if user.is_active and user.organization_role == OrganizationRole.ADMIN])
+    
+    @property
+    def member_count(self) -> int:
+        """Get count of member users in organization"""
+        if not hasattr(self, 'users') or self.users is None:
+            return 0
+        from app.models.organization_invitation import OrganizationRole
+        return len([user for user in self.users 
+                   if user.is_active and user.organization_role == OrganizationRole.MEMBER])
+    
+    @property
+    def active_member_count(self) -> int:
+        """Get count of all active members (admins + members)"""
+        return self.admin_count + self.member_count
+    
+    @property
+    def pending_invitations_count(self) -> int:
+        """Get count of pending invitations"""
+        if not hasattr(self, 'invitations') or self.invitations is None:
+            return 0
+        from app.models.organization_invitation import InvitationStatus
+        return len([inv for inv in self.invitations 
+                   if inv.status == InvitationStatus.PENDING and not inv.is_expired])
+    
+    def has_domain_match(self, email_domain: str) -> bool:
+        """Check if organization domain matches email domain"""
+        return self.domain is not None and self.domain.lower() == email_domain.lower()
     
     def to_dict(self, include_sensitive: bool = False) -> dict:
         """

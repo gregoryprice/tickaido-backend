@@ -16,6 +16,14 @@ import logging
 import time
 from typing import Optional, Dict, Any, ClassVar
 
+# Import the debug logger
+try:
+    from app.utils.http_debug_logger import log_http_request_response_pair
+except ImportError:
+    # Fallback if running outside main app context
+    def log_http_request_response_pair(*args, **kwargs):
+        pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -112,13 +120,28 @@ class AuthenticatedHTTPClient:
         
         try:
             client = await self._get_client()
+            start_time = time.time()
+            url = f"{self.backend_url}{endpoint}"
+            
             response = await client.request(
                 method=method,
-                url=f"{self.backend_url}{endpoint}",
+                url=url,
                 headers=headers,
                 params=params,
                 json=json_data,
                 timeout=timeout
+            )
+            
+            # Debug log the request/response
+            duration_ms = (time.time() - start_time) * 1000
+            log_http_request_response_pair(
+                method=method,
+                url=url,
+                response=response,
+                headers=headers,
+                params=params,
+                json_data=json_data,
+                duration_ms=duration_ms
             )
             
             self._circuit_breaker.record_success()

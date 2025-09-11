@@ -682,9 +682,10 @@ Focus on the main issue or request being discussed.""",
                     "max_iterations": 1  # Single iteration for title generation
                 }
                 
-                # Create the system title generation agent
+                # Create the system title generation agent with NULL organization_id
+                # System agents serve all organizations universally
                 agent = Agent(
-                    organization_id=None,  # System agent has no organization
+                    organization_id=None,  # System agent - no organization
                     agent_type="title_generation",
                     name="System Title Generator",
                     is_active=True,
@@ -735,6 +736,44 @@ Focus on the main issue or request being discussed.""",
             except Exception as e:
                 logger.error(f"Error ensuring system title agent: {e}")
                 return None
+    
+    async def initialize_system_agents(
+        self,
+        db: Optional[AsyncSession] = None
+    ) -> bool:
+        """
+        Initialize all required system agents on application startup.
+        
+        This method ensures all system-wide agents are created and available
+        for use by all organizations. System agents have organization_id = NULL.
+        
+        Args:
+            db: Database session (optional)
+            
+        Returns:
+            bool: True if all system agents are ready, False if initialization failed
+        """
+        async with get_async_db_session() if db is None else db as session:
+            try:
+                logger.info("🔧 Initializing system agents...")
+                
+                # Initialize system title generation agent
+                title_agent = await self.ensure_system_title_agent(db=session)
+                if not title_agent:
+                    logger.error("❌ Failed to initialize system title generation agent")
+                    return False
+                
+                logger.info(f"✅ System title generation agent ready: {title_agent.id}")
+                
+                # Future system agents can be added here
+                # Example: categorization_agent = await self.ensure_system_categorization_agent(db=session)
+                
+                logger.info("✅ All system agents initialized successfully")
+                return True
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize system agents: {e}")
+                return False
 
 
 # Global agent service instance

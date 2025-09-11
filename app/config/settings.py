@@ -15,13 +15,17 @@ class Settings(BaseSettings):
     """
     
     # Application Settings
-    app_name: str = Field(default="AI Ticket Creator Backend", description="Application name")
+    app_name: str = Field(default="TickAido", description="Application name")
     environment: str = Field(default="development", description="Environment (development, staging, production)")
     debug: bool = Field(default=False, description="Debug mode")
     
     # Database Settings
     database_url: str = Field(..., description="PostgreSQL database URL")
     database_echo: bool = Field(default=False, description="Echo SQL queries to logs")
+    
+    # HTTP Debug Logging Settings
+    http_debug_logging_enabled: bool = Field(default=False, description="Enable HTTP debug logging")
+    http_debug_log_level: str = Field(default="DEBUG", description="Log level for HTTP debug messages")
     
     # Redis Settings
     redis_url: str = Field(..., description="Redis URL for caching and pub/sub")

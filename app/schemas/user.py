@@ -145,12 +145,12 @@ class UserProfileResponse(UserPrivateResponse):
     recent_activity: Optional[List[Dict[str, Any]]] = Field(None, description="Recent activity")
 
 
-class UserMeResponse(BaseResponse):
-    """Current user profile information for /me endpoint"""
+class UserResponse(BaseResponse):
+    """Standard user response format used across all endpoints"""
     email: str = Field(description="User email")
     full_name: Optional[str] = Field(None, description="Full name")
     avatar_url: Optional[str] = Field(None, description="Avatar URL")
-    role: UserRoleSchema = Field(description="User role")
+    role: Optional[str] = Field(None, description="Role within organization")
     is_active: bool = Field(description="Whether user is active")
     timezone: str = Field(description="User timezone")
     language: str = Field(description="User language")
@@ -164,6 +164,9 @@ class UserMeResponse(BaseResponse):
     organization_domain: Optional[str] = Field(None, description="Organization domain")
     organization_plan: Optional[str] = Field(None, description="Organization plan")
     organization_timezone: Optional[str] = Field(None, description="Organization timezone")
+    invited_by_id: Optional[UUID] = Field(None, description="User who invited this member")
+    invited_at: Optional[datetime] = Field(None, description="When user was invited to organization")
+    joined_organization_at: Optional[datetime] = Field(None, description="When user joined organization")
 
 
 class UserAPIKeyResponse(BaseSchema):
@@ -292,14 +295,6 @@ class UserLogin(BaseSchema):
     password: str = Field(description="User password")
 
 
-class UserResponse(BaseSchema):
-    """Simple user response schema"""
-    id: UUID = Field(description="User ID")
-    email: str = Field(description="User email")
-    full_name: Optional[str] = Field(description="User's full name")
-    is_active: bool = Field(description="Whether user is active")
-    created_at: datetime = Field(description="Account creation timestamp")
-    last_login_at: Optional[datetime] = Field(None, description="Last login timestamp")
 
 
 class RefreshTokenRequest(BaseSchema):
@@ -313,7 +308,7 @@ class TokenResponse(BaseSchema):
     refresh_token: str = Field(description="JWT refresh token")
     token_type: str = Field("bearer", description="Token type")
     expires_in: int = Field(description="Token expiration in seconds")
-    user: UserResponse = Field(description="User information")
+    user: 'UserResponse' = Field(description="User information")
 
 
 class UserUpdate(BaseSchema):

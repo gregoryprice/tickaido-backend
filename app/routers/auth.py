@@ -16,9 +16,10 @@ from sqlalchemy import select
 from ..database import get_db_session
 from ..models.user import User
 from ..models.organization import Organization
+from ..models.organization_invitation import OrganizationRole
 from ..schemas.user import (
     UserCreate, UserLogin, UserResponse, TokenResponse, RefreshTokenRequest, 
-    UserUpdate, UserMeResponse, EmailCheckRequest, EmailCheckResponse
+    UserUpdate, EmailCheckRequest, EmailCheckResponse
 )
 from ..middleware.auth_middleware import (
     auth_middleware, 
@@ -26,11 +27,47 @@ from ..middleware.auth_middleware import (
     get_current_user_optional
 )
 from ..middleware.rate_limiting import auth_rate_limit
-from ..services.ai_agent_service import ai_agent_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+async def build_user_response(user: User, db: AsyncSession) -> UserResponse:
+    """Build standardized UserResponse object"""
+    # Load organization data if user has one
+    organization = None
+    if user.organization_id:
+        org_result = await db.execute(
+            select(Organization).where(Organization.id == user.organization_id)
+        )
+        organization = org_result.scalar_one_or_none()
+    
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        avatar_url=user.avatar_url,
+        role=user.organization_role.value if user.organization_role else None,
+        is_active=user.is_active,
+        timezone=user.timezone,
+        language=user.language,
+        preferences=user.preferences,
+        is_verified=user.is_verified,
+        last_login_at=user.last_login_at,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        # Organization fields
+        organization_id=user.organization_id,
+        organization_name=organization.name if organization else None,
+        organization_domain=organization.domain if organization else None,
+        organization_plan=organization.plan if organization else None,
+        organization_timezone=organization.timezone if organization else None,
+        # Organization membership fields
+        invited_by_id=user.invited_by_id,
+        invited_at=user.invited_at,
+        joined_organization_at=user.joined_organization_at
+    )
 
 
 @router.post("/check-email", response_model=EmailCheckResponse)
@@ -85,80 +122,97 @@ async def register_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User with this email already exists"
             )
-        
+
         # Create password hash
         password_hash = auth_middleware.get_password_hash(user_data.password)
-        
-        # Handle organization - create or find existing
+
+        # Infer organization from email domain
+        try:
+            email_domain = user_data.email.split('@')[1].lower().strip()
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid email format"
+            )
+
         organization_id = None
-        if user_data.organization_name:
-            # Try to find existing organization by name
-            existing_org = await db.execute(
+        organization = None
+
+        # Primary: find organization by domain
+        org_by_domain_result = await db.execute(
+            select(Organization).where(Organization.domain == email_domain)
+        )
+        organization = org_by_domain_result.scalar_one_or_none()
+
+        # Fallback: if not found by domain and a name was provided, try to find by name
+        # (We don't use name for selection preference; only to opportunistically set domain.)
+        if not organization and getattr(user_data, "organization_name", None):
+            org_by_name_result = await db.execute(
                 select(Organization).where(Organization.name == user_data.organization_name)
             )
-            organization = existing_org.scalar_one_or_none()
-            
-            # Create new organization if doesn't exist
-            if not organization:
-                organization = Organization(
-                    name=user_data.organization_name,
-                    is_enabled=True,
-                    plan="basic",
-                    timezone="UTC",
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc)
-                )
-                db.add(organization)
-                # Commit the organization first to ensure it exists for foreign key
+            organization = org_by_name_result.scalar_one_or_none()
+
+            # If an existing org has no domain, set it to the registrant's email domain
+            if organization and not organization.domain:
+                organization.domain = email_domain
                 await db.commit()
                 await db.refresh(organization)
-                logger.info(f"✅ New organization created: {user_data.organization_name}")
-                
-                # Auto-create Customer Support Agent for new organization
-                try:
-                    agent = await ai_agent_service.create_organization_agent(
-                        organization_id=organization.id,
-                        agent_type="customer_support",
-                        name=f"{organization.name} - Customer Support Agent",
-                        auto_created=True,
-                        db=db
-                    )
-                    if agent:
-                        logger.info(f"🤖 Auto-created Customer Support Agent for organization {organization.name}")
-                    else:
-                        logger.warning(f"⚠️ Failed to auto-create agent for organization {organization.name}")
-                except Exception as e:
-                    logger.error(f"❌ Error auto-creating agent for organization {organization.name}: {e}")
-                    # Don't fail registration if agent creation fails
-            
-            organization_id = organization.id
+                logger.info(
+                    f"🏷️ Set domain for existing organization '{organization.name}' to {email_domain}"
+                )
+
+        # If still not found, create a new organization with the inferred domain
+        if not organization:
+            derived_name = getattr(user_data, "organization_name", None) or email_domain
+            organization = Organization(
+                name=derived_name,
+                domain=email_domain,
+                is_enabled=True,
+                plan="basic",
+                timezone="UTC",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            db.add(organization)
+            await db.commit()
+            await db.refresh(organization)
+            logger.info(f"✅ New organization created: {derived_name} ({email_domain})")
+
+        organization_id = organization.id
+
+        # Check if this user should be an admin (first user in organization)
+        existing_members_result = await db.execute(
+            select(User).where(
+                User.organization_id == organization_id,
+                User.organization_role.is_not(None),  # Only count users with actual organization roles
+                User.is_deleted == False
+            )
+        )
+        existing_members = existing_members_result.scalars().all()
         
+        # First user in organization becomes admin
+        organization_role = OrganizationRole.ADMIN if len(existing_members) == 0 else OrganizationRole.MEMBER
+
         # Create new user
         db_user = User(
             email=user_data.email,
             full_name=user_data.full_name,
             password_hash=password_hash,
             organization_id=organization_id,
+            organization_role=organization_role,  # ✅ Now properly set
             is_active=True,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc)
         )
-        
+
         db.add(db_user)
         await db.commit()
         await db.refresh(db_user)
-        
+
         logger.info(f"✅ New user registered: {user_data.email}")
-        
-        return UserResponse(
-            id=db_user.id,
-            email=db_user.email,
-            full_name=db_user.full_name,
-            is_active=db_user.is_active,
-            created_at=db_user.created_at,
-            last_login_at=db_user.last_login_at
-        )
-        
+
+        return await build_user_response(db_user, db)
+
     except HTTPException:
         raise
     except Exception as e:
@@ -204,14 +258,7 @@ async def login_user(
             refresh_token=refresh_token,
             token_type="bearer",
             expires_in=1800,  # 30 minutes
-            user=UserResponse(
-                id=user.id,
-                email=user.email,
-                full_name=user.full_name,
-                is_active=user.is_active,
-                created_at=user.created_at,
-                last_login_at=user.last_login_at
-            )
+            user=await build_user_response(user, db)
         )
         
     except HTTPException:
@@ -273,14 +320,7 @@ async def refresh_token(
             refresh_token=new_refresh_token,
             token_type="bearer",
             expires_in=1800,  # 30 minutes
-            user=UserResponse(
-                id=user.id,
-                email=user.email,
-                full_name=user.full_name,
-                is_active=user.is_active,
-                created_at=user.created_at,
-                last_login_at=user.last_login_at
-            )
+            user=await build_user_response(user, db)
         )
         
     except HTTPException:
@@ -294,44 +334,16 @@ async def refresh_token(
         )
 
 
-@router.get("/me", response_model=UserMeResponse)
+@router.get("/me", response_model=UserResponse)
 async def get_current_user_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get current user's profile information"""
-    # Load organization data if user has one
-    organization = None
-    if current_user.organization_id:
-        org_result = await db.execute(
-            select(Organization).where(Organization.id == current_user.organization_id)
-        )
-        organization = org_result.scalar_one_or_none()
-    
-    return UserMeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        avatar_url=current_user.avatar_url,
-        role=current_user.role.value,
-        is_active=current_user.is_active,
-        timezone=current_user.timezone,
-        language=current_user.language,
-        preferences=current_user.preferences,
-        is_verified=current_user.is_verified,
-        last_login_at=current_user.last_login_at,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
-        # Organization fields
-        organization_id=current_user.organization_id,
-        organization_name=organization.name if organization else None,
-        organization_domain=organization.domain if organization else None,
-        organization_plan=organization.plan if organization else None,
-        organization_timezone=organization.timezone if organization else None
-    )
+    return await build_user_response(current_user, db)
 
 
-@router.put("/me", response_model=UserMeResponse)
+@router.put("/me", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
@@ -359,35 +371,7 @@ async def update_user_profile(
         
         logger.info(f"✅ User profile updated: {current_user.email}")
         
-        # Load organization data if user has one
-        organization = None
-        if current_user.organization_id:
-            org_result = await db.execute(
-                select(Organization).where(Organization.id == current_user.organization_id)
-            )
-            organization = org_result.scalar_one_or_none()
-        
-        return UserMeResponse(
-            id=current_user.id,
-            email=current_user.email,
-            full_name=current_user.full_name,
-            avatar_url=current_user.avatar_url,
-            role=current_user.role.value,
-            is_active=current_user.is_active,
-            timezone=current_user.timezone,
-            language=current_user.language,
-            preferences=current_user.preferences,
-            is_verified=current_user.is_verified,
-            last_login_at=current_user.last_login_at,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at,
-            # Organization fields
-            organization_id=current_user.organization_id,
-            organization_name=organization.name if organization else None,
-            organization_domain=organization.domain if organization else None,
-            organization_plan=organization.plan if organization else None,
-            organization_timezone=organization.timezone if organization else None
-        )
+        return await build_user_response(current_user, db)
         
     except Exception as e:
         logger.error(f"❌ Profile update failed for {current_user.email}: {e}")
@@ -415,20 +399,14 @@ async def logout_user(
 
 @router.get("/verify")
 async def verify_token(
-    current_user: User = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db_session)
 ):
     """Verify if current token is valid"""
     if current_user:
         return {
             "valid": True,
-            "user": UserResponse(
-                id=current_user.id,
-                email=current_user.email,
-                full_name=current_user.full_name,
-                is_active=current_user.is_active,
-                created_at=current_user.created_at,
-                last_login_at=current_user.last_login_at
-            )
+            "user": await build_user_response(current_user, db)
         }
     else:
         return {"valid": False, "user": None}

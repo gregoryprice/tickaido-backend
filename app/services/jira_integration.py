@@ -5,10 +5,12 @@ Handles JIRA Cloud API v3 integration for ticket creation, attachments, and comm
 """
 
 import logging
+import time
 from typing import Dict, Any, Optional, List
 import httpx
 
 from .integration_interface import IntegrationInterface, IntegrationTestResult, IntegrationTicketResult
+from app.utils.http_debug_logger import log_http_request_response_pair
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +66,22 @@ class JiraIntegration(IntegrationInterface):
         """
         try:
             # PATTERN: Test endpoint that requires authentication
-            response = await self.client.get(f"{self.base_url}/rest/api/3/myself")
+            start_time = time.time()
+            url = f"{self.base_url}/rest/api/3/myself"
+            
+            response = await self.client.get(url)
             response.raise_for_status()
             user_info = response.json()
+            
+            # Debug log the request/response
+            duration_ms = (time.time() - start_time) * 1000
+            log_http_request_response_pair(
+                method="GET",
+                url=url,
+                response=response,
+                headers=dict(self.client.headers),
+                duration_ms=duration_ms
+            )
             
             logger.info(f"✅ JIRA connection successful for {self.email}")
             
@@ -110,9 +125,22 @@ class JiraIntegration(IntegrationInterface):
             List of project dictionaries with key, name, and description
         """
         try:
-            response = await self.client.get(f"{self.base_url}/rest/api/3/project")
+            start_time = time.time()
+            url = f"{self.base_url}/rest/api/3/project"
+            
+            response = await self.client.get(url)
             response.raise_for_status()
             projects = response.json()
+            
+            # Debug log the request/response
+            duration_ms = (time.time() - start_time) * 1000
+            log_http_request_response_pair(
+                method="GET",
+                url=url,
+                response=response,
+                headers=dict(self.client.headers),
+                duration_ms=duration_ms
+            )
             
             return [
                 {
@@ -251,12 +279,23 @@ class JiraIntegration(IntegrationInterface):
             logger.info(f"Creating JIRA issue in project {issue_data['project_key']}")
             logger.debug(f"JIRA payload: {payload}")
             
-            response = await self.client.post(
-                f"{self.base_url}/rest/api/3/issue",
-                json=payload
-            )
+            start_time = time.time()
+            url = f"{self.base_url}/rest/api/3/issue"
+            
+            response = await self.client.post(url, json=payload)
             response.raise_for_status()
             result = response.json()
+            
+            # Debug log the request/response
+            duration_ms = (time.time() - start_time) * 1000
+            log_http_request_response_pair(
+                method="POST",
+                url=url,
+                response=response,
+                headers=dict(self.client.headers),
+                json_data=payload,
+                duration_ms=duration_ms
+            )
             
             issue_key = result["key"]
             issue_url = f"{self.base_url}/browse/{issue_key}"

@@ -74,6 +74,9 @@ from app.api.v1.tickets import router as tickets_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.users import router as users_router
 from app.api.v1.agents import router as agents_router
+from app.api.v1.members import router as members_router
+from app.api.v1.organization_discovery import router as org_discovery_router
+from app.api.v1.invitations import router as invitations_router
 from app.routers.auth import router as auth_router
 from app.routers.integration import router as integration_router
 from app.websocket.chat import router as chat_websocket_router
@@ -143,9 +146,84 @@ def run_alembic_migrations() -> bool:
         logger.error(f"❌ Error running Alembic migrations: {e}")
         return False
 
+async def ensure_admin_organization():
+    """Ensure the TickAido admin organization and user exist"""
+    from app.database import get_async_db_session
+    from app.models.organization import Organization
+    from app.models.user import User, UserRole
+    from sqlalchemy import select
+    import uuid
+    
+    async with get_async_db_session() as db:
+        # Check if TickAido organization exists
+        result = await db.execute(select(Organization).where(Organization.name == "TickAido"))
+        org = result.scalar_one_or_none()
+        
+        if not org:
+            logger.info("🏢 Creating TickAido admin organization...")
+            org = Organization(
+                id=uuid.uuid4(),
+                name="TickAido",
+                domain="tickaido.com",
+                display_name="TickAido",
+                is_enabled=True
+            )
+            db.add(org)
+            await db.commit()
+            await db.refresh(org)
+            logger.info(f"✅ Created TickAido organization: {org.id}")
+        else:
+            logger.info(f"✅ TickAido organization exists: {org.id}")
+        
+        # Check if admin user exists
+        result = await db.execute(select(User).where(User.email == "support@tickaido.com"))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            logger.info("👤 Creating TickAido admin user...")
+            from app.services.user_service import UserService
+            user_service = UserService()
+            password_hash = user_service._hash_password("securepass123")
+            
+            user = User(
+                id=uuid.uuid4(),
+                email="support@tickaido.com",
+                full_name="TickAido Support",
+                password_hash=password_hash,
+                organization_id=org.id,
+                role=UserRole.ADMIN,
+                is_active=True,
+                is_admin=True
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"✅ Created TickAido admin user: {user.id}")
+        else:
+            logger.info(f"✅ TickAido admin user exists: {user.id}")
+        
+        return org
+
 async def startup_event():
     """FastAPI startup event handler"""
     logger.info("🚀 Starting AI Ticket Creator Backend initialization")
+    
+    # Step 0: Initialize HTTP debug logging
+    try:
+        from app.utils.http_debug_logger import enable_http_debug_logging
+        from app.config.settings import get_settings
+        import logging
+        
+        settings = get_settings()
+        if settings.http_debug_logging_enabled:
+            log_level = getattr(logging, settings.http_debug_log_level.upper(), logging.DEBUG)
+            enable_http_debug_logging(enabled=True, log_level=log_level)
+            logger.info(f"✅ HTTP debug logging enabled at level {settings.http_debug_log_level}")
+        else:
+            enable_http_debug_logging(enabled=False)
+            logger.info("ℹ️  HTTP debug logging disabled")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to initialize HTTP debug logging: {e}")
     
     # Step 1: Wait for database
     if not wait_for_database_ready():
@@ -170,20 +248,30 @@ async def startup_event():
     # WebSocket functionality will be implemented in a future update
     logger.info("ℹ️  WebSocket manager not yet implemented - WebSocket documentation available at /docs/websocket")
     
-    # Step 4: Ensure system title generation agent exists
+    # Step 3.5: Ensure TickAido admin organization and user exist
+    try:
+        logger.info("🏢 Ensuring TickAido admin organization exists...")
+        await ensure_admin_organization()
+        logger.info("✅ TickAido admin organization ready")
+    except Exception as e:
+        logger.error(f"❌ Failed to create TickAido admin organization: {e}")
+        # Don't raise here - allow the app to continue without the admin org for now
+    
+    # Step 4: Initialize all system agents
     try:
         from app.services.agent_service import agent_service
         from app.database import get_async_db_session
         
-        logger.info("🔍 Checking system title generation agent...")
+        logger.info("🔧 Initializing system agents...")
         async with get_async_db_session() as db:
-            title_agent = await agent_service.ensure_system_title_agent(db=db)
-            if title_agent:
-                logger.info(f"✅ System title generation agent ready: {title_agent.id}")
+            agents_initialized = await agent_service.initialize_system_agents(db=db)
+            if agents_initialized:
+                logger.info("✅ All system agents initialized successfully")
             else:
-                logger.warning("⚠️  System title generation agent could not be created")
+                logger.warning("⚠️  Some system agents could not be initialized - application will continue with degraded functionality")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize system title generation agent: {e}")
+        logger.error(f"❌ Failed to initialize system agents: {e}")
+        logger.info("🚀 Application will continue without system agents - some features may be unavailable")
     
     # Step 5: Initialize AI services (optional for now)
     try:
@@ -238,6 +326,9 @@ app.include_router(tickets_router, prefix="/api/v1", tags=["Tickets"])
 app.include_router(chat_router, prefix="/api/v1", tags=["Chat Assistant"])
 app.include_router(users_router, prefix="/api/v1", tags=["Users"])
 app.include_router(agents_router, prefix="/api/v1", tags=["Agent Management"])
+app.include_router(members_router, prefix="/api/v1", tags=["Member Management"])
+app.include_router(org_discovery_router, prefix="/api/v1", tags=["Organization Discovery"])
+app.include_router(invitations_router, prefix="/api/v1", tags=["Invitation Management"])
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(integration_router, prefix="/api/v1")
 # app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
@@ -636,8 +727,46 @@ async def health_check():
                 logger.warning(f"Schema check failed: {schema_error}")
                 schema_ready = False
         
+        # Check system agents status
+        system_agent_status = {}
+        system_agents_healthy = False
+        
+        if db_healthy:
+            try:
+                from app.services.agent_service import agent_service
+                from app.database import get_async_db_session
+                
+                async with get_async_db_session() as db:
+                    title_agent = await agent_service.get_system_title_agent(db=db)
+                    if title_agent:
+                        system_agent_status = {
+                            "exists": True,
+                            "active": title_agent.is_active,
+                            "organization_id": None,  # System agents have no organization
+                            "last_used": title_agent.last_used_at.isoformat() if title_agent.last_used_at else None
+                        }
+                        system_agents_healthy = title_agent.is_active
+                    else:
+                        system_agent_status = {
+                            "exists": False,
+                            "active": False,
+                            "organization_id": None,
+                            "last_used": None
+                        }
+                        system_agents_healthy = False
+            except Exception as agent_error:
+                logger.warning(f"System agent check failed: {agent_error}")
+                system_agent_status = {
+                    "exists": False,
+                    "active": False,
+                    "organization_id": None,
+                    "last_used": None,
+                    "error": str(agent_error)
+                }
+                system_agents_healthy = False
+        
         # Check if all services are healthy
-        all_healthy = db_healthy and schema_ready
+        all_healthy = db_healthy and schema_ready and system_agents_healthy
         
         status = "healthy" if all_healthy else "unhealthy"
         status_code = 200 if all_healthy else 503
@@ -649,8 +778,10 @@ async def health_check():
                 "database": "healthy" if db_healthy else "unhealthy",
                 "schema": "ready" if schema_ready else "not_ready",
                 "ai_service": "healthy",  # Will be updated when AI service is implemented
-                "mcp_server": "healthy"   # Will be updated when MCP server is implemented
+                "mcp_server": "healthy",   # Will be updated when MCP server is implemented
+                "system_agents": "healthy" if system_agents_healthy else "unhealthy"
             },
+            "system_title_agent": system_agent_status,
             "environment": settings.environment,
             "version": "1.0.0"
         }

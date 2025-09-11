@@ -4,6 +4,7 @@ Integration Service - Business logic for third-party integrations
 """
 
 import httpx
+import time
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timezone
@@ -26,6 +27,7 @@ from app.schemas.integration import (
     IntegrationSortParams
 )
 from app.config.settings import get_settings
+from app.utils.http_debug_logger import log_http_request_response_pair
 from .integration_interface import IntegrationInterface
 from .jira_integration import JiraIntegration
 
@@ -63,7 +65,7 @@ class IntegrationService:
             raise ValueError(f"User {user_id} not found")
             
         # Validate credentials based on type
-        self._validate_integration_config(
+        self._validate_credentials(
             integration_request.platform_name,
             integration_request.credentials
         )
@@ -287,7 +289,7 @@ class IntegrationService:
         for field, value in update_data.items():
             if field == "configuration" and value:
                 # Validate configuration
-                self._validate_integration_config(
+                self._validate_credentials(
                     db_integration.platform_name,
                     value
                 )
@@ -605,7 +607,7 @@ class IntegrationService:
         await db.commit()
         return True
     
-    def _validate_integration_config(
+    def _validate_credentials(
         self,
         platform_name: str,
         configuration: Dict[str, Any]
@@ -621,7 +623,8 @@ class IntegrationService:
         """Get required configuration fields for platform"""
         field_map = {
             "salesforce": ["client_id", "client_secret", "instance_url"],
-            "jira": ["url", "email", "api_token"],  # JIRA required fields including base URL
+            # JIRA relies on top-level base_url and credentials containing email/api_token
+            "jira": ["email", "api_token"],
             "servicenow": ["instance_url", "username", "password"],
             "zendesk": ["subdomain", "email", "api_token"],
             "github": ["token", "organization"],
@@ -714,10 +717,21 @@ class IntegrationService:
                 "client_secret": config["client_secret"]
             }
             
+            start_time = time.time()
             response = await self.http_client.post(auth_url, data=auth_data)
             response.raise_for_status()
             
             token_data = response.json()
+            
+            # Debug log the request/response
+            duration_ms = (time.time() - start_time) * 1000
+            log_http_request_response_pair(
+                method="POST",
+                url=auth_url,
+                response=response,
+                data=auth_data,
+                duration_ms=duration_ms
+            )
             
             if test_type == "connection":
                 return {"status": "connected", "instance": config["instance_url"]}
@@ -739,22 +753,31 @@ class IntegrationService:
         config: Dict[str, Any],
         test_type: str
     ) -> Dict[str, Any]:
-        """Test Jira integration"""
+        """Test Jira integration (deprecated path) via JiraIntegration using base_url"""
         try:
-            auth = (config["email"], config["api_token"])
-            url = f"{config['url']}/rest/api/3/myself"
-            
-            response = await self.http_client.get(url, auth=auth)
-            response.raise_for_status()
-            
-            user_data = response.json()
-            
-            return {
-                "status": "connected",
-                "user": user_data.get("displayName"),
-                "url": config["url"]
-            }
-        
+            base_url = config.get("base_url") or config.get("url")
+            email = config["email"]
+            api_token = config["api_token"]
+
+            jira = JiraIntegration(base_url=base_url, email=email, api_token=api_token)
+            try:
+                if test_type in ("connection", "authentication"):
+                    result = await jira.test_connection()
+                    if result.get("success"):
+                        details = result.get("details", {})
+                        return {
+                            "status": "connected",
+                            "user": details.get("user"),
+                            "base_url": base_url
+                        }
+                    else:
+                        raise Exception(result.get("message", "Unknown error"))
+                else:
+                    # Fallback simple check
+                    result = await jira.test_connection()
+                    return {"status": "connected" if result.get("success") else "error"}
+            finally:
+                await jira.close()
         except Exception as e:
             raise Exception(f"Jira test failed: {str(e)}")
     
@@ -768,10 +791,21 @@ class IntegrationService:
             headers = {"Authorization": f"Bearer {config['bot_token']}"}
             url = "https://slack.com/api/auth.test"
             
+            start_time = time.time()
             response = await self.http_client.post(url, headers=headers)
             response.raise_for_status()
             
             auth_data = response.json()
+            
+            # Debug log the request/response
+            duration_ms = (time.time() - start_time) * 1000
+            log_http_request_response_pair(
+                method="POST",
+                url=url,
+                response=response,
+                headers=headers,
+                duration_ms=duration_ms
+            )
             
             if not auth_data.get("ok"):
                 raise Exception(auth_data.get("error", "Unknown error"))
