@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-File Service - Business logic for file management, processing, and analysis
+File Service - Business logic for file management, processing, and analysis using unified storage
 """
 
 import os
 import uuid
-import aiofiles
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timezone
@@ -27,19 +26,18 @@ from app.schemas.file import (
     FileSortParams
 )
 from app.config.settings import get_settings
+from app.services.storage.factory import get_storage_service
 
 
 class FileService:
-    """Service class for file operations"""
+    """Service class for file operations using unified storage"""
     
     def __init__(self):
         self.settings = get_settings()
-        self.upload_directory = Path(self.settings.upload_directory)
+        self.storage_service = get_storage_service()
         self.max_file_size = self.settings.max_file_size
         self.allowed_file_types = self.settings.allowed_file_types
-        
-        # Ensure upload directory exists
-        self.upload_directory.mkdir(parents=True, exist_ok=True)
+        self.upload_directory = getattr(self.settings, 'upload_directory', '/tmp/uploads')
     
     async def upload_file(
         self,
@@ -49,7 +47,7 @@ class FileService:
         user_id: UUID
     ) -> File:
         """
-        Upload a new file
+        Upload a new file using unified storage
         
         Args:
             db: Database session
@@ -68,32 +66,49 @@ class FileService:
         if file_request.mime_type not in self.allowed_file_types:
             raise ValueError(f"File type {file_request.mime_type} not allowed")
         
-        # Generate unique file ID and storage path
+        # Generate unique file ID and storage key
         file_id = uuid.uuid4()
         file_extension = Path(file_request.filename).suffix
-        storage_filename = f"{file_id}{file_extension}"
-        storage_path = self.upload_directory / storage_filename
         
-        # Save file to disk
-        async with aiofiles.open(storage_path, 'wb') as f:
-            await f.write(file_content)
+        # Create storage key with date organization for better structure
+        now = datetime.now()
+        storage_key = f"attachments/{now.year}/{now.month:02d}/{file_id}{file_extension}"
+        
+        # Upload file using storage service
+        file_url = await self.storage_service.upload_content(
+            content=file_content,
+            storage_key=storage_key,
+            content_type=file_request.mime_type,
+            metadata={
+                "file_id": str(file_id),
+                "user_id": str(user_id),
+                "ticket_id": str(file_request.ticket_id) if file_request.ticket_id else None,
+                "original_filename": file_request.filename,
+                "file_size": str(len(file_content))
+            }
+        )
+        
+        # Calculate file hash
+        import hashlib
+        file_hash = hashlib.sha256(file_content).hexdigest()
         
         # Create database record
         db_file = File(
             id=file_id,
             filename=file_request.filename,
-            original_filename=file_request.filename,
-            storage_path=str(storage_path),
+            file_path=storage_key,  # Store storage key as file path
             mime_type=file_request.mime_type,
             file_size=len(file_content),
+            file_hash=file_hash,
             file_type=file_request.file_type or self._detect_file_type(file_request.mime_type),
             status=FileStatus.UPLOADED,
-            uploaded_by=user_id,
+            uploaded_by_id=user_id,
             ticket_id=file_request.ticket_id,
-            tags=file_request.tags or [],
-            description=file_request.description,
+            processing_attempts=0,  # Initialize to 0
             is_public=file_request.is_public,
-            retention_days=file_request.retention_days
+            download_count=0,  # Initialize to 0
+            tags=file_request.tags or [],
+            # Note: description and retention_days might not be in the File model
         )
         
         db.add(db_file)
@@ -125,7 +140,7 @@ class FileService:
         
         if include_content:
             query = query.options(
-                selectinload(File.uploaded_by_user),
+                selectinload(File.uploader),
                 selectinload(File.ticket)
             )
         
@@ -165,7 +180,7 @@ class FileService:
         filters = []
         
         if user_id:
-            filters.append(File.uploaded_by == user_id)
+            filters.append(File.uploaded_by_id == user_id)
         
         if ticket_id:
             filters.append(File.ticket_id == ticket_id)
@@ -244,7 +259,7 @@ class FileService:
             return None
         
         # Check permissions (owner or admin)
-        if db_file.uploaded_by != user_id:
+        if db_file.uploaded_by_id != user_id:
             # TODO: Check if user is admin
             pass
         
@@ -284,15 +299,14 @@ class FileService:
             return False
         
         # Check permissions
-        if db_file.uploaded_by != user_id:
+        if db_file.uploaded_by_id != user_id:
             # TODO: Check if user is admin
             pass
         
         if hard_delete:
-            # Delete from filesystem
+            # Delete from storage service
             try:
-                if os.path.exists(db_file.storage_path):
-                    os.unlink(db_file.storage_path)
+                await self.storage_service.delete_file(db_file.file_path)
             except Exception:
                 # Log error but continue
                 pass
@@ -314,7 +328,7 @@ class FileService:
         user_id: Optional[UUID] = None
     ) -> Optional[bytes]:
         """
-        Get file content from storage
+        Get file content from unified storage
         
         Args:
             db: Database session
@@ -330,14 +344,53 @@ class FileService:
         
         # Check permissions
         if not db_file.is_public and user_id:
-            if db_file.uploaded_by != user_id:
+            if db_file.uploaded_by_id != user_id:
                 # TODO: Check if user has access via ticket or is admin
                 pass
         
-        # Read file from storage
+        # Read file from storage service using file_path as key
         try:
-            async with aiofiles.open(db_file.storage_path, 'rb') as f:
-                return await f.read()
+            return await self.storage_service.download_file(db_file.file_path)
+        except Exception:
+            return None
+    
+    async def get_file_url(
+        self,
+        db: AsyncSession,
+        file_id: UUID,
+        user_id: Optional[UUID] = None,
+        expires_in: Optional[int] = None
+    ) -> Optional[str]:
+        """
+        Get file URL from unified storage
+        
+        Args:
+            db: Database session
+            file_id: File ID
+            user_id: Optional user ID for permission check
+            expires_in: URL expiration time in seconds (for signed URLs)
+            
+        Returns:
+            File URL if accessible
+        """
+        db_file = await self.get_file(db, file_id)
+        if not db_file:
+            return None
+        
+        # Check permissions
+        if not db_file.is_public and user_id:
+            if db_file.uploaded_by_id != user_id:
+                # TODO: Check if user has access via ticket or is admin
+                pass
+        
+        # Get URL from storage service
+        try:
+            public = db_file.is_public and expires_in is None
+            return await self.storage_service.get_file_url(
+                db_file.file_path,
+                expires_in=expires_in,
+                public=public
+            )
         except Exception:
             return None
     

@@ -276,3 +276,4 @@ async def fetch_user_profile(provider: str, request: Request):
 - Monitor provider deprecations and OIDC metadata changes.
 - Log audit events on SSO logins and linking.
 
+

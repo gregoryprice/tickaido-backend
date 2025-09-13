@@ -17,14 +17,14 @@ ai_providers:
     # Available models and their configurations
     models:
       primary:
-        name: "gpt-4o-mini"
+        name: "gpt-4o"
         max_tokens: 2000
         temperature: 0.2
         timeout: 30
         cost_per_1k_tokens: 0.00015  # For cost tracking
         
       backup:
-        name: "gpt-4"
+        name: "gpt-4o-mini"
         max_tokens: 2000
         temperature: 0.2
         timeout: 30
@@ -54,21 +54,21 @@ ai_providers:
     # Available models and their configurations
     models:
       primary:
-        name: "gemini-1.5-pro"
+        name: "gemini-1.5-pro-latest"
         max_output_tokens: 2000
         temperature: 0.2
         timeout: 30
         cost_per_1k_tokens: 0.00125
         
       fast:
-        name: "gemini-1.5-flash"
+        name: "gemini-1.5-flash-latest"
         max_output_tokens: 1500
         temperature: 0.1
         timeout: 15
         cost_per_1k_tokens: 0.00037
         
       experimental:
-        name: "gemini-1.0-pro"
+        name: "gemini-1.5-flash-8b-latest"
         max_output_tokens: 1500
         temperature: 0.1
         timeout: 30
@@ -110,216 +110,19 @@ ai_strategy:
     monthly_cost_limit: 500.00  # USD
 
 # =============================================================================
-# Agent-Specific Configuration
+# Agent Configuration
 # =============================================================================
 
-agents:
-  customer_support_agent:
-    model_provider: "openai"
-    model_name: "primary"
-    temperature: 0.2
-    max_tokens: 2000
-    timeout: 30
-    system_prompt_template: "customer_support_default"
-    tools_enabled: [
-      # Complete current MCP tool set (13 tools)
-      "create_ticket", "create_ticket_with_ai", "get_ticket",
-      "update_ticket", "delete_ticket", "update_ticket_status",
-      "assign_ticket", "search_tickets", "list_tickets", "get_ticket_stats",
-      "list_integrations", "get_active_integrations", "get_system_health"
-    ]
-    mcp_enabled: true  # Enable MCP integration
-    confidence_threshold: 0.7
-    
-  categorization_agent:
-    model_provider: "openai"
-    model_name: "fast"
-    temperature: 0.1  # Lower temperature for consistent categorization
-    max_tokens: 500
-    timeout: 15
-    system_prompt_template: "categorization_default"
-    tools_enabled: ["categorize_issue"]
-    confidence_threshold: 0.8
-    
-  file_analysis_agent:
-    model_provider: "openai"
-    model_name: "file_analysis"
-    temperature: 0.1
-    max_tokens: 1500
-    timeout: 45
-    system_prompt_template: "file_analysis_default"
-    tools_enabled: ["analyze_file", "extract_text_from_image", "transcribe_audio"]
-    confidence_threshold: 0.6
-    
-  title_generation_agent:
-    model_provider: "openai"
-    model_name: "fast"  # Use fast model for cost efficiency
-    temperature: 0.3
-    max_tokens: 50  # Short responses for titles
-    timeout: 15  # Quick timeout for title generation
-    system_prompt_template: "title_generation_default"
-    tools_enabled: []  # No tools needed for title generation
-    confidence_threshold: 0.7
+# Categorization agent configuration
+categorization_agent:
+  model_provider: "openai"
+  model_name: "fast"
+  temperature: 0.1  # Lower temperature for consistent categorization
+  max_tokens: 500
+  timeout: 15
+  system_prompt_template: "categorization_default"
+  confidence_threshold: 0.8
 
-# =============================================================================
-# Caching Configuration
-# =============================================================================
-
-caching:
-  # Function caching
-  function_cache:
-    enabled: true
-    max_size: 10000  # Number of cached functions
-    ttl: 604800  # 7 days in seconds
-    
-  # Result caching
-  result_cache:
-    enabled: true
-    max_size: 50000  # Number of cached results
-    ttl: 86400  # 24 hours in seconds
-    
-  # Pattern learning cache
-  pattern_cache:
-    enabled: true
-    max_size: 1000  # Number of learned patterns
-    ttl: 2592000  # 30 days in seconds
-
-# =============================================================================
-# Quality and Safety Configuration
-# =============================================================================
-
-quality_control:
-  # Input validation settings
-  validation:
-    enabled: true
-    max_input_length: 50000  # Maximum characters in user input
-    timeout: 5.0  # seconds for validation
-    
-  # Confidence scoring
-  confidence:
-    min_acceptable_score: 0.7
-    auto_retry_below_threshold: true
-    require_human_review_below: 0.5
-    
-  # Safety measures
-  safety:
-    content_filtering: true
-    max_processing_time: 60.0  # seconds
-    blacklisted_patterns: ["ignore previous", "system:", "forget instructions"]
-    max_file_size: 104857600  # 100MB
-
-# =============================================================================
-# Monitoring and Analytics
-# =============================================================================
-
-monitoring:
-  # Performance tracking
-  performance_tracking:
-    enabled: true
-    detailed_metrics: true
-    store_execution_logs: true
-    
-  # Error tracking
-  error_tracking:
-    enabled: true
-    store_error_details: true
-    alert_on_high_error_rate: true
-    error_rate_threshold: 0.1  # 10%
-    
-  # Usage analytics
-  usage_analytics:
-    enabled: true
-    track_rate_patterns: true
-    track_model_performance: true
-    export_metrics: true
-
-# =============================================================================
-# Development and Testing Configuration
-# =============================================================================
-
-development:
-  # Debug settings
-  debug_mode: false
-  verbose_logging: false
-  save_generated_responses: false  # Save AI responses to files
-  
-  # Testing settings
-  test_mode: false
-  use_mock_responses: false
-  mock_generation_delay: 0.1  # seconds
-  
-  # Development overrides
-  force_provider: null  # Force specific provider for testing
-  force_model: null     # Force specific model for testing
-
-# =============================================================================
-# Environment-Specific Overrides
-# =============================================================================
-
-environments:
-  production:
-    ai_strategy:
-      primary_provider: "openai"
-      model_strategy:
-        openai: "primary"
-        google: "primary"
-    quality_control:
-      confidence:
-        min_acceptable_score: 0.8
-    development:
-      debug_mode: false
-      verbose_logging: false
-      
-  staging:
-    ai_strategy:
-      primary_provider: "google"
-      model_strategy:
-        openai: "backup"
-        google: "fast"
-    development:
-      debug_mode: true
-      verbose_logging: true
-      
-  development:
-    ai_strategy:
-      max_retries: 1
-    cost_limits:
-      daily_cost_limit: 10.00
-      monthly_cost_limit: 50.00
-    development:
-      debug_mode: true
-      verbose_logging: true
-      save_generated_responses: true
-      
-  testing:
-    development:
-      test_mode: true
-      use_mock_responses: true
-    caching:
-      function_cache:
-        enabled: false
-      result_cache:
-        enabled: false
-
-# =============================================================================
-# Feature Flags
-# =============================================================================
-
-features:
-  # Experimental features
-  experimental_models: false
-  multi_provider_ensemble: false  # Use multiple providers for consensus
-  adaptive_model_selection: false  # Auto-select best model based on performance
-  
-  # Advanced features
-  pattern_learning: true
-  user_feedback_learning: true
-  automatic_retraining: false
-  
-  # Integration features
-  webhook_notifications: false
-  external_monitoring: false
-  api_usage_reporting: true
 
 # =============================================================================
 # Prompt Templates Configuration

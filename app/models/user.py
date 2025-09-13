@@ -244,8 +244,7 @@ class User(BaseModel):
     )
     
     assigned_tickets = relationship(
-        "Ticket", 
-        back_populates="assignee",
+        "Ticket",
         foreign_keys="Ticket.assigned_to_id"
     )
     
@@ -441,5 +440,8 @@ class User(BaseModel):
         data['display_name'] = self.display_name
         data['can_login'] = self.can_login
         data['is_locked'] = self.is_locked
+        
+        # Add status field for backward compatibility with tests
+        data['status'] = 'active' if self.is_active else 'inactive'
         
         return data

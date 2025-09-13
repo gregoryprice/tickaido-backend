@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Unit tests for Avatar Service
+Unit tests for Avatar Service with storage
 """
 
 import pytest
+import tempfile
+import shutil
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 from pathlib import Path
@@ -13,282 +15,354 @@ from fastapi import UploadFile
 from PIL import Image
 
 from app.services.avatar_service import AvatarService
+from app.services.storage.local_backend import LocalStorageBackend
+from app.services.storage.storage_service import StorageService
+from app.services.storage.avatar_storage_service import AvatarStorageService
+from app.models.user import User
+from app.models.ai_agent import Agent
+
+
+class MockUploadFile:
+    """Mock UploadFile for testing"""
+    def __init__(self, filename, content, content_type):
+        self.filename = filename
+        self.content = content
+        self.content_type = content_type
+        
+    async def read(self):
+        return self.content
+        
+    async def seek(self, position):
+        pass
 
 
 class TestAvatarService:
-    """Test cases for AvatarService"""
+    """Test cases for AvatarService with storage"""
     
     def test_avatar_service_initialization(self):
-        """Test avatar service initializes correctly"""
+        """Test avatar service initializes correctly with storage"""
         service = AvatarService()
         
-        # Check basic properties are set
-        assert service.max_avatar_size == 5 * 1024 * 1024  # 5MB
-        assert 'image/jpeg' in service.allowed_formats
-        assert 'image/png' in service.allowed_formats
-        assert 'image/gif' in service.allowed_formats
-        assert '.jpg' in service.allowed_extensions
-        assert '.png' in service.allowed_extensions
+        # Check service has avatar_storage_service
+        assert service.avatar_storage_service is not None
+        assert hasattr(service, 'backend_type')
+        assert hasattr(service, 'supports_signed_urls')
         
-        # Check thumbnail sizes are defined
-        assert 'small' in service.thumbnail_sizes
-        assert 'medium' in service.thumbnail_sizes  
-        assert 'large' in service.thumbnail_sizes
-        assert service.thumbnail_sizes['small'] == (32, 32)
-        assert service.thumbnail_sizes['medium'] == (150, 150)
-        assert service.thumbnail_sizes['large'] == (300, 300)
-        
-        # Check directories are configured
-        assert service.avatar_directory.exists()
-        
-        print("✅ Avatar service initialization working")
+        print("✅ Avatar service initialization with storage working")
     
     @pytest.mark.asyncio
-    async def test_validate_avatar_file_valid_formats(self):
-        """Test validation passes for valid image formats"""
-        service = AvatarService()
-        
-        # Create mock UploadFile objects for different formats
-        test_cases = [
-            ("image/jpeg", "test.jpg", b"fake_jpeg_content" * 100),
-            ("image/png", "test.png", b"fake_png_content" * 100),
-            ("image/gif", "test.gif", b"fake_gif_content" * 100)
-        ]
-        
-        for mime_type, filename, content in test_cases:
-            mock_file = MagicMock(spec=UploadFile)
-            mock_file.content_type = mime_type
-            mock_file.filename = filename
-            
-            # Should not raise an exception
-            try:
-                await service._validate_avatar_file(mock_file, content)
-            except ValueError as e:
-                pytest.fail(f"Valid format {mime_type} should not raise ValueError: {e}")
-        
-        print("✅ Avatar file validation for valid formats working")
-    
-    @pytest.mark.asyncio
-    async def test_validate_avatar_file_invalid_formats(self):
-        """Test validation rejects invalid formats and sizes"""
-        service = AvatarService()
-        
-        # Test oversized file
-        mock_file_large = MagicMock(spec=UploadFile)
-        mock_file_large.content_type = "image/jpeg"
-        mock_file_large.filename = "large.jpg"
-        large_content = b"x" * (6 * 1024 * 1024)  # 6MB - over limit
-        
-        with pytest.raises(ValueError, match="exceeds maximum allowed size"):
-            await service._validate_avatar_file(mock_file_large, large_content)
-        
-        # Test invalid MIME type
-        mock_file_invalid = MagicMock(spec=UploadFile)
-        mock_file_invalid.content_type = "application/pdf"
-        mock_file_invalid.filename = "document.pdf"
-        invalid_content = b"fake_pdf_content" * 100
-        
-        with pytest.raises(ValueError, match="not allowed"):
-            await service._validate_avatar_file(mock_file_invalid, invalid_content)
-        
-        # Test invalid file extension
-        mock_file_bad_ext = MagicMock(spec=UploadFile)
-        mock_file_bad_ext.content_type = "image/jpeg"
-        mock_file_bad_ext.filename = "test.exe"
-        valid_content = b"fake_image_content" * 100
-        
-        with pytest.raises(ValueError, match="not allowed"):
-            await service._validate_avatar_file(mock_file_bad_ext, valid_content)
-        
-        # Test tiny file
-        mock_file_tiny = MagicMock(spec=UploadFile)
-        mock_file_tiny.content_type = "image/jpeg"
-        mock_file_tiny.filename = "tiny.jpg"
-        tiny_content = b"x"  # Too small
-        
-        with pytest.raises(ValueError, match="too small"):
-            await service._validate_avatar_file(mock_file_tiny, tiny_content)
-        
-        print("✅ Avatar file validation for invalid formats working")
-    
-    def test_validate_image_security_magic_numbers(self):
-        """Test image security validation using magic numbers"""
-        service = AvatarService()
-        
-        # Create a simple 20x20 pixel PNG for testing (above minimum size)
-        img = Image.new('RGB', (20, 20), color='red')
-        img_bytes = BytesIO()
-        img.save(img_bytes, format='PNG')
-        valid_png_content = img_bytes.getvalue()
-        
-        # Should not raise an exception for valid PNG
+    async def test_validate_via_storage_service(self):
+        """Test validation works through storage service"""
+        # Setup temporary directory and service
+        temp_dir = tempfile.mkdtemp()
         try:
-            service._validate_image_security(valid_png_content, "test.png")
-        except ValueError as e:
-            pytest.fail(f"Valid PNG should not raise ValueError: {e}")
-        
-        # Create a simple 20x20 pixel JPEG for testing (above minimum size)
-        img_jpeg = Image.new('RGB', (20, 20), color='blue')
-        jpeg_bytes = BytesIO()
-        img_jpeg.save(jpeg_bytes, format='JPEG')
-        valid_jpeg_content = jpeg_bytes.getvalue()
-        
-        # Should not raise an exception for valid JPEG
+            backend = LocalStorageBackend(base_path=temp_dir)
+            avatar_storage_service = AvatarStorageService(backend)
+            
+            # Create test image
+            img = Image.new('RGB', (100, 100), color='red')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_content = img_buffer.getvalue()
+            
+            # Test valid file
+            valid_file = MockUploadFile("test.png", img_content, "image/png")
+            user_id = uuid4()
+            
+            # Should not raise exception
+            avatar_urls = await avatar_storage_service.upload_user_avatar(user_id, valid_file)
+            assert len(avatar_urls) == 4  # original + 3 thumbnails
+            
+            # Test invalid file type
+            invalid_file = MockUploadFile("test.txt", b"not an image", "text/plain")
+            
+            with pytest.raises(Exception):
+                await avatar_storage_service.upload_user_avatar(user_id, invalid_file)
+            
+            # Test oversized file
+            large_content = b"x" * (6 * 1024 * 1024)  # 6MB
+            large_file = MockUploadFile("large.png", large_content, "image/png")
+            
+            with pytest.raises(Exception):
+                await avatar_storage_service.upload_user_avatar(user_id, large_file)
+            
+            print("✅ Avatar validation through storage working")
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    @pytest.mark.asyncio
+    async def test_upload_user_avatar_success_path(self):
+        """Test successful user avatar upload through AvatarService"""
+        # Setup
+        temp_dir = tempfile.mkdtemp()
         try:
-            service._validate_image_security(valid_jpeg_content, "test.jpg")
-        except ValueError as e:
-            pytest.fail(f"Valid JPEG should not raise ValueError: {e}")
-        
-        # Test invalid content (not an image)
-        invalid_content = b"This is not an image file"
-        with pytest.raises(ValueError, match="not a valid image format"):
-            service._validate_image_security(invalid_content, "fake.jpg")
-        
-        # Test suspicious content (embed in the middle of valid PNG to pass magic number check)
-        # Create content that starts with PNG header but has suspicious content in first 1KB
-        png_header = valid_png_content[:100]  # PNG header and some data
-        suspicious_middle = b"<script>alert('xss')</script>"
-        png_remainder = valid_png_content[100:]
-        suspicious_content = png_header + suspicious_middle + png_remainder
-        
-        with pytest.raises(ValueError, match="suspicious content"):
-            service._validate_image_security(suspicious_content, "malicious.png")
-        
-        print("✅ Image security validation with magic numbers working")
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
+            
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
+            
+            # Create mock database session and user
+            mock_db = AsyncMock()
+            mock_user = MagicMock()
+            mock_user.id = uuid4()
+            mock_user.avatar_url = None
+            mock_db.get.return_value = mock_user
+            
+            # Create test image
+            img = Image.new('RGB', (150, 150), color='blue')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='JPEG')
+            img_content = img_buffer.getvalue()
+            
+            # Upload avatar
+            upload_file = MockUploadFile("test.jpg", img_content, "image/jpeg")
+            result_url = await avatar_service.upload_user_avatar(mock_db, mock_user.id, upload_file)
+            
+            # Verify result
+            assert result_url is not None
+            assert "avatars/users" in result_url
+            
+            # Verify database was updated
+            mock_db.get.assert_called_with(User, mock_user.id)
+            mock_db.commit.assert_called()
+            assert mock_user.avatar_url is not None
+            
+            print("✅ User avatar upload through AvatarService working")
+        finally:
+            shutil.rmtree(temp_dir)
     
     @pytest.mark.asyncio
-    async def test_upload_avatar_success_path(self):
-        """Test successful avatar upload flow"""
-        service = AvatarService()
-        
-        # Create a mock database session
-        mock_db = AsyncMock()
-        mock_user = MagicMock()
-        mock_user.avatar_url = None
-        mock_db.get.return_value = mock_user
-        
-        # Create a test image
-        img = Image.new('RGB', (100, 100), color='green')
-        img_bytes = BytesIO()
-        img.save(img_bytes, format='JPEG')
-        test_content = img_bytes.getvalue()
-        
-        # Create mock UploadFile
-        mock_file = AsyncMock(spec=UploadFile)
-        mock_file.filename = "avatar.jpg"
-        mock_file.content_type = "image/jpeg"
-        mock_file.read.return_value = test_content
-        mock_file.seek = AsyncMock()
-        
-        # Mock file system operations
-        with patch('pathlib.Path.mkdir'), \
-             patch('pathlib.Path.exists', return_value=True), \
-             patch.object(service, '_save_original_image', return_value=Path("/fake/path.jpg")), \
-             patch.object(service, '_generate_thumbnails', return_value={}):
+    async def test_upload_agent_avatar_success_path(self):
+        """Test successful agent avatar upload through AvatarService"""
+        # Setup
+        temp_dir = tempfile.mkdtemp()
+        try:
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
             
-            test_user_id = uuid4()
-            result_url = await service.upload_avatar(mock_db, test_user_id, mock_file)
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
             
-            # Verify the result
-            assert result_url == f"/api/v1/users/{test_user_id}/avatar"
+            # Create mock database session and agent
+            mock_db = AsyncMock()
+            mock_agent = MagicMock()
+            mock_agent.id = uuid4()
+            mock_agent.avatar_url = None
+            mock_agent.has_custom_avatar = False
+            mock_db.get.return_value = mock_agent
             
-            # Verify database operations
-            mock_db.get.assert_called_once()
-            mock_db.commit.assert_called_once()
-        
-        print("✅ Avatar upload success path working")
-    
-    def test_detect_extension_from_mime(self):
-        """Test MIME type to extension detection"""
-        service = AvatarService()
-        
-        # Test various MIME types
-        assert service._detect_extension_from_mime('image/jpeg') == '.jpg'
-        assert service._detect_extension_from_mime('image/jpg') == '.jpg'
-        assert service._detect_extension_from_mime('image/png') == '.png'
-        assert service._detect_extension_from_mime('image/gif') == '.gif'
-        assert service._detect_extension_from_mime('image/heic') == '.heic'
-        assert service._detect_extension_from_mime('image/webp') == '.webp'
-        
-        # Test unknown MIME type defaults to .jpg
-        assert service._detect_extension_from_mime('unknown/type') == '.jpg'
-        
-        print("✅ MIME type to extension detection working")
-    
-    def test_generate_avatar_url(self):
-        """Test avatar URL generation"""
-        service = AvatarService()
-        
-        test_user_id = uuid4()
-        expected_url = f"/api/v1/users/{test_user_id}/avatar"
-        
-        result = service._generate_avatar_url(test_user_id)
-        assert result == expected_url
-        
-        print("✅ Avatar URL generation working")
+            # Create test image
+            img = Image.new('RGB', (150, 150), color='green')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_content = img_buffer.getvalue()
+            
+            # Upload avatar
+            upload_file = MockUploadFile("agent.png", img_content, "image/png")
+            result_url = await avatar_service.upload_agent_avatar(mock_db, mock_agent.id, upload_file)
+            
+            # Verify result
+            assert result_url is not None
+            assert "avatars/agents" in result_url
+            
+            # Verify database was updated
+            mock_db.get.assert_called_with(Agent, mock_agent.id)
+            mock_db.commit.assert_called()
+            assert mock_agent.avatar_url is not None
+            assert mock_agent.has_custom_avatar == True
+            
+            print("✅ Agent avatar upload through AvatarService working")
+        finally:
+            shutil.rmtree(temp_dir)
     
     @pytest.mark.asyncio
-    async def test_get_avatar_path(self):
-        """Test getting avatar file path"""
-        service = AvatarService()
-        
-        test_user_id = uuid4()
-        
-        # Mock file system to simulate no avatar found
-        with patch('pathlib.Path.glob', return_value=[]), \
-             patch('pathlib.Path.is_file', return_value=False):
+    async def test_get_avatar_path_legacy_compatibility(self):
+        """Test legacy get_avatar_path method compatibility"""
+        # Setup
+        temp_dir = tempfile.mkdtemp()
+        try:
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
             
-            result = await service.get_avatar_path(test_user_id)
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
+            
+            user_id = uuid4()
+            
+            # Test with no avatar (should return None)
+            result = await avatar_service.get_avatar_path(user_id)
             assert result is None
-        
-        # Mock file system to simulate avatar found
-        mock_path = Path(f"/fake/avatars/medium/{test_user_id}_avatar_123.jpg")
-        with patch('pathlib.Path.glob', return_value=[mock_path]), \
-             patch('pathlib.Path.is_file', return_value=True):
             
-            result = await service.get_avatar_path(test_user_id, "medium")
-            assert result == mock_path
-        
-        print("✅ Avatar path retrieval working")
+            # Test with avatar (first upload one)
+            mock_db = AsyncMock()
+            mock_user = MagicMock()
+            mock_user.id = user_id
+            mock_user.avatar_url = None
+            mock_db.get.return_value = mock_user
+            
+            # Create test image and upload
+            img = Image.new('RGB', (100, 100), color='yellow')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_content = img_buffer.getvalue()
+            
+            upload_file = MockUploadFile("test.png", img_content, "image/png")
+            await avatar_service.upload_user_avatar(mock_db, user_id, upload_file)
+            
+            # Now test getting the path (should return URL)
+            result = await avatar_service.get_avatar_path(user_id, "medium")
+            assert result is not None
+            assert "avatars/users" in result
+            
+            print("✅ Legacy get_avatar_path compatibility working")
+        finally:
+            shutil.rmtree(temp_dir)
     
     @pytest.mark.asyncio
-    async def test_delete_avatar(self):
-        """Test avatar deletion"""
-        service = AvatarService()
-        
-        # Create mock database session and user
-        mock_db = AsyncMock()
-        mock_user = MagicMock()
-        mock_user.avatar_url = "/api/v1/users/123/avatar"
-        mock_db.get.return_value = mock_user
-        
-        test_user_id = uuid4()
-        
-        # Mock file system operations
-        mock_file_paths = [
-            Path(f"/fake/{test_user_id}_avatar_123.jpg"),
-            Path(f"/fake/small/{test_user_id}_avatar_123.jpg"),
-            Path(f"/fake/medium/{test_user_id}_avatar_123.jpg")
-        ]
-        
-        with patch('pathlib.Path.glob', return_value=mock_file_paths), \
-             patch('pathlib.Path.is_file', return_value=True), \
-             patch('pathlib.Path.unlink') as mock_unlink:
+    async def test_delete_avatar_legacy_compatibility(self):
+        """Test legacy delete_avatar method compatibility"""
+        # Setup
+        temp_dir = tempfile.mkdtemp()
+        try:
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
             
-            result = await service.delete_avatar(mock_db, test_user_id)
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
             
-            # Verify files were "deleted"
-            assert result is True
-            assert mock_unlink.call_count >= len(mock_file_paths)
+            # Create mock database session and user
+            mock_db = AsyncMock()
+            user_id = uuid4()
+            mock_user = MagicMock()
+            mock_user.id = user_id
+            mock_user.avatar_url = None
+            mock_db.get.return_value = mock_user
+            
+            # First upload an avatar
+            img = Image.new('RGB', (100, 100), color='purple')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='JPEG')
+            img_content = img_buffer.getvalue()
+            
+            upload_file = MockUploadFile("test.jpg", img_content, "image/jpeg")
+            await avatar_service.upload_user_avatar(mock_db, user_id, upload_file)
+            
+            # Reset mock calls
+            mock_db.reset_mock()
+            mock_user.avatar_url = "/some/avatar/url"  # Simulate existing avatar
+            
+            # Test delete_avatar (legacy method)
+            result = await avatar_service.delete_avatar(mock_db, user_id)
+            
+            # Verify result
+            assert result == True
             
             # Verify database operations
-            mock_db.get.assert_called_once()
-            mock_db.commit.assert_called_once()
+            mock_db.get.assert_called_with(User, user_id)
+            mock_db.commit.assert_called()
             assert mock_user.avatar_url is None
-        
-        print("✅ Avatar deletion working")
-
-
-# Run tests if this file is executed directly
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+            
+            print("✅ Legacy delete_avatar compatibility working")
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    @pytest.mark.asyncio
+    async def test_service_properties(self):
+        """Test service properties work correctly"""
+        # Setup with local backend
+        temp_dir = tempfile.mkdtemp()
+        try:
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
+            
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
+            
+            # Test properties
+            assert avatar_service.backend_type == "local"
+            assert avatar_service.supports_signed_urls == False
+            
+            print("✅ Service properties working")
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    @pytest.mark.asyncio
+    async def test_error_handling(self):
+        """Test error handling in avatar service"""
+        # Setup
+        temp_dir = tempfile.mkdtemp()
+        try:
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
+            
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
+            
+            # Test user not found
+            mock_db = AsyncMock()
+            mock_db.get.return_value = None  # User not found
+            
+            user_id = uuid4()
+            
+            # Create valid image
+            img = Image.new('RGB', (100, 100), color='red')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_content = img_buffer.getvalue()
+            
+            upload_file = MockUploadFile("test.png", img_content, "image/png")
+            
+            # Should raise HTTPException
+            with pytest.raises(Exception):
+                await avatar_service.upload_user_avatar(mock_db, user_id, upload_file)
+            
+            # Verify rollback was called
+            mock_db.rollback.assert_called()
+            
+            print("✅ Error handling working")
+        finally:
+            shutil.rmtree(temp_dir)
+    
+    @pytest.mark.asyncio  
+    async def test_backward_compatibility_methods(self):
+        """Test that legacy methods still work"""
+        # Setup
+        temp_dir = tempfile.mkdtemp()
+        try:
+            backend = LocalStorageBackend(base_path=temp_dir)
+            storage_service = StorageService(backend)
+            
+            avatar_service = AvatarService()
+            avatar_service.storage_service = storage_service
+            
+            # Create mock database and user
+            mock_db = AsyncMock()
+            user_id = uuid4()
+            mock_user = MagicMock()
+            mock_user.id = user_id
+            mock_user.avatar_url = None
+            mock_db.get.return_value = mock_user
+            
+            # Create test image
+            img = Image.new('RGB', (100, 100), color='orange')
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_content = img_buffer.getvalue()
+            
+            # Test legacy upload_avatar method
+            upload_file = MockUploadFile("legacy.png", img_content, "image/png")
+            result = await avatar_service.upload_avatar(mock_db, user_id, upload_file)
+            assert result is not None
+            
+            # Test get_avatar_path (legacy)
+            path_result = await avatar_service.get_avatar_path(user_id, "small")
+            assert path_result is not None
+            
+            # Test delete_avatar (legacy)
+            delete_result = await avatar_service.delete_avatar(mock_db, user_id)
+            assert delete_result == True
+            
+            print("✅ Backward compatibility methods working")
+        finally:
+            shutil.rmtree(temp_dir)

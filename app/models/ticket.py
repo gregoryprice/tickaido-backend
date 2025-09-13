@@ -362,11 +362,6 @@ class Ticket(BaseModel):
         foreign_keys=[created_by_id]
     )
     
-    assignee = relationship(
-        "User",
-        back_populates="assigned_tickets", 
-        foreign_keys=[assigned_to_id]
-    )
     
     escalated_by = relationship(
         "User",

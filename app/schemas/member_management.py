@@ -11,10 +11,8 @@ from enum import Enum
 
 from app.schemas.base import BaseSchema, BaseResponse, EmailStr
 
-# Import to avoid circular dependency
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from app.schemas.user import UserResponse
+# Import UserResponse directly  
+from app.schemas.user import UserResponse
 
 
 class OrganizationRoleSchema(str, Enum):
@@ -94,6 +92,31 @@ class MemberRoleUpdateRequest(BaseSchema):
     role: OrganizationRoleSchema = Field(description="New organization role")
 
 
+class MemberRoleUpdateResponse(BaseSchema):
+    """Response for member role update"""
+    message: str = Field(description="Success message")
+
+
+class MemberUpdateResponse(BaseSchema):
+    """Response for member update operations"""
+    id: str = Field(description="Member ID")
+    role: str = Field(description="Updated role")
+    updated_fields: List[str] = Field(description="List of updated fields")
+    message: str = Field(description="Success message")
+    member: UserResponse = Field(description="Updated member information")
+
+
+class MemberRemovalResponse(BaseSchema):
+    """Response for member removal"""
+    message: str = Field(description="Success message")
+
+
+class UserDeleteResponse(BaseSchema):
+    """Response for user account deletion"""
+    message: str = Field(description="Success message")
+    organization_deleted: bool = Field(description="Whether organization was also deleted")
+
+
 class MemberListParams(BaseSchema):
     """Parameters for listing organization members"""
     role: Optional[OrganizationRoleSchema] = Field(None, description="Filter by role")
@@ -104,7 +127,7 @@ class MemberListParams(BaseSchema):
 
 class MembersListResponse(BaseSchema):
     """Response for organization members list"""
-    data: List['UserResponse'] = Field(description="List of organization members")
+    data: List[UserResponse] = Field(description="List of organization members")
     pagination: Dict[str, int] = Field(description="Pagination information")
 
 
@@ -156,8 +179,9 @@ class InvitationResponse(BaseResponse):
     organization_id: UUID = Field(description="Organization ID")
     email: str = Field(description="Invited email address")
     role: OrganizationRoleSchema = Field(description="Role to be assigned")
-    invited_by: Dict[str, Any] = Field(description="User who sent the invitation")
+    inviter_id: UUID = Field(description="ID of user who sent the invitation")
     invitation_token: Optional[str] = Field(None, description="Invitation token (only for creation)")
+    token: Optional[str] = Field(None, description="Invitation token (alias for compatibility)")
     status: InvitationStatusSchema = Field(description="Invitation status")
     expires_at: datetime = Field(description="Expiration date")
     accepted_at: Optional[datetime] = Field(None, description="Acceptance date")

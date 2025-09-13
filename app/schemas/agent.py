@@ -22,8 +22,7 @@ class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Human-readable name for the agent")
     agent_type: str = Field(default="customer_support", description="Type of agent")
     
-    # Optional personalization
-    avatar_url: Optional[str] = Field(None, max_length=500, description="URL for agent avatar image")
+    # Optional personalization - avatar_url removed, now handled by dedicated avatar endpoints
     
     # Optional configuration fields
     role: Optional[str] = Field(None, max_length=255, description="Agent role and responsibility description")
@@ -57,8 +56,8 @@ class AgentUpdateRequest(BaseModel):
     
     # All fields are optional for updates
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name for the agent")
-    avatar_url: Optional[str] = Field(None, max_length=500, description="URL for agent avatar image")
     is_active: Optional[bool] = Field(None, description="Whether agent is active")
+    # avatar_url removed - now handled by dedicated avatar endpoints
     
     # Configuration fields
     role: Optional[str] = Field(None, max_length=255, description="Agent role and responsibility description")
@@ -300,6 +299,61 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = None
     code: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now())
+
+
+class AgentAvatarResponse(BaseModel):
+    """Schema for agent avatar responses"""
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        use_enum_values=True
+    )
+    
+    agent_id: Optional[UUID] = Field(None, description="Agent ID")
+    avatar_url: Optional[str] = Field(None, description="Avatar URL")
+    message: str = Field(description="Response message")
+    filename: Optional[str] = Field(None, description="Original filename")
+    file_size: Optional[int] = Field(None, description="File size in bytes")
+    upload_date: Optional[datetime] = Field(None, description="Upload timestamp")
+    has_custom_avatar: Optional[bool] = Field(None, description="Whether agent has custom avatar")
+
+
+class AgentAvatarDeleteResponse(BaseModel):
+    """Schema for agent avatar deletion response"""
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        use_enum_values=True
+    )
+    
+    agent_id: UUID = Field(description="Agent ID")
+    deleted: bool = Field(description="Whether avatar was deleted")
+    message: str = Field(description="Response message")
+
+
+class AgentAvatarInfoResponse(BaseModel):
+    """Schema for agent avatar info response - aligned with user avatar info"""
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        use_enum_values=True
+    )
+    
+    id: UUID = Field(description="Agent ID")
+    agent_id: UUID = Field(description="Agent ID")
+    avatar_url: Optional[str] = Field(None, description="Avatar URL")
+    filename: Optional[str] = Field(None, description="Original filename")
+    file_size: Optional[int] = Field(None, description="File size in bytes")
+    upload_date: Optional[datetime] = Field(None, description="Upload timestamp")
+    thumbnail_sizes: Optional[Dict[str, str]] = Field(
+        None,
+        description="Available thumbnail sizes with their URLs"
+    )
+    created_at: datetime = Field(description="Agent creation timestamp")
+    updated_at: datetime = Field(description="Agent last update timestamp")
 
 
 class SuccessResponse(BaseModel):

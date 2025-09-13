@@ -287,7 +287,11 @@ class AgentService:
         """
         async with get_async_db_session() if db is None else db as session:
             try:
-                agent = await self.get_agent(agent_id, db=session)
+                # Get the agent directly in this session to avoid detached instance
+                stmt = select(Agent).where(Agent.id == agent_id)
+                result = await session.execute(stmt)
+                agent = result.scalar_one_or_none()
+                
                 if not agent:
                     logger.error(f"Agent {agent_id} not found")
                     return False
@@ -305,7 +309,7 @@ class AgentService:
                     db=session
                 )
                 
-                # Soft delete
+                # Soft delete using ORM method
                 agent.soft_delete()
                 await session.commit()
                 

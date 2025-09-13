@@ -54,6 +54,13 @@ class Agent(BaseModel):
         comment="URL for agent avatar image"
     )
     
+    has_custom_avatar = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Whether agent has a custom uploaded avatar"
+    )
+    
     # Agent status
     is_active = Column(
         Boolean,

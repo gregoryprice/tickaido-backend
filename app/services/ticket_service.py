@@ -50,7 +50,6 @@ class TicketService:
             # Build query with organization isolation
             query = select(Ticket).join(User, Ticket.created_by_id == User.id).options(
                 selectinload(Ticket.creator),
-                selectinload(Ticket.assignee),
                 selectinload(Ticket.files)
             ).filter(User.organization_id == organization_id)
             
@@ -227,7 +226,6 @@ class TicketService:
             # Load relationships
             query = select(Ticket).options(
                 selectinload(Ticket.creator),
-                selectinload(Ticket.assignee),
                 selectinload(Ticket.files)
             ).where(Ticket.id == ticket.id)
             
@@ -425,7 +423,6 @@ class TicketService:
         try:
             query = select(Ticket).join(User, Ticket.created_by_id == User.id).options(
                 selectinload(Ticket.creator),
-                selectinload(Ticket.assignee),
                 selectinload(Ticket.files)
             ).where(
                 and_(
@@ -543,9 +540,13 @@ class TicketService:
                 return None
             
             # Update fields
+            nullable_fields = {'assigned_to_id', 'department', 'resolution_summary', 'internal_notes', 'custom_fields'}
+            
             for field, value in update_data.items():
-                if hasattr(ticket, field) and value is not None:
-                    setattr(ticket, field, value)
+                if hasattr(ticket, field):
+                    # Allow None values for nullable fields
+                    if value is not None or field in nullable_fields:
+                        setattr(ticket, field, value)
             
             # Update activity timestamp
             ticket.last_activity_at = datetime.now(timezone.utc)

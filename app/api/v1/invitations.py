@@ -23,7 +23,10 @@ from app.schemas.member_management import (
     InvitationAcceptResponse,
     InvitationListParams,
     InvitationsListResponse,
-    MemberManagementError
+    MemberInviteRequest,
+    MemberManagementError,
+    OrganizationRoleSchema,
+    InvitationStatusSchema
 )
 
 logger = logging.getLogger(__name__)
@@ -31,8 +34,338 @@ router = APIRouter()
 member_service = MemberManagementService()
 user_service = UserService()
 
+# Direct invitation endpoints expected by tests
+
+@router.delete("/invitations/{invitation_id}", status_code=status.HTTP_200_OK)
+async def revoke_invitation_by_id(
+    invitation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Revoke/cancel invitation by ID.
+    
+    - **invitation_id**: Invitation ID to cancel
+    - Requires: User must be an admin of the organization
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization"
+            )
+        
+        if not current_user.is_organization_admin():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization admins can cancel invitations"
+            )
+        
+        # Cancel the invitation
+        invitation = await member_service.cancel_invitation(
+            db=db,
+            invitation_id=invitation_id,
+            admin_user_id=current_user.id
+        )
+        
+        return {
+            "message": "Invitation cancelled successfully",
+            "invitation_id": str(invitation.id),
+            "cancelled_at": invitation.cancelled_at.isoformat() if invitation.cancelled_at else None
+        }
+        
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error cancelling invitation {invitation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel invitation"
+        )
+
+
+@router.post("/invitations", response_model=InvitationResponse)
+async def create_organization_invitation(
+    invite_request: MemberInviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Create invitation for current user's organization.
+    
+    - **email**: Email address to invite
+    - **role**: Role to assign (admin, member)
+    - **send_email**: Whether to send invitation email
+    - **message**: Optional custom message
+    - Requires: User must be an admin of their organization
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization to send invitations"
+            )
+        
+        # Check admin permissions before calling service
+        if not current_user.is_organization_admin():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization admins can invite members"
+            )
+        
+        # Convert schema enum to model enum
+        from app.models.organization_invitation import OrganizationRole
+        role_value = invite_request.role.value if hasattr(invite_request.role, 'value') else str(invite_request.role)
+        model_role = OrganizationRole(role_value)
+        
+        # Create invitation
+        invitation = await member_service.create_invitation(
+            db=db,
+            organization_id=current_user.organization_id,
+            email=invite_request.email,
+            role=model_role,
+            admin_user_id=current_user.id,
+            message=invite_request.message
+        )
+        
+        return InvitationResponse(
+            id=invitation.id,
+            created_at=invitation.created_at,
+            updated_at=invitation.updated_at,
+            organization_id=invitation.organization_id,
+            email=invitation.email,
+            role=OrganizationRoleSchema(invitation.role.value),
+            inviter_id=current_user.id,
+            invitation_token=invitation.invitation_token,
+            token=invitation.invitation_token,  # Alias for compatibility
+            status=InvitationStatusSchema(invitation.status.value),
+            expires_at=invitation.expires_at,
+            accepted_at=invitation.accepted_at,
+            declined_at=invitation.declined_at,
+            cancelled_at=invitation.cancelled_at,
+            message=invitation.message,
+            is_expired=invitation.is_expired,
+            is_pending=invitation.is_pending
+        )
+        
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error creating invitation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send invitation"
+        )
+
+
+@router.get("/invitations", response_model=InvitationsListResponse)
+async def list_current_user_invitations(
+    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=100, description="Results per page"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    List invitations for current user's organization.
+    
+    - **status**: Filter by status (pending, accepted, declined, expired, cancelled) - optional
+    - **page**: Page number for pagination
+    - **limit**: Results per page (max 100)
+    - Requires: User must be an admin of their organization
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization"
+            )
+        
+        # Verify admin permissions
+        if not current_user.is_organization_admin():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization admins can view invitations"
+            )
+        
+        # Parse status filter
+        parsed_status = None
+        if status_filter:
+            try:
+                parsed_status = InvitationStatus(status_filter)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status. Must be one of: {[s.value for s in InvitationStatus]}"
+                )
+        
+        # Calculate offset
+        offset = (page - 1) * limit
+        
+        # Get invitations
+        invitations, total = await member_service.get_organization_invitations(
+            db=db,
+            organization_id=current_user.organization_id,
+            status_filter=parsed_status,
+            offset=offset,
+            limit=limit
+        )
+        
+        # Convert to response format
+        invitation_responses = []
+        for invitation in invitations:
+            invitation_responses.append(InvitationResponse(
+                id=invitation.id,
+                created_at=invitation.created_at,
+                updated_at=invitation.updated_at,
+                organization_id=invitation.organization_id,
+                email=invitation.email,
+                role=OrganizationRoleSchema(invitation.role.value),
+                inviter_id=invitation.invited_by_id,
+                invitation_token=invitation.invitation_token,
+                token=invitation.invitation_token,
+                status=InvitationStatusSchema(invitation.status.value),
+                expires_at=invitation.expires_at,
+                accepted_at=invitation.accepted_at,
+                declined_at=invitation.declined_at,
+                cancelled_at=invitation.cancelled_at,
+                message=invitation.message,
+                is_expired=invitation.is_expired,
+                is_pending=invitation.is_pending
+            ))
+        
+        return InvitationsListResponse(
+            data=invitation_responses,
+            pagination={
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "pages": (total + limit - 1) // limit if limit > 0 else 0
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing invitations: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve invitations"
+        )
+
 
 # Public invitation endpoints (no auth required)
+
+@router.get("/invitations/token/{token}", response_model=InvitationDetailsResponse)
+async def get_invitation_by_token_alias(
+    token: str,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get invitation details by token (alias endpoint).
+    
+    **Public endpoint - No authentication required**
+    
+    - **token**: Invitation token
+    - Alias for /invitations/{token} endpoint
+    """
+    return await get_invitation_details(token, db)
+
+
+@router.get("/invitations/{invitation_id}", response_model=InvitationDetailsResponse) 
+async def get_invitation_by_id(
+    invitation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get invitation details by ID.
+    
+    **Requires authentication**
+    
+    - **invitation_id**: Invitation ID (UUID format)
+    - Returns invitation details for the user's organization
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization"
+            )
+        
+        # Load invitation with relationships
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        stmt = select(OrganizationInvitation).options(
+            selectinload(OrganizationInvitation.invited_by),
+            selectinload(OrganizationInvitation.organization)
+        ).where(OrganizationInvitation.id == invitation_id)
+        
+        result = await db.execute(stmt)
+        invitation = result.scalar_one_or_none()
+        
+        if not invitation or invitation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invitation not found"
+            )
+        
+        # Prepare organization info
+        organization_info = {
+            "id": str(invitation.organization.id),
+            "name": invitation.organization.name,
+            "domain": invitation.organization.domain,
+            "display_name": invitation.organization.effective_display_name,
+            "logo_url": invitation.organization.logo_url
+        }
+        
+        # Return using same format as get_invitation_details
+        return InvitationDetailsResponse(
+            id=invitation.id,
+            created_at=invitation.created_at,
+            updated_at=invitation.updated_at,
+            organization_id=invitation.organization_id,
+            email=invitation.email,
+            role=OrganizationRoleSchema(invitation.role.value),
+            inviter_id=invitation.invited_by_id,
+            invitation_token=invitation.invitation_token,
+            token=invitation.invitation_token,
+            status=InvitationStatusSchema(invitation.status.value),
+            expires_at=invitation.expires_at,
+            accepted_at=invitation.accepted_at,
+            declined_at=invitation.declined_at,
+            cancelled_at=invitation.cancelled_at,
+            message=invitation.message,
+            is_expired=invitation.is_expired,
+            is_pending=invitation.is_pending,
+            organization=organization_info
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting invitation by ID {invitation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve invitation"
+        )
+
 
 @router.get("/invitations/{token}", response_model=InvitationDetailsResponse)
 async def get_invitation_details(
@@ -57,13 +390,7 @@ async def get_invitation_details(
                 detail="Invitation not found or invalid"
             )
         
-        # Prepare response data
-        invited_by_info = {
-            "id": str(invitation.invited_by.id),
-            "email": invitation.invited_by.email,
-            "full_name": invitation.invited_by.full_name
-        }
-        
+        # Prepare organization info
         organization_info = {
             "id": str(invitation.organization.id),
             "name": invitation.organization.name,
@@ -78,17 +405,19 @@ async def get_invitation_details(
             updated_at=invitation.updated_at,
             organization_id=invitation.organization_id,
             email=invitation.email,
-            role=invitation.role,
-            invited_by=invited_by_info,
-            organization=organization_info,
-            status=invitation.status,
+            role=OrganizationRoleSchema(invitation.role.value),
+            inviter_id=invitation.invited_by_id,
+            invitation_token=invitation.invitation_token,
+            token=invitation.invitation_token,
+            status=InvitationStatusSchema(invitation.status.value),
             expires_at=invitation.expires_at,
             accepted_at=invitation.accepted_at,
             declined_at=invitation.declined_at,
             cancelled_at=invitation.cancelled_at,
             message=invitation.message,
             is_expired=invitation.is_expired,
-            is_pending=invitation.is_pending
+            is_pending=invitation.is_pending,
+            organization=organization_info
         )
         
     except HTTPException:
@@ -276,21 +605,17 @@ async def list_organization_invitations(
         # Convert to response format
         invitation_responses = []
         for invitation in invitations:
-            invited_by_info = {
-                "id": str(invitation.invited_by.id),
-                "email": invitation.invited_by.email,
-                "full_name": invitation.invited_by.full_name
-            }
-            
             invitation_responses.append(InvitationResponse(
                 id=invitation.id,
                 created_at=invitation.created_at,
                 updated_at=invitation.updated_at,
                 organization_id=invitation.organization_id,
                 email=invitation.email,
-                role=invitation.role,
-                invited_by=invited_by_info,
-                status=invitation.status,
+                role=OrganizationRoleSchema(invitation.role.value),
+                inviter_id=invitation.invited_by_id,
+                invitation_token=invitation.invitation_token,
+                token=invitation.invitation_token,
+                status=InvitationStatusSchema(invitation.status.value),
                 expires_at=invitation.expires_at,
                 accepted_at=invitation.accepted_at,
                 declined_at=invitation.declined_at,

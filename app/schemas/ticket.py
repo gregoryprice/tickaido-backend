@@ -306,7 +306,7 @@ class TicketBaseResponse(BaseResponse):
     department: Optional[str] = Field(None, description="Assigned department")
     source_channel: str = Field(description="Source channel")
     created_by: TicketUserInfo = Field(alias="creator", description="Ticket creator")
-    assigned_to: Optional[TicketUserInfo] = Field(alias="assignee", description="Assigned user")
+    assigned_to_id: Optional[UUID] = Field(None, description="ID of assigned user")
 
 
 class TicketListResponse(TicketBaseResponse):

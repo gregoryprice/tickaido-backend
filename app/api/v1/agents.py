@@ -53,8 +53,8 @@ async def create_agent(
             organization_id=current_user.organization_id,
             name=agent_data.name,
             agent_type=agent_data.agent_type,
-            avatar_url=agent_data.avatar_url,
-            configuration=agent_data.model_dump(exclude={'name', 'agent_type', 'avatar_url'}),
+            avatar_url=None,  # Always null on creation, use avatar endpoints for avatar management
+            configuration=agent_data.model_dump(exclude={'name', 'agent_type'}),
             created_by_user_id=current_user.id,
             reason="Agent creation via API",
             ip_address=get_client_ip(request),
@@ -91,8 +91,11 @@ async def update_agent(
         if agent.organization_id != current_user.organization_id:
             raise HTTPException(status_code=403, detail="Access denied to agent")
         
-        # Prepare updates (exclude None values)
+        # Prepare updates (exclude None values and avatar_url)
         updates = {k: v for k, v in agent_data.model_dump().items() if v is not None}
+        
+        # Filter out avatar_url if somehow provided - handled by dedicated avatar endpoints
+        updates.pop('avatar_url', None)
         
         if not updates:
             # No updates provided, return current agent
