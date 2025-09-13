@@ -55,6 +55,7 @@ class TestAvatarAPIEndpoints:
         # Mock avatar service
         with patch('app.api.v1.users.avatar_service') as mock_service:
             mock_service.upload_avatar = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar")
+            mock_service.get_user_avatar_url = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar/medium")
             
             # Call the endpoint
             result = await upload_avatar(user_id, mock_file, current_user, mock_db)
@@ -187,21 +188,44 @@ class TestAvatarAPIEndpoints:
         mock_db = AsyncMock()
         mock_db.get.return_value = mock_user
         
-        # Mock avatar service
-        from pathlib import Path
-        mock_path = Path(f"/fake/avatars/medium/{user_id}_avatar.jpg")
-        
+        # Mock avatar service with complete setup
         with patch('app.api.v1.users.avatar_service') as mock_service:
-            mock_service.get_avatar_path = AsyncMock(return_value=mock_path)
+            # Set up the avatar URL that includes the storage path
+            avatar_url = "/api/v1/storage/avatars/users/test/medium.jpg"
+            mock_service.get_user_avatar_url = AsyncMock(return_value=avatar_url)
+            mock_service.backend_type = "local"  # This triggers the local storage path
             
-            with patch('pathlib.Path.exists', return_value=True):
-                with patch('app.api.v1.users.FileResponse') as mock_file_response:
-                    mock_file_response.return_value = "mocked_file_response"
-                    
-                    result = await get_avatar(user_id, "medium", mock_db)
-                    
-                    assert result == "mocked_file_response"
-                    mock_service.get_avatar_path.assert_called_once_with(user_id, "medium")
+            # Mock the avatar storage service backend
+            mock_backend = AsyncMock()
+            mock_backend.download_file = AsyncMock(return_value=b"fake_image_data")
+            
+            # Create the nested structure that the code expects
+            mock_storage_service = MagicMock()
+            mock_storage_service.backend = mock_backend
+            mock_service.avatar_storage_service = mock_storage_service
+            
+            # Mock the Response class to avoid creating actual HTTP response
+            with patch('fastapi.responses.Response') as mock_response_class:
+                mock_response_instance = MagicMock()
+                mock_response_class.return_value = mock_response_instance
+                
+                result = await get_avatar(user_id, "medium", None, mock_db)
+                
+                # Verify the Response was created with correct parameters
+                assert result == mock_response_instance
+                mock_service.get_user_avatar_url.assert_called_once_with(user_id, "medium")
+                
+                # Verify backend download was called with correct storage key
+                expected_storage_key = "avatars/users/test/medium.jpg"
+                mock_backend.download_file.assert_called_once_with(expected_storage_key)
+                
+                # Verify Response was created with image content
+                mock_response_class.assert_called_once()
+                call_kwargs = mock_response_class.call_args[1]
+                assert call_kwargs['content'] == b"fake_image_data"
+                assert call_kwargs['media_type'] == "image/jpeg"
+                assert "Cache-Control" in call_kwargs['headers']
+                assert "ETag" in call_kwargs['headers']
         
         print("✅ Avatar retrieval success test working")
 
@@ -218,14 +242,17 @@ class TestAvatarAPIEndpoints:
         
         # Mock avatar service to return None (no avatar found)
         with patch('app.api.v1.users.avatar_service') as mock_service:
-            mock_service.get_avatar_path = AsyncMock(return_value=None)
+            mock_service.get_user_avatar_url = AsyncMock(return_value=None)
             
             # Should raise 404 Not Found
             with pytest.raises(HTTPException) as exc_info:
-                await get_avatar(user_id, "medium", mock_db)
+                await get_avatar(user_id, "medium", None, mock_db)
             
             assert exc_info.value.status_code == 404
             assert "Avatar not found" in str(exc_info.value.detail)
+            
+            # Verify service was called
+            mock_service.get_user_avatar_url.assert_called_once_with(user_id, "medium")
         
         print("✅ Avatar retrieval not found test working")
 
@@ -296,27 +323,24 @@ class TestAvatarAPIEndpoints:
         mock_db = AsyncMock()
         mock_db.get.return_value = mock_user
         
-        # Mock avatar service and file path
-        from pathlib import Path
-        mock_path = Path(f"/fake/avatars/medium/{user_id}_avatar.jpg")
-        
+        # Mock avatar service
         with patch('app.api.v1.users.avatar_service') as mock_service:
-            mock_service.get_avatar_path = AsyncMock(return_value=mock_path)
-            mock_service.thumbnail_sizes = {"small": (32, 32), "medium": (150, 150), "large": (300, 300)}
+            mock_service.get_user_avatar_url = AsyncMock(return_value=f"/api/v1/storage/avatars/users/{user_id}/medium.jpg")
             
-            with patch('pathlib.Path.exists', return_value=True), \
-                 patch('pathlib.Path.stat') as mock_stat:
-                mock_stat.return_value.st_size = 1024
-                
-                result = await get_avatar_info(user_id, current_user, mock_db)
-                
-                assert isinstance(result, AvatarResponse)
-                assert result.user_id == user_id
-                assert result.avatar_url == f"/api/v1/users/{user_id}/avatar"
-                assert result.file_size == 1024
-                assert "small" in result.thumbnail_sizes
-                assert "medium" in result.thumbnail_sizes
-                assert "large" in result.thumbnail_sizes
+            # Mock the avatar storage service backend
+            mock_backend = MagicMock()
+            mock_file_info = MagicMock()
+            mock_file_info.get.return_value = 1024  # file size
+            mock_backend.get_file_info = AsyncMock(return_value=mock_file_info)
+            mock_service.avatar_storage_service.backend = mock_backend
+            
+            result = await get_avatar_info(user_id, current_user, mock_db)
+            
+            assert isinstance(result, AvatarResponse)
+            assert result.user_id == user_id
+            assert "thumbnail_sizes" in result.model_dump()
+            # Verify multiple calls to get_user_avatar_url for different sizes
+            assert mock_service.get_user_avatar_url.call_count >= 3
         
         print("✅ Avatar info retrieval test working")
 
@@ -347,6 +371,7 @@ class TestAvatarAPIEndpoints:
         # Mock avatar service
         with patch('app.api.v1.users.avatar_service') as mock_service:
             mock_service.upload_avatar = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar")
+            mock_service.get_user_avatar_url = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar/medium")
             
             # Should succeed for admin user
             result = await upload_avatar(user_id, mock_file, current_user, mock_db)

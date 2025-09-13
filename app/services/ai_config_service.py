@@ -449,53 +449,36 @@ class AIConfigService:
     
     async def load_default_agent_configuration(self) -> Dict[str, Any]:
         """
-        Load default agent configuration from ai_config.yaml
+        Load default agent configuration from ai_config.yaml using AI providers and strategy
         
         Returns:
-            Dict[str, Any]: Default agent configuration with all settings
+            Dict[str, Any]: Default agent configuration with core settings
         """
         try:
             config = self.load_config()
             
-            # Get customer support agent configuration
-            agent_config = await self.get_agent_config("customer_support_agent")
-            if not agent_config:
-                logger.error("Customer support agent configuration not found")
-                return self._get_fallback_agent_configuration()
+            # Get AI strategy configuration
+            ai_strategy = config.get("ai_strategy", {})
+            primary_provider = ai_strategy.get("primary_provider", "openai")
+            model_strategy = ai_strategy.get("model_strategy", {})
+            model_name = model_strategy.get(primary_provider, "primary")
             
             # Load prompt template
-            system_prompt = await self.load_prompt_template(
-                agent_config.get("system_prompt_template", "customer_support_default")
-            )
+            system_prompt = await self.load_prompt_template("customer_support_default")
             
-            # Build complete configuration
+            # Build complete configuration using AI strategy
             default_config = {
                 "system_prompt": system_prompt,
-                "model_provider": agent_config.get("model_provider", "openai"),
-                "model_name": agent_config.get("model_name", "primary"),
-                "temperature": agent_config.get("temperature", 0.2),
-                "max_tokens": agent_config.get("max_tokens", 2000),
-                "timeout": agent_config.get("timeout", 30),
-                "confidence_threshold": agent_config.get("confidence_threshold", 0.7),
-                
-                # Updated tool list (all 13 current tools)
-                "tools_enabled": agent_config.get("tools_enabled", [
-                    "create_ticket", "create_ticket_with_ai", "get_ticket",
-                    "update_ticket", "delete_ticket", "update_ticket_status",
-                    "assign_ticket", "search_tickets", "list_tickets", "get_ticket_stats",
-                    "list_integrations", "get_active_integrations", "get_system_health"
-                ]),
-                "mcp_enabled": agent_config.get("mcp_enabled", True),  # Enable by default
+                "model_provider": primary_provider,
+                "model_name": model_name,
+                "temperature": 0.2,
+                "max_tokens": 2000,
+                "timeout": 30,
+                "confidence_threshold": 0.7,
+                "mcp_enabled": True,
                 
                 # Agent iteration limit from config
-                "max_iterations": self.get_max_iterations(),
-                
-                # Additional behavioral settings
-                "auto_escalation_enabled": True,
-                "integration_routing_enabled": True,
-                "response_style": "professional",
-                "default_priority": "medium",
-                "default_category": "general"
+                "max_iterations": self.get_max_iterations()
             }
             
             logger.info("✅ Default agent configuration loaded from ai_config.yaml")
@@ -510,7 +493,7 @@ class AIConfigService:
         Get fallback agent configuration if ai_config.yaml loading fails
         
         Returns:
-            Dict[str, Any]: Fallback configuration with all 13 tools
+            Dict[str, Any]: Fallback configuration with core settings
         """
         logger.warning("Using fallback agent configuration")
         
@@ -522,21 +505,8 @@ class AIConfigService:
             "max_tokens": 2000,
             "timeout": 30,
             "confidence_threshold": 0.7,
-            
-            # All 13 current MCP tools
-            "tools_enabled": [
-                "create_ticket", "create_ticket_with_ai", "get_ticket",
-                "update_ticket", "delete_ticket", "update_ticket_status",
-                "assign_ticket", "search_tickets", "list_tickets", "get_ticket_stats",
-                "list_integrations", "get_active_integrations", "get_system_health"
-            ],
             "mcp_enabled": True,
-            
-            "auto_escalation_enabled": True,
-            "integration_routing_enabled": True,
-            "response_style": "professional",
-            "default_priority": "medium",
-            "default_category": "general"
+            "max_iterations": 10
         }
 
 

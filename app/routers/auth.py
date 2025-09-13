@@ -43,11 +43,16 @@ async def build_user_response(user: User, db: AsyncSession) -> UserResponse:
         )
         organization = org_result.scalar_one_or_none()
     
+    # Get medium variant avatar URL using avatar service
+    from app.services.avatar_service import AvatarService
+    avatar_service = AvatarService()
+    medium_avatar_url = await avatar_service.get_user_avatar_url(user.id, "medium") if user.avatar_url else None
+    
     return UserResponse(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
-        avatar_url=user.avatar_url,
+        avatar_url=medium_avatar_url,  # Use medium variant URL
         role=user.organization_role.value if user.organization_role else None,
         is_active=user.is_active,
         timezone=user.timezone,
@@ -180,18 +185,28 @@ async def register_user(
 
         organization_id = organization.id
 
-        # Check if this user should be an admin (first user in organization)
-        existing_members_result = await db.execute(
-            select(User).where(
-                User.organization_id == organization_id,
-                User.organization_role.is_not(None),  # Only count users with actual organization roles
-                User.is_deleted == False
-            )
-        )
-        existing_members = existing_members_result.scalars().all()
+        # Check if this user should be an admin 
+        # If an organization_name was provided, this is likely a new org and user should be admin
+        # Otherwise, check if this is the first user in the organization
+        organization_role = OrganizationRole.MEMBER  # Default
         
-        # First user in organization becomes admin
-        organization_role = OrganizationRole.ADMIN if len(existing_members) == 0 else OrganizationRole.MEMBER
+        if getattr(user_data, "organization_name", None):
+            # Organization name provided - user is creating/founding this org, make them admin
+            organization_role = OrganizationRole.ADMIN
+            logger.info(f"Setting {user_data.email} as admin for new organization {user_data.organization_name}")
+        else:
+            # No org name provided, check if first user in existing org
+            existing_members_result = await db.execute(
+                select(User).where(
+                    User.organization_id == organization_id,
+                    User.organization_role.is_not(None),  # Only count users with actual organization roles
+                    User.is_deleted == False
+                )
+            )
+            existing_members = existing_members_result.scalars().all()
+            
+            # First user in organization becomes admin
+            organization_role = OrganizationRole.ADMIN if len(existing_members) == 0 else OrganizationRole.MEMBER
 
         # Create new user
         db_user = User(

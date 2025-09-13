@@ -58,6 +58,17 @@ class Settings(BaseSettings):
         description="Allowed MIME types for file uploads"
     )
     
+    # Storage Backend Settings
+    storage_backend: str = Field(default="local", description="Storage backend (local, s3)")
+    
+    # AWS S3 Settings
+    aws_access_key_id: Optional[str] = Field(default=None, description="AWS access key ID")
+    aws_secret_access_key: Optional[str] = Field(default=None, description="AWS secret access key")
+    aws_region: str = Field(default="us-east-1", description="AWS region")
+    s3_bucket_name: Optional[str] = Field(default=None, description="S3 bucket name for file storage")
+    s3_bucket_path: str = Field(default="", description="S3 bucket path prefix")
+    cloudfront_domain: Optional[str] = Field(default=None, description="CloudFront domain for CDN URLs")
+    
     # WebSocket Settings
     websocket_heartbeat_interval: int = Field(default=30, description="WebSocket heartbeat interval in seconds")
     websocket_timeout: int = Field(default=60, description="WebSocket connection timeout in seconds")
@@ -119,6 +130,15 @@ class Settings(BaseSettings):
         """Validate Redis URL format"""
         if not v.startswith("redis://"):
             raise ValueError("Redis URL must start with redis://")
+        return v
+    
+    @field_validator("storage_backend")
+    @classmethod
+    def validate_storage_backend(cls, v):
+        """Validate storage backend setting"""
+        valid_backends = ["local", "s3"]
+        if v not in valid_backends:
+            raise ValueError(f"Storage backend must be one of: {valid_backends}")
         return v
     
     @property

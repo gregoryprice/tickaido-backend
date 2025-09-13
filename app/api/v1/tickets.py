@@ -228,11 +228,14 @@ async def update_ticket(
     Update a ticket.
     """
     try:
+        # Don't exclude None values for nullable fields like assigned_to_id
+        update_dict = update_data.model_dump()
+        
         ticket = await ticket_service.update_ticket(
             db=db,
             ticket_id=ticket_id,
             organization_id=current_user.organization_id,
-            update_data=update_data.model_dump(exclude_none=True)
+            update_data=update_dict
         )
         
         if not ticket:

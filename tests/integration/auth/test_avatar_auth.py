@@ -113,6 +113,7 @@ class TestAvatarAuthentication:
         from unittest.mock import patch
         with patch('app.api.v1.users.avatar_service') as mock_service:
             mock_service.upload_avatar = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar")
+            mock_service.get_user_avatar_url = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar/medium")
             
             # Should succeed for admin user (no exception raised)
             try:
@@ -150,6 +151,7 @@ class TestAvatarAuthentication:
         from unittest.mock import patch
         with patch('app.api.v1.users.avatar_service') as mock_service:
             mock_service.upload_avatar = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar")
+            mock_service.get_user_avatar_url = AsyncMock(return_value=f"/api/v1/users/{user_id}/avatar/medium")
             
             # Should succeed for own avatar
             result = await upload_avatar(user_id, mock_file, current_user, mock_db)

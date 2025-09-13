@@ -74,6 +74,7 @@ from app.api.v1.tickets import router as tickets_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.users import router as users_router
 from app.api.v1.agents import router as agents_router
+from app.api.v1.agent_avatars import router as agent_avatars_router
 from app.api.v1.members import router as members_router
 from app.api.v1.organization_discovery import router as org_discovery_router
 from app.api.v1.invitations import router as invitations_router
@@ -326,6 +327,7 @@ app.include_router(tickets_router, prefix="/api/v1", tags=["Tickets"])
 app.include_router(chat_router, prefix="/api/v1", tags=["Chat Assistant"])
 app.include_router(users_router, prefix="/api/v1", tags=["Users"])
 app.include_router(agents_router, prefix="/api/v1", tags=["Agent Management"])
+app.include_router(agent_avatars_router, prefix="/api/v1", tags=["Agent Avatars"])
 app.include_router(members_router, prefix="/api/v1", tags=["Member Management"])
 app.include_router(org_discovery_router, prefix="/api/v1", tags=["Organization Discovery"])
 app.include_router(invitations_router, prefix="/api/v1", tags=["Invitation Management"])

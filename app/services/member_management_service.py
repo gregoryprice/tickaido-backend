@@ -382,10 +382,10 @@ class MemberManagementService:
             PermissionError: If admin doesn't have permission
             ValueError: If invitation already exists or validation fails
         """
-        # Verify admin permissions
+        # Verify admin user exists and belongs to the organization
         admin_user = await db.get(User, admin_user_id)
-        if not admin_user or not admin_user.is_organization_admin():
-            raise PermissionError("Only organization admins can invite members")
+        if not admin_user:
+            raise ValueError("Admin user not found")
         
         if admin_user.organization_id != organization_id:
             raise PermissionError("Admin can only invite to their own organization")

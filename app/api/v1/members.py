@@ -23,14 +23,186 @@ from app.schemas.member_management import (
     MemberInviteRequest,
     MemberInviteResponse,
     MemberRoleUpdateRequest,
+    MemberRoleUpdateResponse,
+    MemberUpdateResponse,
+    MemberRemovalResponse,
     UserDeleteRequest,
+    UserDeleteResponse,
     OrganizationMemberStatsResponse,
+    MembersListResponse,
     MemberManagementError
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/organizations")
+router = APIRouter()
 member_service = MemberManagementService()
+
+
+# Simpler endpoints for current user's organization
+@router.get("/members")
+async def list_current_user_organization_members(
+    role: Optional[str] = Query(None, description="Filter by role (admin, member)"),
+    active: Optional[bool] = Query(None, description="Filter by active status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=100, description="Results per page"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get all members of current user's organization.
+    
+    - **role**: Filter by role (admin, member) - optional
+    - **active**: Filter by active status - optional
+    - **page**: Page number for pagination
+    - **limit**: Results per page (max 100)
+    - Requires: User must be part of an organization
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization"
+            )
+        
+        # Forward to the main endpoint
+        return await list_organization_members(
+            current_user.organization_id, role, active, page, limit, current_user, db
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing current user's organization members: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list members"
+        )
+
+
+@router.get("/members/{member_id}")
+async def get_current_user_organization_member(
+    member_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get details of a specific member in current user's organization.
+    
+    - **member_id**: ID of the member to retrieve
+    - Requires: User must be part of the same organization as the member
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization"
+            )
+        
+        # Forward to the main endpoint
+        return await get_organization_member(
+            current_user.organization_id, member_id, current_user, db
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting current user's organization member {member_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get member"
+        )
+
+
+@router.patch("/members/{member_id}", response_model=MemberUpdateResponse)
+async def update_current_user_organization_member(
+    member_id: UUID,
+    update_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> MemberUpdateResponse:
+    """
+    Update a member in current user's organization.
+    
+    - **member_id**: ID of the member to update
+    - **role**: New role (admin, member)
+    - Requires: User must be an admin of the organization
+    """
+    try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization"
+            )
+        
+        if not current_user.is_organization_admin():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization admins can update member roles"
+            )
+        
+        # Extract role from update data
+        new_role_str = update_data.get("role")
+        if not new_role_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Role field is required"
+            )
+        
+        # Convert to enum
+        from app.models.organization_invitation import OrganizationRole
+        try:
+            new_role = OrganizationRole(new_role_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid role. Must be one of: {[r.value for r in OrganizationRole]}"
+            )
+        
+        # Update member role
+        success = await member_service.update_member_role(
+            db=db,
+            organization_id=current_user.organization_id,
+            user_id=member_id,
+            new_role=new_role,
+            admin_user_id=current_user.id
+        )
+        
+        if success:
+            # Get updated member to return
+            updated_member = await db.get(User, member_id)
+            member_response = await build_user_response(updated_member, db)
+            
+            return MemberUpdateResponse(
+                id=str(member_id),
+                role=new_role.value,
+                updated_fields=["role"],
+                message="Member role updated successfully",
+                member=member_response
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update member role"
+            )
+        
+    except HTTPException:
+        raise
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error updating member {member_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update member"
+        )
 
 
 async def build_user_response(user: User, db: AsyncSession) -> UserResponse:
@@ -69,9 +241,8 @@ async def build_user_response(user: User, db: AsyncSession) -> UserResponse:
         joined_organization_at=user.joined_organization_at
     )
 
-
-@router.get("/{org_id}/members")
-@router.get("/{org_id}/members/")
+@router.get("/{org_id}/members", response_model=MembersListResponse)
+@router.get("/{org_id}/members/", response_model=MembersListResponse)
 async def list_organization_members(
     org_id: UUID,
     role: Optional[str] = Query(None, description="Filter by role (admin, member)"),
@@ -80,7 +251,7 @@ async def list_organization_members(
     limit: int = Query(50, ge=1, le=100, description="Results per page"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
-):
+) -> MembersListResponse:
     """
     Get all members of an organization.
     
@@ -129,15 +300,15 @@ async def list_organization_members(
             member_response = await build_user_response(member, db)
             member_responses.append(member_response)
         
-        return {
-            "data": member_responses,
-            "pagination": {
+        return MembersListResponse(
+            data=member_responses,
+            pagination={
                 "page": page,
                 "limit": limit,
                 "total": total,
                 "pages": (total + limit - 1) // limit if limit > 0 else 0
             }
-        }
+        )
         
     except HTTPException:
         raise
@@ -146,6 +317,83 @@ async def list_organization_members(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve organization members"
+        )
+
+@router.get("/{org_id}/members/stats", response_model=OrganizationMemberStatsResponse)
+async def get_organization_member_stats(
+    org_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get organization member statistics.
+    
+    - **org_id**: Organization ID
+    - Returns: Member counts, admin counts, pending invitations
+    - Requires: User must be a member of the organization
+    """
+    try:
+        # Verify user is member of the organization
+        if current_user.organization_id != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view stats for your own organization"
+            )
+        
+        stats = await member_service.get_organization_member_stats(db, org_id)
+        
+        return OrganizationMemberStatsResponse(**stats)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting member stats for organization {org_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve member statistics"
+        )
+
+
+@router.get("/{org_id}/members/{member_id}", response_model=UserResponse)
+async def get_organization_member(
+    org_id: UUID,
+    member_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> UserResponse:
+    """
+    Get details of a specific member in an organization.
+    
+    - **org_id**: Organization ID
+    - **member_id**: ID of the member to retrieve
+    - Requires: User must be a member of the organization
+    """
+    try:
+        # Verify user is member of the organization
+        if current_user.organization_id != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view members of your own organization"
+            )
+        
+        # Get the member
+        member = await db.get(User, member_id)
+        if not member or member.organization_id != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Member not found"
+            )
+        
+        # Return standardized user response
+        return await build_user_response(member, db)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting member {member_id} from organization {org_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get member"
         )
 
 
@@ -212,14 +460,14 @@ async def invite_organization_member(
         )
 
 
-@router.put("/{org_id}/members/{user_id}/role", status_code=status.HTTP_200_OK)
+@router.put("/{org_id}/members/{user_id}/role", response_model=MemberRoleUpdateResponse)
 async def update_member_role(
     org_id: UUID,
     user_id: UUID,
     role_update: MemberRoleUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
-):
+) -> MemberRoleUpdateResponse:
     """
     Update member's role in the organization.
     
@@ -239,7 +487,7 @@ async def update_member_role(
         )
         
         if success:
-            return {"message": "Member role updated successfully"}
+            return MemberRoleUpdateResponse(message="Member role updated successfully")
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -264,13 +512,13 @@ async def update_member_role(
         )
 
 
-@router.delete("/{org_id}/members/{user_id}", status_code=status.HTTP_200_OK)
+@router.delete("/{org_id}/members/{user_id}", response_model=MemberRemovalResponse)
 async def remove_organization_member(
     org_id: UUID,
     user_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
-):
+) -> MemberRemovalResponse:
     """
     Remove member from organization.
     
@@ -291,7 +539,7 @@ async def remove_organization_member(
         )
         
         if success:
-            return {"message": "Member removed from organization successfully"}
+            return MemberRemovalResponse(message="Member removed from organization successfully")
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -316,50 +564,15 @@ async def remove_organization_member(
         )
 
 
-@router.get("/{org_id}/members/stats", response_model=OrganizationMemberStatsResponse)
-async def get_organization_member_stats(
-    org_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db_session)
-):
-    """
-    Get organization member statistics.
-    
-    - **org_id**: Organization ID
-    - Returns: Member counts, admin counts, pending invitations
-    - Requires: User must be a member of the organization
-    """
-    try:
-        # Verify user is member of the organization
-        if current_user.organization_id != org_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only view stats for your own organization"
-            )
-        
-        stats = await member_service.get_organization_member_stats(db, org_id)
-        
-        return OrganizationMemberStatsResponse(**stats)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting member stats for organization {org_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve member statistics"
-        )
-
-
 # User management endpoints
 
-@router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
+@router.delete("/users/{user_id}", response_model=UserDeleteResponse)
 async def delete_user_account(
     user_id: UUID,
     delete_request: UserDeleteRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
-):
+) -> UserDeleteResponse:
     """
     Delete user account entirely.
     
@@ -430,10 +643,10 @@ async def delete_user_account(
         target_user.soft_delete()
         await db.commit()
         
-        return {
-            "message": "User account deleted successfully",
-            "organization_deleted": delete_request.delete_organization
-        }
+        return UserDeleteResponse(
+            message="User account deleted successfully",
+            organization_deleted=delete_request.delete_organization
+        )
         
     except HTTPException:
         raise

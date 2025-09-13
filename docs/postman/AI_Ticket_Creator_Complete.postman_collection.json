@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "ai-ticket-creator-complete-2025",
 		"name": "AI Ticket Creator Backend API - Complete (Agent + Integration + Member Management)",
-		"description": "Complete API collection for AI-powered ticket creation and management system with refactored multi-agent architecture, integration system, and comprehensive member management.\n\n## Features\n- **Member Management System**: Complete organization member management with role-based access control\n- **Organization Discovery**: Domain-based organization matching during registration\n- **Invitation System**: Secure invitation workflow with email notifications\n- **Multi-Agent System**: Multiple agents per organization with embedded configuration\n- **Agent Management**: CRUD operations with change history tracking\n- **User authentication and organization management**\n- **AI-powered ticket creation and management**\n- **Chat Assistant**: Real-time AI chat with conversation management\n- **File processing**: OCR, transcription, and agent context integration\n- **Third-party integrations**: JIRA, Salesforce, GitHub, Webhooks, etc.\n- **Real-time WebSocket communications**\n\n## Member Management Features\n1. **Role-Based Access**: Admin and Member roles with proper permission enforcement\n2. **Invitation System**: Secure token-based invitations with expiration\n3. **Organization Discovery**: Domain-based organization matching for seamless registration\n4. **Security Controls**: Self-role modification prevention, last admin protection\n5. **Auto-Admin Promotion**: Automatic admin promotion when last admin is removed\n6. **Cross-Organization Isolation**: Complete data isolation between organizations\n\n## Integration Architecture (REFACTORED)\nThe system now uses semantic integration categories:\n1. **Category-Based System**: 7 functional categories (ticketing, crm, messaging, communication, project_management, code_repository, webhook)\n2. **Platform Identification**: Separate platform_name field (jira, slack, salesforce, etc.)\n3. **Automatic Status Management**: enabled=false automatically sets status=inactive\n4. **ID-Based Routing**: Tickets use integration_id instead of integration_name\n5. **Clean Architecture**: All deprecated IntegrationType enum removed\n\n## Agent Architecture\nThe system supports:\n1. **Multiple Agents per Organization**: No singleton constraints\n2. **Embedded Configuration**: 20+ typed fields instead of JSON blob\n3. **Change History Tracking**: Complete audit trail with rollback capabilities\n4. **File Context Processing**: Up to 20 files per agent with text extraction\n5. **Autonomous Task Processing**: Queue-based multi-channel operations\n6. **Simplified API**: 6 CRUD + history endpoints\n\n## Agent-Centric Chat System\nThe chat system is fully agent-centric with:\n1. **Thread Management**: Create, read, update, delete threads per agent\n2. **Message Handling**: Send messages and receive AI responses\n3. **Context Awareness**: Agents use their configuration and file context\n4. **Real-time Processing**: WebSocket support for live conversations\n5. **Title Generation**: AI-powered thread title suggestions\n6. **Search & Filtering**: Find threads by content, archive status, etc.\n\n## Authentication\nAll protected endpoints require JWT authentication. Use the login flow to get access tokens.\n\n## Base URL\nLocal Development: http://localhost:8000",
+		"description": "Complete API collection for AI-powered ticket creation and management system with refactored multi-agent architecture, integration system, and comprehensive member management.\n\n## Features\n- **Member Management System**: Complete organization member management with role-based access control\n- **Organization Discovery**: Domain-based organization matching during registration\n- **Invitation System**: Secure invitation workflow with email notifications\n- **Multi-Agent System**: Multiple agents per organization with embedded configuration\n- **Agent Management**: CRUD operations with change history tracking\n- **User authentication and organization management**\n- **AI-powered ticket creation and management**\n- **Chat Assistant**: Real-time AI chat with conversation management\n- **File processing**: OCR, transcription, and agent context integration\n- **Third-party integrations**: JIRA, Salesforce, GitHub, Webhooks, etc.\n- **Real-time WebSocket communications**\n\n## Member Management Features\n1. **Role-Based Access**: Admin and Member roles with proper permission enforcement\n2. **Invitation System**: Secure token-based invitations with expiration\n3. **Organization Discovery**: Domain-based organization matching for seamless registration\n4. **Security Controls**: Self-role modification prevention, last admin protection\n5. **Auto-Admin Promotion**: Automatic admin promotion when last admin is removed\n6. **Cross-Organization Isolation**: Complete data isolation between organizations\n\n## Integration Architecture (REFACTORED)\nThe system now uses semantic integration categories:\n1. **Category-Based System**: 7 functional categories (ticketing, crm, messaging, communication, project_management, code_repository, webhook)\n2. **Platform Identification**: Separate platform_name field (jira, slack, salesforce, etc.)\n3. **Automatic Status Management**: enabled=false automatically sets status=inactive\n4. **ID-Based Routing**: Tickets use integration_id instead of integration_name\n5. **Clean Architecture**: All deprecated IntegrationType enum removed\n\n## Agent Architecture\nThe system supports:\n1. **Multiple Agents per Organization**: No singleton constraints\n2. **Embedded Configuration**: 20+ typed fields instead of JSON blob\n3. **Change History Tracking**: Complete audit trail with rollback capabilities\n4. **File Context Processing**: Up to 20 files per agent with text extraction\n5. **Autonomous Task Processing**: Queue-based multi-channel operations\n6. **Simplified API**: 6 CRUD + history endpoints\n7. **Separated Avatar Management**: Dedicated avatar endpoints separate from agent CRUD\n\n## Agent-Centric Chat System\nThe chat system is fully agent-centric with:\n1. **Thread Management**: Create, read, update, delete threads per agent\n2. **Message Handling**: Send messages and receive AI responses\n3. **Context Awareness**: Agents use their configuration and file context\n4. **Real-time Processing**: WebSocket support for live conversations\n5. **Title Generation**: AI-powered thread title suggestions\n6. **Search & Filtering**: Find threads by content, archive status, etc.\n\n## Authentication\nAll protected endpoints require JWT authentication. Use the login flow to get access tokens.\n\n## Base URL\nLocal Development: http://localhost:8000",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "ai-ticket-creator"
 	},
@@ -179,7 +179,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Customer Support Specialist\",\n    \"agent_type\": \"customer_support\",\n    \"avatar_url\": \"https://example.com/support-avatar.png\",\n    \"role\": \"Specialized customer support agent for technical inquiries and issue resolution\",\n    \"prompt\": \"You are a helpful customer support specialist with expertise in technical issues. Be professional, thorough, and solution-focused. Always aim to resolve issues efficiently.\",\n    \"initial_context\": \"Welcome! I'm here to help you resolve any issues you may be experiencing. Please describe your problem in detail.\",\n    \"initial_ai_msg\": \"Hello! I'm your customer support specialist. How can I help you today?\",\n    \"tone\": \"helpful\",\n    \"communication_style\": \"professional\",\n    \"use_streaming\": true,\n    \"response_length\": \"detailed\",\n    \"memory_retention\": 10,\n    \"show_suggestions_after_each_message\": true,\n    \"max_context_size\": 150000,\n    \"use_memory_context\": true,\n    \"max_iterations\": 8,\n    \"timeout_seconds\": 120,\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"get_ticket\", \"update_ticket\", \"get_system_health\"]\n}"
+							"raw": "{\n    \"name\": \"Customer Support Specialist\",\n    \"agent_type\": \"customer_support\",\n    \"role\": \"Specialized customer support agent for technical inquiries and issue resolution\",\n    \"prompt\": \"You are a helpful customer support specialist with expertise in technical issues. Be professional, thorough, and solution-focused. Always aim to resolve issues efficiently.\",\n    \"initial_context\": \"Welcome! I'm here to help you resolve any issues you may be experiencing. Please describe your problem in detail.\",\n    \"initial_ai_msg\": \"Hello! I'm your customer support specialist. How can I help you today?\",\n    \"tone\": \"helpful\",\n    \"communication_style\": \"professional\",\n    \"use_streaming\": true,\n    \"response_length\": \"detailed\",\n    \"memory_retention\": 10,\n    \"show_suggestions_after_each_message\": true,\n    \"max_context_size\": 150000,\n    \"use_memory_context\": true,\n    \"max_iterations\": 8,\n    \"timeout_seconds\": 120,\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"get_ticket\", \"update_ticket\", \"get_system_health\"]\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/agents",
@@ -205,8 +205,18 @@
 									"    pm.expect(jsonData).to.have.property('role');",
 									"    pm.expect(jsonData).to.have.property('prompt');",
 									"    pm.expect(jsonData).to.have.property('avatar_url');",
+									"    pm.expect(jsonData.avatar_url).to.be.null; // Avatar not set during creation",
 									"    pm.expect(jsonData.tools_enabled).to.be.an('array');",
 									"    pm.expect(jsonData.tools_enabled.length).to.be.greaterThan(0);",
+									"});",
+									"",
+									"pm.test(\"Avatar management separated from agent CRUD\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    // Response includes avatar_url field (read-only)",
+									"    pm.expect(jsonData).to.have.property('avatar_url');",
+									"    // But avatar_url should be null since we didn't upload one",
+									"    pm.expect(jsonData.avatar_url).to.be.null;",
+									"    console.log('Avatar URL in response:', jsonData.avatar_url);",
 									"});"
 								]
 							}
@@ -360,7 +370,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Sales Assistant\",\n    \"agent_type\": \"sales\",\n    \"avatar_url\": \"https://example.com/sales-avatar.png\",\n    \"role\": \"Sales support specialist for lead qualification and customer onboarding\",\n    \"communication_style\": \"persuasive\",\n    \"tone\": \"enthusiastic\",\n    \"response_length\": \"moderate\",\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"list_integrations\"]\n}"
+							"raw": "{\n    \"name\": \"Sales Assistant\",\n    \"agent_type\": \"sales\",\n    \"role\": \"Sales support specialist for lead qualification and customer onboarding\",\n    \"communication_style\": \"persuasive\",\n    \"tone\": \"enthusiastic\",\n    \"response_length\": \"moderate\",\n    \"tools_enabled\": [\"create_ticket\", \"search_tickets\", \"list_integrations\"]\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/agents",
@@ -399,6 +409,194 @@
 							"path": ["api", "v1", "agents", "{{SECOND_AGENT_ID}}"]
 						}
 					}
+				},
+				{
+					"name": "Upload Agent Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "sample-avatar.jpg",
+									"description": "Agent avatar image file (JPG, PNG, GIF, HEIC, WebP)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}/avatar",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}", "avatar"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Avatar uploaded successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('uploaded successfully');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Agent Avatar",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}/avatar?size=medium",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}", "avatar"],
+							"query": [
+								{
+									"key": "size",
+									"value": "medium",
+									"description": "Avatar size: small, medium, large, original"
+								}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Avatar retrieved successfully\", function () {",
+									"    // Should return image content or redirect (302) to image URL",
+									"    pm.expect([200, 302]).to.include(pm.response.code);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Agent Avatar Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}/avatar/info",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}", "avatar", "info"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Avatar info retrieved successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('agent_id');",
+									"    pm.expect(jsonData).to.have.property('has_custom_avatar');",
+									"    pm.expect(jsonData).to.have.property('backend_type');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Delete Agent Avatar",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}/avatar",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}", "avatar"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Avatar deleted successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('deleted successfully');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Upload Empty File (Remove Avatar)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "empty-file.txt",
+									"description": "Empty file to remove avatar (demonstrates empty file deletion feature)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/agents/{{AGENT_ID}}/avatar",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "agents", "{{AGENT_ID}}", "avatar"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Empty file removes avatar\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('removed successfully');",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},

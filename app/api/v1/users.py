@@ -59,6 +59,13 @@ async def upload_avatar(
         # Refresh user to get updated timestamp
         await db.refresh(user)
         
+        # Generate thumbnail URLs using avatar service
+        thumbnail_sizes = {}
+        for size in ["small", "medium", "large", "original"]:
+            size_url = await avatar_service.get_user_avatar_url(user_id, size)
+            if size_url:
+                thumbnail_sizes[size] = size_url
+        
         # Return avatar response
         return AvatarResponse(
             id=user.id,  # Using user.id as the response ID
@@ -67,7 +74,7 @@ async def upload_avatar(
             filename=file.filename,
             file_size=file.size if hasattr(file, 'size') else None,
             upload_date=user.updated_at,  # This will be updated after avatar upload
-            thumbnail_sizes=None,  # Will be generated in the service
+            thumbnail_sizes=thumbnail_sizes,  # Generated via avatar service
             created_at=user.created_at,
             updated_at=user.updated_at
         )
@@ -93,6 +100,7 @@ async def upload_avatar(
 async def get_avatar(
     user_id: UUID,
     size: Optional[str] = "medium",
+    t: Optional[str] = None,  # Cache-busting timestamp parameter (ignored)
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -112,34 +120,55 @@ async def get_avatar(
                 detail="User not found"
             )
         
-        # Get avatar path (handle optional size parameter)
+        # Get avatar URL (handle optional size parameter)
         avatar_size = size if size is not None else "medium"
-        avatar_path = await avatar_service.get_avatar_path(user_id, avatar_size)
+        avatar_url = await avatar_service.get_user_avatar_url(user_id, avatar_size)
         
-        if not avatar_path or not avatar_path.exists():
+        if not avatar_url:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Avatar not found"
             )
         
-        # Determine content type based on file extension
-        content_type_map = {
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.heic': 'image/heic',
-            '.webp': 'image/webp'
-        }
-        
-        file_extension = avatar_path.suffix.lower()
-        content_type = content_type_map.get(file_extension, 'image/jpeg')
-        
-        return FileResponse(
-            path=avatar_path,
-            media_type=content_type,
-            filename=f"avatar_{user_id}_{size}{file_extension}"
-        )
+        # For unified storage, we need to handle differently based on backend type
+        if avatar_service.backend_type == "s3":
+            # For S3, redirect to the actual URL
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=avatar_url, status_code=302)
+        else:
+            # For local storage, get the file content and serve it
+            # Extract storage key from URL
+            storage_key = avatar_url.split("/api/v1/storage/")[-1] if "/api/v1/storage/" in avatar_url else None
+            if storage_key:
+                file_content = await avatar_service.avatar_storage_service.backend.download_file(storage_key)
+                if file_content:
+                    # Determine content type based on storage key extension
+                    content_type = "image/jpeg"  # default
+                    if storage_key.lower().endswith('.png'):
+                        content_type = "image/png"
+                    elif storage_key.lower().endswith('.gif'):
+                        content_type = "image/gif"
+                    elif storage_key.lower().endswith('.webp'):
+                        content_type = "image/webp"
+                    
+                    # Generate ETag with timestamp for proper cache-busting
+                    base_etag = hash(file_content)
+                    etag_value = f'"{base_etag}-{t}"' if t else f'"{base_etag}"'
+                    
+                    from fastapi.responses import Response
+                    return Response(
+                        content=file_content,
+                        media_type=content_type,
+                        headers={
+                            "Cache-Control": "public, max-age=3600",
+                            "ETag": etag_value
+                        }
+                    )
+            
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Avatar file not found"
+            )
         
     except HTTPException:
         raise
@@ -236,27 +265,36 @@ async def get_avatar_info(
                 detail="User has no avatar"
             )
         
-        # Get file path to check if it exists and get file info
-        avatar_path = await avatar_service.get_avatar_path(user_id, "medium")
+        # Generate thumbnail URLs using avatar service
+        thumbnail_sizes = {}
+        for size in ["small", "medium", "large", "original"]:
+            size_url = await avatar_service.get_user_avatar_url(user_id, size)
+            if size_url:
+                thumbnail_sizes[size] = size_url
         
-        if not avatar_path or not avatar_path.exists():
+        if not thumbnail_sizes:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Avatar file not found"
+                detail="Avatar not found"
             )
         
-        # Generate thumbnail URLs
-        thumbnail_sizes = {
-            size: f"/api/v1/users/{user_id}/avatar?size={size}"
-            for size in avatar_service.thumbnail_sizes.keys()
-        }
+        # Get file info for original image to get file size
+        original_url = thumbnail_sizes.get("original")
+        file_size = None
+        if original_url:
+            # Extract storage key from original URL
+            storage_key = original_url.split("/api/v1/storage/")[-1] if "/api/v1/storage/" in original_url else None
+            if storage_key:
+                file_info = await avatar_service.avatar_storage_service.backend.get_file_info(storage_key)
+                if file_info:
+                    file_size = file_info.get("size")
         
         return AvatarResponse(
             id=user.id,
             user_id=user_id,
             avatar_url=user.avatar_url,
-            filename=avatar_path.name,
-            file_size=avatar_path.stat().st_size if avatar_path.exists() else None,
+            filename=None,  # Not available without storage metadata
+            file_size=file_size,  # Size of original image from storage backend
             upload_date=user.updated_at,
             thumbnail_sizes=thumbnail_sizes,
             created_at=user.created_at,

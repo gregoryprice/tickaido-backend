@@ -19,6 +19,7 @@ from app.models.agent_file import AgentFile
 from app.models.agent_task import AgentTask
 from app.models.agent_action import AgentAction
 from app.models.chat import Thread, Message
+from app.models.file_storage_metadata import FileStorageMetadata, AvatarVariant
 
 __all__ = [
     # Base
@@ -64,5 +65,9 @@ __all__ = [
     
     # Chat models
     "Thread",
-    "Message"
+    "Message",
+    
+    # File Storage models
+    "FileStorageMetadata",
+    "AvatarVariant"
 ]
