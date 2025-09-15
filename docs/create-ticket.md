@@ -391,16 +391,24 @@ class Principal:
             
         Examples:
             principal.has_permission('tickets.create')  # Check ticket creation
-            principal.has_permission('org.admin')       # Check org admin access
+            principal.has_permission('users.*')         # Check user admin access
         """
-        # Direct permission check
+        # Wildcard permission checks (most specific to least specific)
+        # 1. Check for exact permission: 'tickets.create'
         if self.permissions.get(permission, False):
             return True
+        
+        # 2. Check for resource wildcard: 'tickets.*' 
+        resource = permission.split('.')[0] if '.' in permission else permission
+        resource_wildcard = f"{resource}.*"
+        if self.permissions.get(resource_wildcard, False):
+            return True
             
-        # Wildcard permission check (e.g., 'tickets.*' grants 'tickets.create')
-        resource = permission.split('.')[0]
-        wildcard = f"{resource}.*"
-        return self.permissions.get(wildcard, False)
+        # 3. Check for global admin permission: '*'
+        if self.permissions.get("*", False):
+            return True
+            
+        return False
     
     def has_role(self, role: str) -> bool:
         """
@@ -462,7 +470,7 @@ class Principal:
         return (
             self.has_role('admin') or 
             self.has_role('org_admin') or 
-            self.has_permission('admin.*')
+            self.has_permission('users.*')
         )
     
     def get_audit_context(self) -> Dict[str, Any]:
@@ -566,6 +574,181 @@ class Principal:
         )
 ```
 
+### **COMPREHENSIVE PERMISSION SYSTEM ARCHITECTURE**
+
+This section defines how permissions work for both **Users** and **AI Agents** in the Principal-based authentication system.
+
+#### **User Permission System**
+
+##### **Permission Format**
+Permissions follow the format `resource.action` with hierarchical wildcard support:
+
+```
+tickets.create          # Specific permission
+tickets.read            # Read tickets
+tickets.update          # Update existing tickets
+tickets.delete          # Delete tickets
+tickets.*               # All ticket operations  
+users.read              # Read user data
+users.create            # Create new users
+users.update            # Update existing users
+users.delete            # Delete users
+users.*                 # All user operations
+*                       # GLOBAL ADMIN - All permissions
+```
+
+##### **Permission Hierarchy (Most to Least Specific)**
+1. **Exact Permission**: `tickets.create` 
+2. **Resource Wildcard**: `tickets.*` (grants all ticket operations)
+3. **Global Admin**: `*` (grants ALL permissions on platform)
+
+##### **Permission Examples**
+```python
+# User with specific permissions
+permissions = {
+    "tickets.create": True,
+    "tickets.read": True, 
+    "tickets.update": False,
+    "tickets.delete": False,
+    "users.read": True
+}
+
+# User with resource wildcard
+permissions = {
+    "tickets.*": True,        # Can do anything with tickets (create, read, update, delete)
+    "users.read": True        # Can only read users
+}
+
+# Global admin user
+permissions = {
+    "*": True                 # Can do EVERYTHING on platform
+}
+```
+
+#### **AI Agent Permission System**
+
+##### **Agent Toolset Permission Requirements**
+Each AI agent receives a **filtered toolset** based on the user's permissions who initiated the chat:
+
+```python
+# Agent Chat Flow with Permissions
+user_permissions = {"tickets.create": True, "tickets.read": True}
+
+# AI Agent gets filtered toolset
+agent_tools = [
+    "create_ticket",     # ✅ Allowed (user has tickets.create)
+    "list_tickets",      # ✅ Allowed (user has tickets.read)  
+    "delete_ticket"      # ❌ BLOCKED (user lacks tickets.delete)
+]
+```
+
+##### **Tool-to-Permission Mapping**
+```python
+TOOL_PERMISSION_MAP = {
+    # Ticket Management Tools
+    "create_ticket": "tickets.create",
+    "create_ticket_with_ai": "tickets.create", 
+    "list_tickets": "tickets.read",
+    "get_ticket": "tickets.read",
+    "update_ticket": "tickets.update",
+    "patch_ticket": "tickets.update", 
+    "delete_ticket": "tickets.delete",
+    "assign_ticket": "tickets.update",
+    
+    # User Management Tools  
+    "list_users": "users.read",
+    "create_user": "users.create",
+    "update_user": "users.update",
+    "delete_user": "users.delete"
+}
+```
+
+##### **Agent Security Enforcement**
+```python
+# In Pydantic AI Agent with MCP Tools
+class SecureTicketAgent(Agent):
+    async def run_tools(self, tools: List[str], user_principal: Principal):
+        # Filter tools based on user permissions
+        allowed_tools = []
+        
+        for tool_name in tools:
+            required_permission = TOOL_PERMISSION_MAP.get(tool_name)
+            if not required_permission:
+                continue  # Skip unmapped tools
+                
+            if user_principal.has_permission(required_permission):
+                allowed_tools.append(tool_name)
+            else:
+                logger.warning(f"Tool {tool_name} blocked - user lacks {required_permission}")
+        
+        # Agent can only use allowed tools
+        return await self.execute_with_filtered_tools(allowed_tools)
+```
+
+#### **Permission Creation and Management**
+
+##### **Role-Based Permission Assignment**
+```python
+# Default role permissions (configured in PrincipalService)
+ROLE_PERMISSIONS = {
+    'admin': {
+        'tickets.*': True,  # All ticket permissions
+        'users.*': True     # All user permissions
+    },
+    'org_admin': {
+        'tickets.*': True,
+        'users.read': True,
+        'users.update': True
+    },
+    'support_user': {
+        'tickets.create': True,
+        'tickets.read': True,
+        'tickets.update': True
+    },
+    'agent': {
+        'tickets.read': True,
+        'tickets.create': True,
+        'tickets.update': True
+    },
+    'viewer': {
+        'tickets.read': True
+    }
+}
+```
+
+##### **API Token Permission Management**
+API tokens can have custom permission sets defined when created:
+
+```python
+# API Token with custom permissions
+api_token = APIToken(
+    user_id=user.id,
+    organization_id=org.id,
+    permissions=[
+        "tickets.create",
+        "tickets.read",
+        "tickets.update"
+    ]
+)
+```
+
+##### **Dynamic Permission Updates**
+Permissions are computed in real-time from:
+1. **User Roles** → Mapped to permissions via `ROLE_PERMISSIONS`
+2. **API Token Permissions** → Direct permission list
+3. **Organization Context** → Organization-level permission overrides
+4. **Feature Flags** → Can enable/disable permission groups
+
+##### **Permission Caching Strategy**
+```python
+# Principal permissions cached for performance
+cache_key = f"principal:{user_id}:{org_id}:{token_hash}"
+cached_principal = await redis.get(cache_key)
+
+# Cache TTL: 15 minutes (refreshed on permission changes)
+# Invalidated when: user roles change, API token updated, logout
+```
+
 #### Complete Principal Service Implementation
 ```python
 import json
@@ -600,33 +783,30 @@ class PrincipalService:
         # This should ideally be loaded from database or config file
         self.role_permissions = {
             'admin': {
-                'admin.*': True,
                 'tickets.*': True,
-                'users.*': True,
-                'organizations.*': True,
-                'integrations.*': True
+                'users.*': True
             },
             'org_admin': {
-                'org.admin': True,
                 'tickets.*': True,
                 'users.read': True,
-                'users.update': True,
-                'integrations.read': True,
-                'integrations.create': True
+                'users.update': True
             },
             'support_admin': {
                 'tickets.*': True,
-                'users.read': True,
-                'integrations.read': True
+                'users.read': True
             },
             'support_user': {
                 'tickets.create': True,
                 'tickets.read': True,
-                'tickets.update': True,
-                'tickets.comment': True
+                'tickets.update': True
             },
             'viewer': {
                 'tickets.read': True
+            },
+            'agent': {
+                'tickets.read': True,
+                'tickets.create': True,
+                'tickets.update': True
             },
             'guest': {
                 # No permissions by default
@@ -2540,11 +2720,103 @@ curl -H "Authorization: Bearer $TOKEN2" http://localhost:8000/api/v1/tickets \
 5. **API Endpoints**: Full CRUD operations with proper auth middleware
 
 ### ❌ What Needs Implementation (Priority Order)
-1. **Principal Service**: Create `/app/services/principal_service.py`
-2. **Permission System**: Implement RBAC/ABAC with role-based permissions
+1. **Principal Service**: Create `/app/services/principal_service.py` with permission mapping
+2. **Tool Permission Filtering**: Implement `TOOL_PERMISSION_MAP` and agent toolset filtering
 3. **MCP Security Layer**: Replace JWT tokens with Principal objects in tools
-4. **AI Agent Integration**: Connect Pydantic AI agents with MCP tools  
-5. **Centralized Authorization**: Unified permission checking across layers
+4. **AI Agent Integration**: Connect Pydantic AI agents with filtered MCP tools  
+5. **Permission Management API**: Admin endpoints for role/permission management
+6. **Centralized Authorization**: Unified permission checking across all layers
+
+### 🔐 **Permission Management Implementation Plan**
+
+#### **Database Schema Changes**
+```sql
+-- Add permission tracking to users table
+ALTER TABLE users ADD COLUMN custom_permissions JSONB DEFAULT '{}';
+ALTER TABLE users ADD COLUMN effective_permissions JSONB DEFAULT '{}'; -- Computed permissions cache
+
+-- Add permission tracking to API tokens
+ALTER TABLE api_tokens ADD COLUMN permissions TEXT[] DEFAULT ARRAY[]::TEXT[];
+
+-- Create permission audit log
+CREATE TABLE permission_audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    organization_id UUID REFERENCES organizations(id),
+    action VARCHAR(50) NOT NULL, -- 'granted', 'revoked', 'role_changed'
+    permission_name VARCHAR(255),
+    old_value JSONB,
+    new_value JSONB,
+    changed_by_user_id UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+#### **Admin API Endpoints**
+```python
+# Permission Management API (admin only)
+@router.post("/api/v1/admin/users/{user_id}/permissions")
+async def grant_user_permission(user_id: str, permission: str, current_user: User):
+    # Requires 'users.manage' permission
+    
+@router.delete("/api/v1/admin/users/{user_id}/permissions/{permission}")  
+async def revoke_user_permission(user_id: str, permission: str, current_user: User):
+    # Requires 'users.manage' permission
+
+@router.put("/api/v1/admin/users/{user_id}/role")
+async def change_user_role(user_id: str, new_role: str, current_user: User):
+    # Requires 'users.manage' permission + audit logging
+    
+@router.get("/api/v1/admin/permissions/audit")
+async def get_permission_audit_log(current_user: User):
+    # Requires 'users.*' permission
+```
+
+#### **Runtime Permission Checks**
+```python
+# Permission checking in API endpoints
+@require_permission("tickets.create")
+async def create_ticket(ticket_data, current_user: User):
+    principal = await principal_service.get_principal_for_user(current_user)
+    
+    if not principal.has_permission("tickets.create"):
+        raise HTTPException(403, "Insufficient permissions")
+        
+# Permission checking in MCP tools
+async def create_ticket_tool(context):
+    principal = context.principal  # Injected by MCP middleware
+    
+    if not principal.has_permission("tickets.create"):
+        return "Error: You don't have permission to create tickets"
+```
+
+#### **Permission Testing Strategy**
+```python
+# Unit tests for permission system
+def test_exact_permission():
+    principal = Principal(permissions={"tickets.create": True})
+    assert principal.has_permission("tickets.create") == True
+    assert principal.has_permission("tickets.delete") == False
+
+def test_wildcard_permission():
+    principal = Principal(permissions={"tickets.*": True})
+    assert principal.has_permission("tickets.create") == True
+    assert principal.has_permission("tickets.delete") == True
+    assert principal.has_permission("users.read") == False
+
+def test_global_admin_permission():
+    principal = Principal(permissions={"*": True})
+    assert principal.has_permission("tickets.create") == True
+    assert principal.has_permission("users.delete") == True
+    assert principal.has_permission("users.*") == True
+
+def test_agent_tool_filtering():
+    principal = Principal(permissions={"tickets.read": True})
+    tools = ["create_ticket", "list_tickets", "delete_ticket"]
+    
+    filtered = filter_tools_by_permissions(tools, principal)
+    assert filtered == ["list_tickets"]  # Only read permission
+```
 
 ### 🗑️ Deprecated Code Removed
 - ❌ `mcp_server/auth/token_service.py` - Thread-based token storage
