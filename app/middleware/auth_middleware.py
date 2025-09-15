@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clerk authentication middleware for FastAPI with dual authentication support
+Authentication middleware for FastAPI with dual authentication support
 """
 
 import logging
@@ -179,7 +179,7 @@ class AuthMiddleware:
             
             # Validate environment matches current environment
             settings = get_settings()
-            expected_env = settings.environment[:3]  # pro, sta, dev, tst
+            expected_env = settings.environment[:3]  # pro, sta, dev
             logger.debug(f"Expected environment: {expected_env}, got: {env_prefix}")
             if env_prefix != expected_env:
                 logger.warning(f"Token environment mismatch: expected {expected_env}, got {env_prefix}")
