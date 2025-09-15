@@ -10,6 +10,10 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+# Global flags to prevent duplicate startup
+_startup_completed = False
+_admin_org_initialized = False
+
 # Add the current directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -149,6 +153,15 @@ def run_alembic_migrations() -> bool:
 
 async def ensure_admin_organization():
     """Ensure the TickAido admin organization and user exist"""
+    global _admin_org_initialized
+    
+    if _admin_org_initialized:
+        logger.debug("✅ Admin organization already initialized, skipping")
+        return
+    
+    import threading
+    logger.debug(f"🔍 ensure_admin_organization called from thread: {threading.get_ident()}")
+    
     from app.database import get_async_db_session
     from app.models.organization import Organization
     from app.models.user import User, UserRole
@@ -203,10 +216,21 @@ async def ensure_admin_organization():
         else:
             logger.info(f"✅ TickAido admin user exists: {user.id}")
         
+        _admin_org_initialized = True
         return org
 
 async def startup_event():
     """FastAPI startup event handler"""
+    import threading
+    import os
+    logger.debug(f"🔍 startup_event called from thread: {threading.get_ident()}, PID: {os.getpid()}")
+    
+    global _startup_completed
+    
+    if _startup_completed:
+        logger.debug("🔄 Startup already completed, skipping initialization")
+        return
+        
     logger.info("🚀 Starting AI Ticket Creator Backend initialization")
     
     # Step 0: Initialize HTTP debug logging
@@ -282,6 +306,7 @@ async def startup_event():
         logger.error(f"❌ Failed to prepare AI services: {e}")
     
     logger.info("🎉 Backend initialization completed successfully!")
+    _startup_completed = True
 
 async def shutdown_event():
     """FastAPI shutdown event handler"""
@@ -333,6 +358,12 @@ app.include_router(org_discovery_router, prefix="/api/v1", tags=["Organization D
 app.include_router(invitations_router, prefix="/api/v1", tags=["Invitation Management"])
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(integration_router, prefix="/api/v1")
+
+# Clerk integration routes
+from app.routers.clerk_webhooks import router as clerk_webhook_router
+from app.routers.api_tokens import router as api_token_router
+app.include_router(clerk_webhook_router, prefix="/api/v1")
+app.include_router(api_token_router, prefix="/api/v1")
 # app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
 # app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(chat_websocket_router, prefix="/api/v1")

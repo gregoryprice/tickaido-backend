@@ -20,7 +20,7 @@ from app.models.user import User
 from app.models.chat import Message
 from app.services.thread_service import thread_service
 from app.services.ai_chat_service import ai_chat_service
-from app.dependencies import get_current_active_user
+from app.middleware.auth_middleware import get_current_user
 from app.services.auth_provider import decode_jwt_token
 
 router = APIRouter(prefix="/chat", tags=["Agent-Centric Chat"])
@@ -34,7 +34,7 @@ async def list_threads(
     q: Optional[str] = Query(None, description="Search threads by title and content"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """List user's chat threads for a specific agent with optional filtering and search"""
@@ -81,7 +81,7 @@ async def list_threads(
 async def create_thread(
     agent_id: UUID = Path(..., description="Agent ID"),
     request: CreateThreadRequest = None,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Create a new chat thread for a specific agent"""
@@ -116,7 +116,7 @@ async def get_thread(
     agent_id: UUID = Path(..., description="Agent ID"),
     thread_id: UUID = Path(..., description="Thread ID"),
     include_messages: bool = Query(True, description="Include messages in response"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get a specific thread with its messages"""
@@ -167,7 +167,7 @@ async def send_message(
     http_request: Request,
     agent_id: UUID = Path(..., description="Agent ID"),
     thread_id: UUID = Path(..., description="Thread ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Send a message to a thread and get AI response"""
@@ -268,7 +268,7 @@ async def update_thread(
     request: UpdateThreadRequest,
     agent_id: UUID = Path(..., description="Agent ID"),
     thread_id: UUID = Path(..., description="Thread ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update thread fields (title, archive status, metadata)"""
@@ -318,7 +318,7 @@ async def update_thread(
 async def delete_thread(
     agent_id: UUID = Path(..., description="Agent ID"),
     thread_id: UUID = Path(..., description="Thread ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete a thread (soft delete by archiving)"""
@@ -351,7 +351,7 @@ async def delete_thread(
 async def generate_thread_title(
     agent_id: UUID = Path(..., description="Agent ID"),
     thread_id: UUID = Path(..., description="Thread ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Generate a title for a thread and update it"""
@@ -412,7 +412,7 @@ async def get_thread_messages(
     thread_id: UUID = Path(..., description="Thread ID"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=200, description="Page size"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get all messages for a thread with pagination"""

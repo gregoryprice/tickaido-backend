@@ -88,8 +88,14 @@ class AgentService:
         """
         async with get_async_db_session() if db is None else db as session:
             try:
+                # If organization_id is None, return empty list (no system agents via API)
+                if organization_id is None:
+                    logger.debug("No organization_id provided - returning empty agent list")
+                    return []
+                
                 conditions = [
                     Agent.organization_id == organization_id,
+                    Agent.organization_id.is_not(None),  # Explicitly exclude system agents
                     Agent.is_deleted == False
                 ]
                 

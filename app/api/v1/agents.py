@@ -13,7 +13,7 @@ from app.database import get_db_session
 from app.models.user import User
 from app.services.agent_service import agent_service
 from app.services.agent_history_service import agent_history_service
-from app.dependencies import get_current_active_user
+from app.middleware.auth_middleware import get_current_user
 from app.schemas.agent import (
     AgentCreateRequest, 
     AgentUpdateRequest, 
@@ -40,7 +40,7 @@ def get_client_ip(request: Request) -> Optional[str]:
 async def create_agent(
     agent_data: AgentCreateRequest,
     request: Request,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Create a new agent for the organization"""
@@ -77,7 +77,7 @@ async def update_agent(
     agent_id: UUID = Path(..., description="Agent ID"),
     agent_data: AgentUpdateRequest = ...,
     request: Request = ...,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update an agent"""
@@ -128,7 +128,7 @@ async def update_agent(
 async def delete_agent(
     agent_id: UUID = Path(..., description="Agent ID"),
     request: Request = ...,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete an agent (soft delete)"""
@@ -170,7 +170,7 @@ async def delete_agent(
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(
     agent_id: UUID = Path(..., description="Agent ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get a single agent by ID"""
@@ -201,7 +201,7 @@ async def list_agents(
     limit: int = Query(50, ge=1, le=100, description="Items per page"),
     agent_type: Optional[str] = Query(None, description="Filter by agent type"),
     include_inactive: bool = Query(False, description="Include inactive agents"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """List agents for the organization with pagination and filtering"""
@@ -242,7 +242,7 @@ async def get_agent_history(
     limit: int = Query(50, ge=1, le=100, description="Items per page"),
     change_type: Optional[str] = Query(None, description="Filter by change type"),
     field_filter: Optional[str] = Query(None, description="Filter by field name"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get change history for an agent"""

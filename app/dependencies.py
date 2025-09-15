@@ -52,7 +52,7 @@ async def get_current_user(
         payload = jwt.decode(
             credentials.credentials, 
             settings.jwt_secret_key,  # Use jwt_secret_key instead of secret_key
-            algorithms=[settings.algorithm]
+            algorithms=settings.algorithms
         )
         
         # Extract user ID from token
@@ -313,7 +313,7 @@ async def get_current_user_from_token(
         payload = jwt.decode(
             token, 
             settings.jwt_secret_key,
-            algorithms=[settings.algorithm]
+            algorithms=settings.algorithms
         )
         
         # Extract user ID from token

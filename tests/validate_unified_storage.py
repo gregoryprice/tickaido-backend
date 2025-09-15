@@ -5,6 +5,7 @@ Run this to validate that the storage system is working correctly
 """
 
 import asyncio
+import pytest
 import tempfile
 import shutil
 from pathlib import Path
@@ -31,6 +32,7 @@ class MockUploadFile:
         pass
 
 
+@pytest.mark.asyncio
 async def test_local_backend():
     """Test LocalStorageBackend functionality"""
     print("Testing LocalStorageBackend...")
@@ -77,6 +79,7 @@ async def test_local_backend():
         shutil.rmtree(temp_dir)
 
 
+@pytest.mark.asyncio
 async def test_unified_service():
     """Test StorageService functionality"""
     print("\nTesting StorageService...")
@@ -133,6 +136,7 @@ async def test_unified_service():
         shutil.rmtree(temp_dir)
 
 
+@pytest.mark.asyncio
 async def test_avatar_service_integration():
     """Test AvatarService with unified storage"""
     print("\nTesting AvatarService integration...")

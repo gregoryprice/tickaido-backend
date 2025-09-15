@@ -15,7 +15,7 @@ from app.database import get_db_session
 from app.schemas.user import AvatarResponse, AvatarDeleteResponse
 from app.models.user import User
 from app.services.avatar_service import AvatarService
-from app.dependencies import get_current_user
+from app.middleware.auth_middleware import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users")

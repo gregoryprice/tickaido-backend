@@ -137,6 +137,15 @@ class User(BaseModel):
         comment="External authentication ID"
     )
     
+    # Clerk integration
+    clerk_id = Column(
+        String(255),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Clerk user ID for authentication service integration"
+    )
+    
     # User preferences
     preferences = Column(
         JSON,
@@ -277,6 +286,13 @@ class User(BaseModel):
         foreign_keys="OrganizationInvitation.invited_by_id"
     )
     
+    # API token management
+    api_tokens = relationship(
+        "APIToken",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
     
@@ -378,6 +394,10 @@ class User(BaseModel):
     def update_api_key_usage(self):
         """Update API key last used timestamp"""
         self.api_key_last_used_at = datetime.now(timezone.utc)
+    
+    def can_generate_api_token(self) -> bool:
+        """Check if user can generate API tokens"""
+        return self.has_permission("api:generate") and self.is_active and not self.is_locked
     
     # Organization membership methods
     def is_organization_admin(self) -> bool:

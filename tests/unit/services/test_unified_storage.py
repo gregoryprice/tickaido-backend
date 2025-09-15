@@ -309,6 +309,7 @@ class TestStorageIntegration:
         yield temp_dir
         shutil.rmtree(temp_dir)
     
+    @pytest.mark.asyncio
     async def test_complete_file_workflow(self, temp_dir):
         """Test complete file upload, retrieve, and delete workflow"""
         # Setup service
