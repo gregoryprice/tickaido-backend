@@ -382,8 +382,8 @@ class IntegrationService:
                     elif test_type == "authentication":
                         result = await integration_impl.test_authentication()
                     elif test_type == "permissions" or test_type == "project_access":
-                        # Pass integration-specific test data from credentials
-                        test_data = db_integration.get_credentials()
+                        # Use provided test data or fall back to credentials
+                        test_data = test_request.test_data or db_integration.get_credentials()
                         result = await integration_impl.test_permissions(test_data)
                     elif test_type == "create_ticket":
                         # Use provided test data or default credentials

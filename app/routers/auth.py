@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 from ..database import get_db_session
 from ..models.user import User
@@ -239,50 +239,101 @@ async def register_user(
         )
 
 
-@router.post("/login", response_model=TokenResponse)
-async def login_user(
-    user_data: UserLogin,
+@router.post("/generate-api-key")
+async def generate_api_key_for_testing(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
     _rate_limit: Dict[str, Any] = Depends(auth_rate_limit)
 ):
-    """Authenticate user and return JWT tokens"""
+    """
+    Generate API key for authenticated Clerk user for API testing.
+    
+    This endpoint allows Clerk-authenticated users to generate API keys
+    for use in Postman, Insomnia, or other API testing tools.
+    
+    **Workflow:**
+    1. User authenticates via Clerk in frontend
+    2. User calls this endpoint with Clerk JWT token
+    3. System generates long-lived API key for testing
+    4. User uses API key in Postman/testing tools
+    """
     try:
-        # Authenticate user
-        user = await auth_middleware.authenticate_user(
-            user_data.email, 
-            user_data.password, 
-            db
-        )
-        
-        if not user:
+        if not current_user.organization_id:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-                headers={"WWW-Authenticate": "Bearer"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization to generate API keys"
             )
         
-        # Create tokens
-        token_data = {"sub": str(user.id), "email": user.email}
-        access_token = auth_middleware.create_access_token(token_data)
-        refresh_token = auth_middleware.create_refresh_token(token_data)
+        # Check for existing active API tokens
+        from app.models.api_token import APIToken
+        from sqlalchemy import func
         
-        logger.info(f"✅ User logged in successfully: {user.email}")
-        
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            expires_in=1800,  # 30 minutes
-            user=await build_user_response(user, db)
+        existing_count = await db.scalar(
+            select(func.count(APIToken.id)).where(
+                and_(
+                    APIToken.user_id == current_user.id,
+                    APIToken.is_active == True,
+                    APIToken.name == "Postman Testing"
+                )
+            )
         )
+        
+        if existing_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Postman testing API key already exists. Use /api/v1/api-tokens to manage existing keys."
+            )
+        
+        # Generate secure token  
+        import secrets
+        import hashlib
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        
+        # Get environment prefix
+        from app.config.settings import get_settings
+        settings = get_settings()
+        env_prefix = settings.environment[:4]  # dev, stag, prod, test
+        
+        # Create API token record
+        api_token = APIToken(
+            user_id=current_user.id,
+            organization_id=current_user.organization_id,
+            name="Postman Testing",
+            token_hash=token_hash,
+            permissions=["*"],  # Full permissions for testing
+            expires_at=datetime.now(timezone.utc) + timedelta(days=90),  # 90 days
+            is_active=True
+        )
+        
+        db.add(api_token)
+        await db.commit()
+        await db.refresh(api_token)
+        
+        # Format token with environment prefix
+        formatted_token = f"ai_{env_prefix}_{raw_token}"
+        
+        logger.info(f"✅ API key generated for testing: {current_user.email}")
+        
+        return {
+            "api_key": formatted_token,
+            "id": str(api_token.id),
+            "name": api_token.name,
+            "expires_at": api_token.expires_at,
+            "organization_id": str(current_user.organization_id),
+            "instructions": {
+                "postman_setup": "1. Copy the api_key value above\n2. In Postman, set Authorization to 'Bearer Token'\n3. Paste the api_key as the Bearer Token value\n4. Use this for all API requests",
+                "security_note": "This API key has full permissions and expires in 90 days. Store it securely."
+            }
+        }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Login failed for {user_data.email}: {e}")
+        logger.error(f"❌ API key generation failed for {current_user.email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
+            detail="Failed to generate API key"
         )
 
 

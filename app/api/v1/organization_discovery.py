@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Request
 
 from app.database import get_db_session
-from app.dependencies import get_current_user
+from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
 from app.services.organization_discovery_service import OrganizationDiscoveryService
 from app.schemas.member_management import (

@@ -42,6 +42,7 @@ class UserService:
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         self.secret_key = self.settings.secret_key
         self.algorithm = self.settings.algorithm
+        self.algorithms = self.settings.algorithms
         self.access_token_expire_minutes = self.settings.access_token_expire_minutes
     
     def _hash_password(self, password: str) -> str:
@@ -67,7 +68,7 @@ class UserService:
     def _verify_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Verify and decode JWT token"""
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            payload = jwt.decode(token, self.secret_key, algorithms=self.algorithms)
             return payload
         except JWTError:
             return None

@@ -823,6 +823,25 @@ files = [
 ]
 
 [[package]]
+name = "clerk-backend-api"
+version = "3.3.0"
+description = "Python Client SDK for clerk.dev"
+optional = false
+python-versions = ">=3.9.2"
+groups = ["main"]
+files = [
+    {file = "clerk_backend_api-3.3.0-py3-none-any.whl", hash = "sha256:2b68da6e928c24c1c6b25ce2c4da2938c764b7c46a5a19c7663cce7c4a12ced4"},
+    {file = "clerk_backend_api-3.3.0.tar.gz", hash = "sha256:a4b4428f22cd1e642e94ec273c427c3cbe17bcb81cb34d43300b35ed7fd742b4"},
+]
+
+[package.dependencies]
+cryptography = ">=45.0.0,<46.0.0"
+httpcore = ">=1.0.9"
+httpx = ">=0.28.1"
+pydantic = ">=2.11.2"
+pyjwt = ">=2.9.0,<3.0.0"
+
+[[package]]
 name = "click"
 version = "8.2.1"
 description = "Composable command line interface toolkit"
@@ -2026,6 +2045,18 @@ groups = ["main"]
 files = [
     {file = "isodate-0.7.2-py3-none-any.whl", hash = "sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15"},
     {file = "isodate-0.7.2.tar.gz", hash = "sha256:4cd1aa0f43ca76f4a6c6c0292a85f40b35ec2e43e315b59f06e6d32171a953e6"},
+]
+
+[[package]]
+name = "itsdangerous"
+version = "2.2.0"
+description = "Safely pass data to untrusted environments and back."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "itsdangerous-2.2.0-py3-none-any.whl", hash = "sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef"},
+    {file = "itsdangerous-2.2.0.tar.gz", hash = "sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173"},
 ]
 
 [[package]]
@@ -3978,6 +4009,9 @@ files = [
     {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
 ]
 
+[package.dependencies]
+cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
+
 [package.extras]
 crypto = ["cryptography (>=3.4.0)"]
 dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx", "sphinx-rtd-theme", "zope.interface"]
@@ -5514,4 +5548,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "4371ab822de5d81d8d218f918a76121310596a840bf9bd29b58b991ab20ac4fc"
+content-hash = "6477f82f6c4340b88444e1bf62070c35aa706d8f6756e40e453bbf15121b4a97"

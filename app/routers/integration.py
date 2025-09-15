@@ -10,7 +10,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 from ..database import get_db_session
 from ..models.user import User
@@ -632,7 +632,6 @@ async def get_active_integrations(
     """Get list of active integrations available for ticket creation"""
     try:
         # Get active integrations for the user's organization
-        from sqlalchemy import and_
         from ..models.integration import Integration, IntegrationStatus
         
         # Build query for active integrations

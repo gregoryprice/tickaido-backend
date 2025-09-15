@@ -816,7 +816,7 @@ class JiraIntegration(IntegrationInterface):
         cls,
         integration: "Integration",
         ticket_data: "Ticket",
-        original_priority_provided: bool = True
+        original_priority_provided: bool = True  # Keep for backward compatibility but unused
     ) -> Dict[str, Any]:
         """
         Create JIRA ticket from internal ticket data.
@@ -841,12 +841,13 @@ class JiraIntegration(IntegrationInterface):
             ) as jira:
                 
                 # Map internal ticket data to JIRA format with proper field mapping
-                priority_mapping = {
-                    "low": "Low",
-                    "medium": "Medium", 
-                    "high": "High",
-                    "critical": "Critical"
-                }
+                # TODO: Re-add priority_mapping when implementing custom field mapping
+                # priority_mapping = {
+                #     "low": "Low",
+                #     "medium": "Medium", 
+                #     "high": "High",
+                #     "critical": "Critical"
+                # }
                 
                 category_to_issue_type = {
                     "technical": "Bug",
@@ -860,8 +861,15 @@ class JiraIntegration(IntegrationInterface):
                     "user_access": "Task"
                 }
                 
+                # Get project key from routing rules or fallback to credentials
+                project_key = None
+                if integration.routing_rules:
+                    project_key = integration.routing_rules.get("default_project")
+                if not project_key:
+                    project_key = credentials.get("project_key", "SUPPORT")
+                
                 jira_data = {
-                    "project_key": str(credentials.get("project_key", "SUPPORT")),
+                    "project_key": str(project_key),
                     "issue_type": str(category_to_issue_type.get(
                         ticket_data.category.value if ticket_data.category else "general", 
                         "Task"
@@ -874,15 +882,15 @@ class JiraIntegration(IntegrationInterface):
                     ]
                 }
                 
-                # Only add priority if it was explicitly provided in the original request
-                # This avoids the "Field 'priority' cannot be set" error on projects where
-                # priority is not enabled on the create screen
-                if original_priority_provided and ticket_data.priority:
-                    jira_priority = priority_mapping.get(
-                        ticket_data.priority.value, 
-                        "Medium"
-                    )
-                    jira_data["priority"] = str(jira_priority)
+                # TODO: Implement proper field mapping for priority based on JIRA custom fields
+                # For now, skip priority to avoid "Field 'priority' cannot be set" errors
+                # when priority is not on the project's create screen
+                # if original_priority_provided and ticket_data.priority:
+                #     jira_priority = priority_mapping.get(
+                #         ticket_data.priority.value, 
+                #         "Medium"
+                #     )
+                #     jira_data["priority"] = str(jira_priority)
                 
                 logger.debug(f"JIRA data before create_ticket: {jira_data}")
                 

@@ -20,6 +20,7 @@ from app.models.agent_task import AgentTask
 from app.models.agent_action import AgentAction
 from app.models.chat import Thread, Message
 from app.models.file_storage_metadata import FileStorageMetadata, AvatarVariant
+from app.models.api_token import APIToken
 
 __all__ = [
     # Base
@@ -69,5 +70,8 @@ __all__ = [
     
     # File Storage models
     "FileStorageMetadata",
-    "AvatarVariant"
+    "AvatarVariant",
+    
+    # API Token models
+    "APIToken"
 ]

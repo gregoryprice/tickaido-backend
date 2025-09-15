@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="your-secret-key-change-in-production", description="JWT secret key")
     jwt_secret_key: str = Field(default="your-jwt-secret-key-change-in-production", description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
+    algorithms: List[str] = Field(default=["HS256", "RS256"], description="Allowed JWT algorithms")
     access_token_expire_minutes: int = Field(default=30, description="Access token expiration time")
     
     # File Upload Settings

@@ -15,7 +15,7 @@ from app.schemas.chat import ConversationResponse, CreateConversationRequest, Me
 from app.models.user import User
 from app.services.chat_service import chat_service
 from app.services.ai_chat_service import ai_chat_service
-from app.dependencies import get_current_active_user
+from app.middleware.auth_middleware import get_current_user
 from app.services.auth_provider import decode_jwt_token
 
 router = APIRouter(prefix="/chat", tags=["Chat Assistant"])
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 async def list_conversations(
     archived: bool = Query(False, description="Filter by archive status"),
     q: Optional[str] = Query(None, description="Search conversations by title and content"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """List user's chat conversations with optional archive filter and search"""
@@ -57,7 +57,7 @@ async def list_conversations(
 @router.post("/conversations", response_model=ConversationResponse)
 async def create_conversation(
     request: CreateConversationRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Create a new chat conversation"""
@@ -86,7 +86,7 @@ async def create_conversation(
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
 async def get_conversation_messages(
     conversation_id: UUID = Path(..., description="Conversation ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get all messages for a conversation"""
@@ -115,7 +115,7 @@ async def send_message(
     request: SendMessageRequest,
     http_request: Request,
     conversation_id: UUID = Path(..., description="Conversation ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Send a message to a conversation and get AI response"""
@@ -246,7 +246,7 @@ async def send_message(
 async def update_conversation(
     request: UpdateConversationRequest,
     conversation_id: UUID = Path(..., description="Conversation ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update conversation fields (title, archive status)"""
@@ -308,7 +308,7 @@ async def update_conversation(
 @router.post("/conversations/{conversation_id}/generate_title", response_model=GenerateTitleResponse)
 async def generate_conversation_title(
     conversation_id: UUID = Path(..., description="Conversation ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Generate a title for a conversation and update it"""
@@ -357,7 +357,7 @@ async def generate_conversation_title(
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: UUID = Path(..., description="Conversation ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete a conversation (soft delete)"""

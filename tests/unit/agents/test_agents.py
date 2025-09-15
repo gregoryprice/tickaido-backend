@@ -439,6 +439,7 @@ class TestMultiAgentCapabilities:
         assert agent2.agent_type == "sales"
         assert agent3.agent_type == "technical_support"
     
+    @pytest.mark.asyncio
     async def test_agent_personalization(self):
         """Test agent personalization features"""
         agent = Agent()

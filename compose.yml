@@ -10,6 +10,7 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
       - JWT_SECRET_KEY=super-secret-jwt-key-for-development-only-256-bits-long
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG

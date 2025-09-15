@@ -17,7 +17,7 @@ from app.schemas.agent import AgentAvatarResponse, AgentAvatarDeleteResponse, Ag
 from app.models.user import User
 from app.models.ai_agent import Agent
 from app.services.avatar_service import AvatarService
-from app.dependencies import get_current_active_user
+from app.middleware.auth_middleware import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents")
@@ -28,7 +28,7 @@ avatar_service = AvatarService()
 async def upload_agent_avatar(
     agent_id: UUID,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -107,7 +107,7 @@ async def get_agent_avatar(
     agent_id: UUID,
     size: str = "medium",
     t: Optional[str] = None,  # Cache-busting timestamp parameter (ignored)
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -206,7 +206,7 @@ async def get_agent_avatar(
 @router.delete("/{agent_id}/avatar", response_model=AgentAvatarDeleteResponse)
 async def delete_agent_avatar(
     agent_id: UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -260,7 +260,7 @@ async def delete_agent_avatar(
 @router.get("/{agent_id}/avatar/info", response_model=AgentAvatarInfoResponse)
 async def get_agent_avatar_info(
     agent_id: UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """

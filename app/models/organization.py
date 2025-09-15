@@ -39,6 +39,21 @@ class Organization(BaseModel):
         comment="Display name for UI (defaults to name if not set)"
     )
     
+    # Clerk integration
+    clerk_organization_id = Column(
+        String(255),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Clerk organization ID for authentication service integration"
+    )
+    
+    clerk_metadata = Column(
+        JSON,
+        nullable=True,
+        comment="Synced Clerk organization data and metadata"
+    )
+    
     # Organization status (note: is_active is inherited from BaseModel via soft delete)
     is_enabled = Column(
         Boolean,
@@ -195,6 +210,13 @@ class Organization(BaseModel):
     
     invitations = relationship(
         "OrganizationInvitation",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    
+    # API token management
+    api_tokens = relationship(
+        "APIToken",
         back_populates="organization",
         cascade="all, delete-orphan"
     )
