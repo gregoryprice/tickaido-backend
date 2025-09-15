@@ -750,12 +750,12 @@ class TestOCRService:
 # VALIDATION GATE: OCRService tests must ALL PASS before proceeding
 ```
 
-#### WhisperService
-**Purpose**: Transcribe audio and video files using OpenAI Whisper
+#### TranscriptionService
+**Purpose**: Transcribe audio and video files using multiple transcription engines (Whisper, cloud APIs)
 
 **Complete Implementation**:
 ```python
-class WhisperService:
+class TranscriptionService:
     """Audio/video transcription using OpenAI Whisper"""
     
     def __init__(self):
@@ -877,6 +877,10 @@ class WhisperService:
             duration=result["duration"],
             method=result["method"]
         )
+    
+    def supports_docker(self) -> bool:
+        """Check if service can run in Docker environment"""
+        return True  # Whisper works well in Docker containers
 
 @dataclass
 class TranscriptionResult:
@@ -905,20 +909,20 @@ pip install openai-whisper torch torchaudio
 
 **Testing Requirements:**
 ```python
-class TestWhisperService:
-    """Comprehensive tests for WhisperService"""
+class TestTranscriptionService:
+    """Comprehensive tests for TranscriptionService"""
     
     @pytest.fixture
-    def whisper_service(self):
-        return WhisperService()
+    def transcription_service(self):
+        return TranscriptionService()
     
     @pytest.mark.asyncio
-    async def test_clear_speech_transcription(self, whisper_service):
+    async def test_clear_speech_transcription(self, transcription_service):
         """REQUIRED TEST: Clear speech transcription"""
         with open("test_files/clear_speech.mp3", "rb") as f:
             audio_content = f.read()
         
-        result = await whisper_service.transcribe_with_segments(audio_content)
+        result = await transcription_service.transcribe_with_segments(audio_content)
         
         assert result["text"] != ""
         assert len(result["text"]) > 10
@@ -928,24 +932,24 @@ class TestWhisperService:
         assert result["duration"] > 0
     
     @pytest.mark.asyncio
-    async def test_multilingual_transcription(self, whisper_service):
+    async def test_multilingual_transcription(self, transcription_service):
         """REQUIRED TEST: Non-English language transcription"""
         with open("test_files/spanish_speech.mp3", "rb") as f:
             audio_content = f.read()
         
-        result = await whisper_service.transcribe_audio(audio_content)
+        result = await transcription_service.transcribe_audio(audio_content)
         
         assert result.text != ""
         assert result.language == "es" or "spanish" in result.text.lower()
         assert result.confidence > 0.5
     
     @pytest.mark.asyncio
-    async def test_segment_accuracy(self, whisper_service):
+    async def test_segment_accuracy(self, transcription_service):
         """REQUIRED TEST: Timestamp segment accuracy"""
         with open("test_files/structured_speech.wav", "rb") as f:
             audio_content = f.read()
         
-        result = await whisper_service.transcribe_with_segments(audio_content)
+        result = await transcription_service.transcribe_with_segments(audio_content)
         
         # Validate segment structure
         for segment in result["segments"]:
@@ -957,38 +961,38 @@ class TestWhisperService:
             assert 0.0 <= segment["confidence"] <= 1.0
     
     @pytest.mark.asyncio
-    async def test_video_audio_extraction(self, whisper_service):
+    async def test_video_audio_extraction(self, transcription_service):
         """REQUIRED TEST: Audio extraction from video files"""
         with open("test_files/sample_video.mp4", "rb") as f:
             video_content = f.read()
         
-        result = await whisper_service.transcribe_audio(video_content)
+        result = await transcription_service.transcribe_audio(video_content)
         
         # Should extract audio and transcribe
         assert result.text != ""
         assert result.method == "whisper_local"
     
     @pytest.mark.asyncio
-    async def test_low_quality_audio_handling(self, whisper_service):
+    async def test_low_quality_audio_handling(self, transcription_service):
         """REQUIRED TEST: Low quality/noisy audio handling"""
         with open("test_files/noisy_audio.mp3", "rb") as f:
             audio_content = f.read()
         
         # Should not crash, may have low confidence
-        result = await whisper_service.transcribe_audio(audio_content)
+        result = await transcription_service.transcribe_audio(audio_content)
         
         assert result.text is not None  # May be empty for very noisy audio
         assert 0.0 <= result.confidence <= 1.0
         assert result.duration >= 0
     
     @pytest.mark.asyncio
-    async def test_performance_requirements(self, whisper_service):
+    async def test_performance_requirements(self, transcription_service):
         """REQUIRED TEST: Transcription performance"""
         with open("test_files/60_second_audio.mp3", "rb") as f:
             audio_content = f.read()
         
         start_time = time.time()
-        result = await whisper_service.transcribe_audio(audio_content)
+        result = await transcription_service.transcribe_audio(audio_content)
         processing_time = time.time() - start_time
         
         # Should process at reasonable speed (allow 2x real-time for base model)
@@ -996,7 +1000,7 @@ class TestWhisperService:
         assert result.text != ""
     
     @pytest.mark.asyncio
-    async def test_format_support(self, whisper_service):
+    async def test_format_support(self, transcription_service):
         """REQUIRED TEST: Multiple audio format support"""
         formats = ["test_audio.mp3", "test_audio.wav", "test_audio.m4a", "test_audio.ogg"]
         
@@ -1005,12 +1009,12 @@ class TestWhisperService:
                 with open(f"test_files/{format_file}", "rb") as f:
                     audio_content = f.read()
                 
-                result = await whisper_service.transcribe_audio(audio_content)
+                result = await transcription_service.transcribe_audio(audio_content)
                 
                 assert result.text is not None
                 assert result.method == "whisper_local"
 
-# VALIDATION GATE: WhisperService tests must ALL PASS before proceeding
+# VALIDATION GATE: TranscriptionService tests must ALL PASS before proceeding
 ```
 
 #### VisionAnalysisService
@@ -1757,7 +1761,7 @@ class FileProcessingService:
     def __init__(self):
         self.document_parser = DocumentParserService()  # Document structure parsing
         self.ocr_service = OCRService()                 # Text extraction from images
-        self.transcription_service = WhisperService()   # Audio/video transcription
+        self.transcription_service = TranscriptionService()   # Audio/video transcription
         self.vision_service = VisionAnalysisService()   # Computer vision analysis
         self.ai_service = AIService()                   # LLM-based content analysis
     
@@ -2250,7 +2254,7 @@ poetry run pytest tests/test_ocr_service.py -v
 # ALL tests must show PASSED status
 ```
 
-#### Gate 3: WhisperService Validation
+#### Gate 3: TranscriptionService Validation
 **Status**: ❌ **BLOCKED** until OCRService passes  
 **Requirements**:
 - ✅ Clear speech transcription
@@ -2263,12 +2267,12 @@ poetry run pytest tests/test_ocr_service.py -v
 
 **Command to validate**:
 ```bash
-poetry run pytest tests/test_whisper_service.py -v
+poetry run pytest tests/test_transcription_service.py -v
 # ALL tests must show PASSED status
 ```
 
 #### Gate 4: VisionAnalysisService Validation
-**Status**: ❌ **BLOCKED** until WhisperService passes
+**Status**: ❌ **BLOCKED** until TranscriptionService passes
 **Requirements**:
 - ✅ Screenshot analysis with UI element detection
 - ✅ Error message detection in images
@@ -2300,8 +2304,37 @@ poetry run pytest tests/test_ai_service.py -v
 # ALL tests must show PASSED status
 ```
 
-#### Gate 6: Integration Testing
+#### Gate 6: Docker Environment Validation
 **Status**: ❌ **BLOCKED** until AIService passes
+**Requirements**: All services must work correctly in Docker containers with real API calls
+- ✅ Docker container has all required system packages
+- ✅ Services can access external APIs from Docker
+- ✅ File processing works with Docker volume mounts
+- ✅ Performance benchmarks met in containerized environment
+
+**Command to validate**:
+```bash
+docker compose exec app poetry run pytest tests/test_services_docker_compatibility.py -v
+# ALL tests must show PASSED status
+```
+
+#### Gate 7: Extracted Context Validation
+**Status**: ❌ **BLOCKED** until Docker validation passes
+**Requirements**: Verify extracted_context field is properly populated for all file types
+- ✅ Document files populate extracted_context.document structure
+- ✅ Image files populate extracted_context.image structure  
+- ✅ Audio files populate extracted_context.audio structure
+- ✅ All confidence scores and metadata are stored correctly
+- ✅ JSON structure matches specification exactly
+
+**Command to validate**:
+```bash
+docker compose exec app poetry run pytest tests/test_extracted_context_validation.py -v
+# ALL tests must show PASSED status
+```
+
+#### Gate 8: Integration Testing
+**Status**: ❌ **BLOCKED** until extracted_context validation passes
 **Requirements**:
 - ✅ End-to-end file upload workflow
 - ✅ Content extraction pipeline integration
@@ -2312,18 +2345,556 @@ poetry run pytest tests/test_ai_service.py -v
 
 **Command to validate**:
 ```bash
-poetry run pytest tests/test_file_attachment_integration.py -v
+docker compose exec app poetry run pytest tests/test_file_attachment_integration.py -v
 # ALL tests must show PASSED status
+```
+
+## Required Test File Creation & Validation
+
+Before implementing services, create comprehensive test files and validation tests:
+
+### Test File Requirements
+
+**Create test_files/ directory with**:
+```bash
+test_files/
+├── documents/
+│   ├── sample.pdf                    # Multi-page PDF with text
+│   ├── sample.docx                   # Word document with tables
+│   ├── large_document.pdf            # >10MB PDF for performance testing
+│   ├── document_with_table.pdf       # PDF containing tables
+│   └── corrupted.pdf                 # Intentionally corrupted file
+├── images/
+│   ├── clear_text_image.png          # High-quality text image
+│   ├── error_screenshot.png          # Screenshot with error dialog
+│   ├── login_screenshot.png          # UI screenshot with forms/buttons
+│   ├── system_diagram.png            # Technical diagram
+│   ├── structured_text.png           # Multiple text regions
+│   ├── spanish_text.png              # Non-English text
+│   ├── blurry_text.png               # Low quality/blurry image
+│   ├── landscape_photo.jpg           # Image with no text
+│   ├── high_res_screenshot.png       # High resolution (>2MB)
+│   └── simple_image.png              # Basic test image
+├── audio/
+│   ├── clear_speech.mp3              # Clear English speech
+│   ├── spanish_speech.mp3            # Spanish language audio
+│   ├── structured_speech.wav         # Speech with clear segments
+│   ├── noisy_audio.mp3               # Low quality/background noise
+│   ├── 60_second_audio.mp3           # Longer audio for performance
+│   ├── test_audio.wav                # WAV format test
+│   ├── test_audio.m4a                # M4A format test
+│   └── test_audio.ogg                # OGG format test
+└── video/
+    ├── sample_video.mp4              # Video with clear audio
+    └── short_demo.mov                # Short video for testing
+```
+
+### Docker Compatibility Tests
+
+**Complete Docker Test Suite**:
+```python
+class TestDockerCompatibility:
+    """Tests that all services work correctly in Docker environment"""
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_document_parser_in_docker(self):
+        """REQUIRED TEST: DocumentParserService works in Docker"""
+        
+        # This test runs inside Docker container
+        parser_service = DocumentParserService()
+        
+        # Test with real PDF file
+        with open("/app/test_files/documents/sample.pdf", "rb") as f:
+            content = f.read()
+        
+        result = await parser_service.analyze_document(content, ["TEXT", "LAYOUT", "TABLES"])
+        
+        # Verify extracted_context structure
+        assert "pages" in result
+        assert len(result["pages"]) > 0
+        assert "metadata" in result
+        
+        # Verify it works with Docker volume mounts
+        assert os.path.exists("/app/test_files/documents/sample.pdf")
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_ocr_service_in_docker(self):
+        """REQUIRED TEST: OCRService works in Docker with Tesseract"""
+        
+        ocr_service = OCRService()
+        
+        with open("/app/test_files/images/clear_text_image.png", "rb") as f:
+            image_content = f.read()
+        
+        result = await ocr_service.extract_text_with_regions(image_content)
+        
+        assert result["full_text"] != ""
+        assert len(result["text_regions"]) > 0
+        assert result["method"] == "tesseract"  # Should use local Tesseract in Docker
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio  
+    async def test_transcription_service_in_docker(self):
+        """REQUIRED TEST: TranscriptionService works in Docker"""
+        
+        transcription_service = TranscriptionService()
+        
+        with open("/app/test_files/audio/clear_speech.mp3", "rb") as f:
+            audio_content = f.read()
+        
+        result = await transcription_service.transcribe_with_segments(audio_content)
+        
+        assert result["text"] != ""
+        assert result["method"] == "whisper_local"
+        assert len(result["segments"]) > 0
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_vision_service_api_access(self):
+        """REQUIRED TEST: VisionAnalysisService can access external APIs from Docker"""
+        
+        vision_service = VisionAnalysisService()
+        
+        with open("/app/test_files/images/login_screenshot.png", "rb") as f:
+            image_content = f.read()
+        
+        # This should make actual API call to OpenAI/Claude/Google
+        result = await vision_service.analyze_image(image_content, ["DESCRIPTION"])
+        
+        assert "description" in result
+        assert len(result["description"]) > 20
+        assert result["confidence"] > 0.5
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_ai_service_api_access(self):
+        """REQUIRED TEST: AIService can access LLM APIs from Docker"""
+        
+        ai_service = AIService()
+        
+        test_content = "This is a test document about user authentication issues and login problems."
+        
+        # This should make actual API call
+        summary = await ai_service.generate_summary(test_content, max_length=100)
+        
+        assert len(summary) > 0
+        assert len(summary) <= 100
+        assert summary != test_content
+        
+        # Test language detection
+        lang = await ai_service.detect_language(test_content)
+        assert lang == "en"
+```
+
+### Extracted Context Validation Tests
+
+**Complete Context Validation Suite**:
+```python
+class TestExtractedContextValidation:
+    """Tests that verify extracted_context field is properly populated"""
+    
+    @pytest.mark.asyncio
+    async def test_document_extracted_context_structure(self):
+        """REQUIRED TEST: Document files populate extracted_context.document correctly"""
+        
+        # Create test file record
+        file_obj = File(
+            id=uuid.uuid4(),
+            filename="test.pdf",
+            file_path="test/test.pdf", 
+            mime_type="application/pdf",
+            file_size=1024,
+            file_hash="abc123",
+            file_type=FileType.DOCUMENT,
+            uploaded_by_id=uuid.uuid4(),
+            organization_id=uuid.uuid4()
+        )
+        
+        # Process file
+        processor = FileProcessingService()
+        await processor.process_uploaded_file(file_obj)
+        
+        # Verify extracted_context structure
+        assert file_obj.extracted_context is not None
+        assert "document" in file_obj.extracted_context
+        
+        doc_context = file_obj.extracted_context["document"]
+        assert "pages" in doc_context
+        assert len(doc_context["pages"]) > 0
+        assert "metadata" in doc_context
+        
+        # Verify page structure
+        page = doc_context["pages"][0]
+        assert "page_number" in page
+        assert "text" in page
+        assert "blocks" in page
+        assert "confidence" in page
+        
+        # Verify extraction method
+        assert file_obj.extraction_method == "document_parser"
+        
+        # Verify AI summary generated
+        assert file_obj.content_summary is not None
+        assert len(file_obj.content_summary) > 0
+    
+    @pytest.mark.asyncio
+    async def test_image_extracted_context_structure(self):
+        """REQUIRED TEST: Image files populate extracted_context.image correctly"""
+        
+        file_obj = File(
+            id=uuid.uuid4(),
+            filename="screenshot.png",
+            file_path="test/screenshot.png",
+            mime_type="image/png", 
+            file_size=2048,
+            file_hash="def456",
+            file_type=FileType.IMAGE,
+            uploaded_by_id=uuid.uuid4(),
+            organization_id=uuid.uuid4()
+        )
+        
+        processor = FileProcessingService()
+        await processor.process_uploaded_file(file_obj)
+        
+        # Verify extracted_context structure
+        assert file_obj.extracted_context is not None
+        assert "image" in file_obj.extracted_context
+        
+        img_context = file_obj.extracted_context["image"]
+        assert "description" in img_context
+        assert "objects" in img_context
+        assert "text_regions" in img_context
+        assert "metadata" in img_context
+        
+        # Verify text regions structure
+        if img_context["text_regions"]:
+            region = img_context["text_regions"][0]
+            assert "text" in region
+            assert "confidence" in region
+            assert "geometry" in region
+            
+        # Verify extraction method
+        assert file_obj.extraction_method == "vision_ocr"
+        assert file_obj.content_summary is not None
+    
+    @pytest.mark.asyncio  
+    async def test_audio_extracted_context_structure(self):
+        """REQUIRED TEST: Audio files populate extracted_context.audio correctly"""
+        
+        file_obj = File(
+            id=uuid.uuid4(),
+            filename="recording.mp3",
+            file_path="test/recording.mp3",
+            mime_type="audio/mpeg",
+            file_size=4096,
+            file_hash="ghi789", 
+            file_type=FileType.AUDIO,
+            uploaded_by_id=uuid.uuid4(),
+            organization_id=uuid.uuid4()
+        )
+        
+        processor = FileProcessingService()
+        await processor.process_uploaded_file(file_obj)
+        
+        # Verify extracted_context structure
+        assert file_obj.extracted_context is not None
+        assert "audio" in file_obj.extracted_context
+        
+        audio_context = file_obj.extracted_context["audio"]
+        assert "transcription" in audio_context
+        assert "analysis" in audio_context
+        
+        # Verify transcription structure
+        transcription = audio_context["transcription"]
+        assert "text" in transcription
+        assert "language" in transcription
+        assert "confidence" in transcription
+        assert "duration_seconds" in transcription
+        assert "segments" in transcription
+        
+        # Verify analysis structure  
+        analysis = audio_context["analysis"]
+        assert "sentiment" in analysis
+        assert "key_topics" in analysis
+        assert "urgency_level" in analysis
+        
+        # Verify extraction method
+        assert file_obj.extraction_method == "speech_transcription"
+        assert file_obj.content_summary is not None
+    
+    @pytest.mark.asyncio
+    async def test_context_json_serialization(self):
+        """REQUIRED TEST: extracted_context can be properly serialized/deserialized"""
+        
+        # Test complex context structure
+        test_context = {
+            "document": {
+                "pages": [
+                    {
+                        "page_number": 1,
+                        "text": "Sample text content",
+                        "blocks": [
+                            {
+                                "type": "paragraph",
+                                "text": "Sample paragraph",
+                                "confidence": 0.95,
+                                "geometry": {
+                                    "bounding_box": {"left": 0.1, "top": 0.2, "width": 0.8, "height": 0.1}
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "metadata": {"total_pages": 1, "language": "en"}
+            }
+        }
+        
+        # Verify JSON serialization works
+        import json
+        serialized = json.dumps(test_context)
+        deserialized = json.loads(serialized)
+        
+        assert deserialized == test_context
+        
+        # Verify database storage
+        file_obj = File(
+            id=uuid.uuid4(),
+            filename="test.pdf",
+            extracted_context=test_context
+        )
+        
+        # Should be able to store and retrieve from database
+        assert file_obj.extracted_context == test_context
+
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_end_to_end_context_extraction_pdf(self):
+        """REQUIRED TEST: End-to-end PDF processing with real API calls in Docker"""
+        
+        # Create real file object and save to database
+        async with AsyncSession() as db:
+            file_obj = File(
+                id=uuid.uuid4(),
+                filename="sample.pdf",
+                file_path="test_files/documents/sample.pdf",
+                mime_type="application/pdf",
+                file_size=12345,
+                file_hash="real_hash_123",
+                file_type=FileType.DOCUMENT,
+                uploaded_by_id=uuid.uuid4(),
+                organization_id=uuid.uuid4(),
+                status=FileStatus.UPLOADED
+            )
+            
+            db.add(file_obj)
+            await db.commit()
+            
+            # Process file with all services
+            processor = FileProcessingService()
+            await processor.process_uploaded_file(file_obj)
+            
+            # Reload from database to verify persistence
+            await db.refresh(file_obj)
+            
+            # Verify complete extracted_context structure
+            assert file_obj.status == FileStatus.PROCESSED
+            assert file_obj.extracted_context is not None
+            assert "document" in file_obj.extracted_context
+            assert file_obj.extraction_method == "document_parser"
+            assert file_obj.content_summary is not None
+            assert file_obj.language_detection in ["en", "es", "fr", "de", "unknown"]
+            
+            # Verify document structure
+            doc = file_obj.extracted_context["document"]
+            assert "pages" in doc
+            assert "metadata" in doc
+            assert len(doc["pages"]) > 0
+            
+            # Verify first page structure
+            page = doc["pages"][0]
+            assert page["page_number"] == 1
+            assert len(page["text"]) > 0
+            assert "blocks" in page
+            assert page["confidence"] > 0.8
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_end_to_end_context_extraction_image(self):
+        """REQUIRED TEST: End-to-end image processing with real Vision API calls"""
+        
+        async with AsyncSession() as db:
+            file_obj = File(
+                id=uuid.uuid4(),
+                filename="error_screenshot.png",
+                file_path="test_files/images/error_screenshot.png",
+                mime_type="image/png",
+                file_size=54321,
+                file_hash="real_hash_456",
+                file_type=FileType.IMAGE,
+                uploaded_by_id=uuid.uuid4(),
+                organization_id=uuid.uuid4(),
+                status=FileStatus.UPLOADED
+            )
+            
+            db.add(file_obj)
+            await db.commit()
+            
+            # Process with real API calls
+            processor = FileProcessingService()
+            await processor.process_uploaded_file(file_obj)
+            
+            await db.refresh(file_obj)
+            
+            # Verify complete structure
+            assert file_obj.status == FileStatus.PROCESSED
+            assert file_obj.extracted_context is not None
+            assert "image" in file_obj.extracted_context
+            assert file_obj.extraction_method == "vision_ocr"
+            assert file_obj.content_summary is not None
+            
+            # Verify image structure
+            img = file_obj.extracted_context["image"]
+            assert "description" in img
+            assert "objects" in img
+            assert "text_regions" in img
+            assert "metadata" in img
+            
+            # Verify description quality (real API call)
+            assert len(img["description"]) > 20
+            assert isinstance(img["objects"], list)
+            assert isinstance(img["text_regions"], list)
+            
+            # Verify metadata structure
+            metadata = img["metadata"]
+            assert metadata["width"] > 0
+            assert metadata["height"] > 0
+            assert metadata["size_bytes"] > 0
+    
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_end_to_end_context_extraction_audio(self):
+        """REQUIRED TEST: End-to-end audio processing with real Whisper transcription"""
+        
+        async with AsyncSession() as db:
+            file_obj = File(
+                id=uuid.uuid4(),
+                filename="customer_call.mp3",
+                file_path="test_files/audio/clear_speech.mp3",
+                mime_type="audio/mpeg",
+                file_size=98765,
+                file_hash="real_hash_789",
+                file_type=FileType.AUDIO,
+                uploaded_by_id=uuid.uuid4(),
+                organization_id=uuid.uuid4(),
+                status=FileStatus.UPLOADED
+            )
+            
+            db.add(file_obj)
+            await db.commit()
+            
+            # Process with real Whisper model
+            processor = FileProcessingService()
+            await processor.process_uploaded_file(file_obj)
+            
+            await db.refresh(file_obj)
+            
+            # Verify complete structure
+            assert file_obj.status == FileStatus.PROCESSED
+            assert file_obj.extracted_context is not None
+            assert "audio" in file_obj.extracted_context
+            assert file_obj.extraction_method == "speech_transcription"
+            assert file_obj.content_summary is not None
+            
+            # Verify audio structure
+            audio = file_obj.extracted_context["audio"]
+            assert "transcription" in audio
+            assert "analysis" in audio
+            
+            # Verify transcription structure
+            transcription = audio["transcription"]
+            assert transcription["text"] != ""
+            assert transcription["language"] in ["en", "es", "fr", "de", "unknown"]
+            assert 0.0 <= transcription["confidence"] <= 1.0
+            assert transcription["duration_seconds"] > 0
+            assert isinstance(transcription["segments"], list)
+            
+            # Verify analysis structure (real AI API call)
+            analysis = audio["analysis"]
+            assert analysis["sentiment"] in ["positive", "neutral", "negative", "frustrated", "angry"]
+            assert isinstance(analysis["key_topics"], list)
+            assert analysis["urgency_level"] in ["low", "medium", "high", "critical"]
+
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    async def test_api_connectivity_from_docker(self):
+        """REQUIRED TEST: All external APIs accessible from Docker"""
+        
+        # Test OpenAI API
+        if os.getenv("OPENAI_API_KEY"):
+            ai_service = AIService()
+            summary = await ai_service.generate_summary("Test content for API connectivity")
+            assert len(summary) > 0
+        
+        # Test vision API connectivity
+        vision_service = VisionAnalysisService()
+        # Create simple test image
+        from PIL import Image
+        import io
+        img = Image.new('RGB', (100, 50), color='white')
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        
+        try:
+            result = await vision_service.analyze_image(img_bytes.getvalue(), ["DESCRIPTION"])
+            assert "description" in result
+        except Exception as e:
+            # Should be specific API error, not network/Docker issue
+            assert "auth" in str(e).lower() or "api" in str(e).lower()
+```
+
+### Docker Environment Setup
+
+**Required Dockerfile additions**:
+```dockerfile
+# Add to existing Dockerfile
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-spa \
+    tesseract-ocr-fra \
+    tesseract-ocr-deu \
+    ffmpeg \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python ML packages
+RUN pip install openai-whisper torch torchaudio pytesseract python-magic
+```
+
+**Docker Compose service updates**:
+```yaml
+services:
+  app:
+    volumes:
+      - ./test_files:/app/test_files:ro  # Mount test files
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY}
 ```
 
 ### Implementation Checklist
 
 **Before starting implementation, ensure**:
-- [ ] All required dependencies are installed
-- [ ] Test files are prepared (PDFs, images, audio samples)
+- [ ] All required dependencies are installed in Docker
+- [ ] Test files are prepared and mounted in Docker volumes
 - [ ] AI configuration is updated in `ai_config.yaml`
 - [ ] Database migration for file model changes is ready
-- [ ] Docker environment includes all required system packages
+- [ ] Docker environment includes all required system packages (Tesseract, ffmpeg)
+- [ ] API keys are properly configured in Docker environment
+- [ ] Test file directory structure is created
 
 **During implementation**:
 - [ ] Each service implementation must be completed in order
@@ -2357,4 +2928,75 @@ poetry run pytest tests/test_file_attachment_integration.py -v
 
 This Phase 1 implementation provides a solid foundation for file attachments while maintaining simplicity and focusing on core functionality. Phase 2 will add advanced security features and additional capabilities.
 
-**⚠️ REMEMBER: You MUST pass each validation gate before proceeding to the next service implementation.**
+## 🔒 MANDATORY VALIDATION ENFORCEMENT
+
+**⚠️ CRITICAL REQUIREMENTS - NO EXCEPTIONS:**
+
+### Test Execution Order
+```bash
+# Step 1: Service-level tests (run individually)
+poetry run pytest tests/test_document_parser_service.py -v --tb=short
+poetry run pytest tests/test_ocr_service.py -v --tb=short  
+poetry run pytest tests/test_transcription_service.py -v --tb=short
+poetry run pytest tests/test_vision_analysis_service.py -v --tb=short
+poetry run pytest tests/test_ai_service.py -v --tb=short
+
+# Step 2: Docker compatibility (must run in container)
+docker compose exec app poetry run pytest tests/test_services_docker_compatibility.py -v --tb=short
+
+# Step 3: Context validation (verify database storage)
+docker compose exec app poetry run pytest tests/test_extracted_context_validation.py -v --tb=short
+
+# Step 4: Full integration (end-to-end testing)
+docker compose exec app poetry run pytest tests/test_file_attachment_integration.py -v --tb=short
+```
+
+### Success Criteria Enforcement
+
+**Each test run MUST show**:
+```
+========================= test session starts =========================
+collected X items
+
+test_service_name.py::test_function_1 PASSED    [100%]
+test_service_name.py::test_function_2 PASSED    [100%]
+...
+========================= X passed, 0 failed =========================
+```
+
+### Failure Protocol
+
+**If ANY test fails**:
+1. ❌ **IMMEDIATE STOP** - Do not proceed to next service
+2. 🔍 **ANALYZE** failure root cause
+3. 🛠️ **FIX** the failing functionality
+4. ✅ **RE-RUN** all tests for that service until 100% pass
+5. 🔄 **VERIFY** no regressions in previously passing services
+6. 📝 **DOCUMENT** the issue and resolution
+
+### Pre-Implementation Requirements
+
+**Docker Environment Must Have**:
+- [ ] Tesseract OCR with language packs installed
+- [ ] ffmpeg for audio/video processing
+- [ ] Python ML packages (whisper, torch, torchaudio)
+- [ ] API keys configured as environment variables
+- [ ] Test files mounted and accessible at `/app/test_files/`
+- [ ] Database with updated file model schema
+
+**API Configuration Must Include**:
+- [ ] Valid OpenAI API key for GPT-4 and Whisper
+- [ ] Valid Anthropic API key for Claude vision
+- [ ] Valid Google API key for Vision API (optional fallback)
+- [ ] Updated `ai_config.yaml` with file processing settings
+
+### Real API Call Requirements
+
+**All tests marked with `@pytest.mark.docker` MUST**:
+- ✅ Make actual API calls to external services
+- ✅ Verify extracted_context field is populated with real data
+- ✅ Store results in database and verify persistence
+- ✅ Demonstrate end-to-end functionality in containerized environment
+- ✅ Handle API failures gracefully with meaningful error messages
+
+**⚠️ ABSOLUTE REQUIREMENT: You MUST pass each validation gate before proceeding to the next service implementation. No shortcuts, no exceptions, no "we'll fix it later" - everything must work perfectly before moving forward.**
