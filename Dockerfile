@@ -13,15 +13,12 @@ ENV POETRY_NO_INTERACTION=1
 # Add Poetry to PATH
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
-# Install system dependencies
+# Install system dependencies for file processing (PRP requirements + ML libraries)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         curl \
         git \
-        clamav \
-        clamav-daemon \
-        clamav-freshclam \
         libgl1-mesa-dri \
         libglib2.0-0 \
         libsm6 \
@@ -31,10 +28,31 @@ RUN apt-get update \
         libgcc-s1 \
         fonts-dejavu-core \
         fontconfig \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-spa \
+        tesseract-ocr-fra \
+        tesseract-ocr-deu \
+        ffmpeg \
+        libmagic1 \
+        pkg-config \
+        libffi-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
+        libopenjp2-7-dev \
+        zlib1g-dev \
+        liblcms2-dev \
+        libwebp-dev \
+        libtcl8.6 \
+        libtk8.6 \
+        python3-tk \
+        libblas-dev \
+        liblapack-dev \
+        gfortran \
     && rm -rf /var/lib/apt/lists/*
 
-# Initialize ClamAV database (run as root before switching to appuser)
-RUN freshclam --quiet || echo "ClamAV database update attempted"
+# ClamAV database initialization removed - not needed for Phase 1
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -

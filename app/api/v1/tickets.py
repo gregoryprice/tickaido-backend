@@ -359,3 +359,79 @@ async def get_ticket_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get ticket stats: {str(e)}"
         )
+
+
+@router.post("/{ticket_id}/attachments")
+async def add_files_to_ticket(
+    ticket_id: UUID,
+    file_ids: dict,  # {"file_ids": ["uuid1", "uuid2"]}
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Add files to a ticket via file_ids array.
+    """
+    try:
+        from app.services.ticket_attachment_service import TicketAttachmentService
+        
+        attachment_service = TicketAttachmentService()
+        file_ids_list = [UUID(fid) for fid in file_ids.get("file_ids", [])]
+        
+        updated_ticket = await attachment_service.add_files_to_ticket(
+            db=db,
+            ticket_id=ticket_id,
+            new_file_ids=file_ids_list,
+            user=current_user
+        )
+        
+        return {
+            "message": "Files added to ticket successfully",
+            "ticket_id": str(updated_ticket.id),
+            "file_ids": updated_ticket.file_ids
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add files to ticket: {str(e)}"
+        )
+
+
+@router.get("/{ticket_id}/files")
+async def get_ticket_files(
+    ticket_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get all files associated with a ticket.
+    """
+    try:
+        from app.services.ticket_attachment_service import TicketAttachmentService
+        
+        attachment_service = TicketAttachmentService()
+        files = await attachment_service.get_ticket_files(db, ticket_id)
+        
+        # Convert to response format
+        file_responses = []
+        for file_obj in files:
+            file_responses.append({
+                "id": str(file_obj.id),
+                "filename": file_obj.filename,
+                "file_size": file_obj.file_size,
+                "mime_type": file_obj.mime_type,
+                "file_type": file_obj.file_type.value,
+                "status": file_obj.status.value,
+                "content_summary": file_obj.content_summary,
+                "extraction_method": file_obj.extraction_method,
+                "created_at": file_obj.created_at,
+                "updated_at": file_obj.updated_at
+            })
+        
+        return file_responses
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get ticket files: {str(e)}"
+        )

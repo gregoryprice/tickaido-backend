@@ -3,20 +3,10 @@
 Celery tasks for file processing, analysis, and management
 """
 
-import os
-import asyncio
-from typing import Dict, Any, List
-from uuid import UUID
-from datetime import datetime, timezone, timedelta
+from typing import Dict, Any
 
-from celery import current_app as celery_app
+from app.celery_app import celery_app
 from celery.utils.log import get_task_logger
-from sqlalchemy import select, and_
-
-from app.database import get_db_session
-from app.models.file import File, FileStatus, FileType
-from app.services.file_service import FileService
-from app.schemas.file import FileProcessingRequest, FileAnalysisRequest
 
 # Get logger
 logger = get_task_logger(__name__)
@@ -34,8 +24,8 @@ def process_file_upload(self, file_id: str, processing_options: Dict[str, Any] =
     logger.info(f"Starting file processing for file_id: {file_id}")
     
     try:
-        # Run async processing
-        result = asyncio.run(_process_file_async(file_id, processing_options))
+        # Use sync DB session with async services
+        result = _process_file_upload_sync(file_id, processing_options)
         logger.info(f"File processing completed for file_id: {file_id}")
         return result
         
@@ -46,23 +36,28 @@ def process_file_upload(self, file_id: str, processing_options: Dict[str, Any] =
 
 
 @celery_app.task(bind=True, retry_backoff=True, max_retries=3)
-def analyze_file_content(self, file_id: str, analysis_options: Dict[str, Any] = None):
+def reprocess_file(self, file_id: str):
     """
-    Perform AI-powered analysis on file content
+    Reprocess a file - same as process_file_upload but with force reprocessing
     
     Args:
-        file_id: UUID of the file to analyze
-        analysis_options: Analysis configuration
+        file_id: UUID of the file to reprocess
     """
-    logger.info(f"Starting file analysis for file_id: {file_id}")
+    logger.info(f"Starting file reprocessing for file_id: {file_id}")
     
     try:
-        result = asyncio.run(_analyze_file_async(file_id, analysis_options))
-        logger.info(f"File analysis completed for file_id: {file_id}")
+        # Force reprocessing by passing force_reprocess option
+        processing_options = {"force_reprocess": True}
+        
+        # Use sync DB session with async services
+        result = _process_file_upload_sync(file_id, processing_options)
+            
+        logger.info(f"File reprocessing completed for file_id: {file_id}")
         return result
         
     except Exception as exc:
-        logger.error(f"File analysis failed for file_id: {file_id}, error: {str(exc)}")
+        logger.error(f"File reprocessing failed for file_id: {file_id}, error: {str(exc)}")
+        # Retry with exponential backoff
         self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
 
 
@@ -74,7 +69,7 @@ def process_pending_files(self):
     logger.info("Starting processing of pending files")
     
     try:
-        processed_count = asyncio.run(_process_pending_files_async())
+        processed_count = _process_pending_files_sync()
         logger.info(f"Processed {processed_count} pending files")
         return {"processed": processed_count}
         
@@ -94,7 +89,7 @@ def cleanup_failed_uploads(self, older_than_hours: int = 24):
     logger.info(f"Starting cleanup of failed uploads older than {older_than_hours} hours")
     
     try:
-        cleaned_count = asyncio.run(_cleanup_failed_uploads_async(older_than_hours))
+        cleaned_count = _cleanup_failed_uploads_sync(older_than_hours)
         logger.info(f"Cleaned up {cleaned_count} failed uploads")
         return {"cleaned": cleaned_count}
         
@@ -103,150 +98,164 @@ def cleanup_failed_uploads(self, older_than_hours: int = 24):
         return {"error": str(exc)}
 
 
-@celery_app.task(bind=True)
-def generate_file_thumbnails(self, file_id: str, sizes: List[tuple] = None):
-    """
-    Generate thumbnails for image files
+# Helper functions for Celery tasks using sync DB with async services  
+def _process_file_upload_sync(file_id: str, processing_options: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Process file upload using sync DB session but async FileProcessingService"""
+    logger.info(f"_process_file_upload_sync starting for {file_id}")
     
-    Args:
-        file_id: UUID of the file
-        sizes: List of (width, height) tuples for thumbnail sizes
-    """
-    if not sizes:
-        sizes = [(150, 150), (300, 300), (600, 600)]
+    from app.services.file_processing_service import FileProcessingService
+    from app.database import SessionLocal
+    from app.models.file import File, FileStatus
+    from sqlalchemy import select, and_
+    from uuid import UUID
     
-    logger.info(f"Generating thumbnails for file_id: {file_id}")
-    
-    try:
-        result = asyncio.run(_generate_thumbnails_async(file_id, sizes))
-        logger.info(f"Thumbnail generation completed for file_id: {file_id}")
-        return result
-        
-    except Exception as exc:
-        logger.error(f"Thumbnail generation failed for file_id: {file_id}, error: {str(exc)}")
-        return {"error": str(exc)}
-
-
-@celery_app.task(bind=True, retry_backoff=True, max_retries=2) 
-def extract_file_text(self, file_id: str, extraction_options: Dict[str, Any] = None):
-    """
-    Extract text from various file types
-    
-    Args:
-        file_id: UUID of the file
-        extraction_options: Text extraction configuration
-    """
-    logger.info(f"Starting text extraction for file_id: {file_id}")
+    # Use synchronous database session for Celery
+    db = SessionLocal()
     
     try:
-        result = asyncio.run(_extract_text_async(file_id, extraction_options))
-        logger.info(f"Text extraction completed for file_id: {file_id}")
-        return result
+        # Get file record using sync query
+        db_file = db.execute(
+            select(File).where(
+                and_(File.id == UUID(file_id), File.is_deleted == False)
+            )
+        ).scalar_one_or_none()
         
-    except Exception as exc:
-        logger.error(f"Text extraction failed for file_id: {file_id}, error: {str(exc)}")
-        self.retry(exc=exc, countdown=30 * (self.request.retries + 1))
-
-
-@celery_app.task(bind=True)
-def scan_file_for_viruses(self, file_id: str):
-    """
-    Scan file for viruses using ClamAV
-    
-    Args:
-        file_id: UUID of the file to scan
-    """
-    logger.info(f"Starting virus scan for file_id: {file_id}")
-    
-    try:
-        result = asyncio.run(_scan_file_async(file_id))
-        logger.info(f"Virus scan completed for file_id: {file_id}")
-        return result
-        
-    except Exception as exc:
-        logger.error(f"Virus scan failed for file_id: {file_id}, error: {str(exc)}")
-        return {"error": str(exc), "status": "scan_failed"}
-
-
-# Async helper functions
-async def _process_file_async(file_id: str, processing_options: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Process file asynchronously"""
-    async with get_db_session() as db:
-        file_service = FileService()
-        
-        # Get file record
-        db_file = await file_service.get_file(db, UUID(file_id))
         if not db_file:
             raise ValueError(f"File not found: {file_id}")
         
-        # Set default processing options
-        if not processing_options:
-            processing_options = {
-                "extract_text": True,
-                "extract_metadata": True,
-                "analyze_content": True,
-                "scan_virus": True
-            }
+        # Skip processing if file is soft-deleted
+        if db_file.is_deleted:
+            logger.warning(f"Skipping processing for soft-deleted file: {file_id}")
+            raise ValueError(f"File is soft-deleted: {file_id}")
         
-        # Create processing request
-        processing_request = FileProcessingRequest(
-            extract_text=processing_options.get("extract_text", True),
-            extract_metadata=processing_options.get("extract_metadata", True),
-            analyze_content=processing_options.get("analyze_content", False)
-        )
+        # Handle idempotency - check current status
+        if db_file.status == FileStatus.PROCESSING:
+            logger.info(f"File {file_id} is already being processed, skipping")
+            return {"status": "already_processing", "file_id": file_id}
         
-        # Process file
-        result = await file_service.process_file(
-            db, UUID(file_id), processing_request, db_file.uploaded_by
-        )
+        if db_file.status == FileStatus.PROCESSED:
+            force_reprocess = processing_options.get("force_reprocess", False) if processing_options else False
+            if not force_reprocess:
+                logger.info(f"File {file_id} is already processed, skipping")
+                return {"status": "already_processed", "file_id": file_id}
         
-        if result:
-            return result.model_dump()
-        else:
-            raise Exception("File processing failed")
+        # Start processing
+        db_file.start_processing()
+        db.commit()
+        
+        try:
+            # Use FileProcessingService methods directly but handle transaction management here
+            file_processing_service = FileProcessingService()
+            
+            # Use asyncio with explicit event loop policy for better cleanup
+            import asyncio
+            
+            # Create async wrapper that calls service methods
+            async def async_process_with_service():
+                await _process_file_using_service_methods(file_processing_service, db_file)
+            
+            # Run async processing with proper cleanup handling
+            try:
+                # Use asyncio.run with debug=False to prevent cleanup warnings
+                if hasattr(asyncio, '_get_running_loop') and asyncio._get_running_loop() is not None:
+                    # If there's already a running loop, create a new one in a thread
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, async_process_with_service())
+                        future.result()
+                else:
+                    # Normal case - no existing loop
+                    asyncio.run(async_process_with_service())
+                    
+            except RuntimeError as e:
+                if "Event loop is closed" not in str(e):
+                    raise
+                # Ignore event loop closure errors during cleanup
+                logger.debug(f"Ignored event loop cleanup error: {e}")
+                
+            except Exception as e:
+                logger.error(f"Async processing failed: {e}")
+                raise
+            
+            # Mark as completed (transaction managed in Celery task)
+            db_file.complete_processing()
+            db.commit()
+            
+            logger.info(f"Successfully processed file {file_id}")
+            return {"status": "completed", "file_id": file_id}
+            
+        except Exception as e:
+            logger.error(f"File processing failed for {file_id}: {e}")
+            db_file.fail_processing(str(e)[:500])
+            db.commit()
+            raise
+            
+    except Exception as e:
+        logger.error(f"Database error for file {file_id}: {e}")
+        db.rollback()
+        raise e
+    
+    finally:
+        db.close()
 
 
-async def _analyze_file_async(file_id: str, analysis_options: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Analyze file content asynchronously"""
-    async with get_db_session() as db:
-        file_service = FileService()
-        
-        # Get file record
-        db_file = await file_service.get_file(db, UUID(file_id))
-        if not db_file:
-            raise ValueError(f"File not found: {file_id}")
-        
-        # Set default analysis options
-        if not analysis_options:
-            analysis_options = {
-                "categorize_content": True,
-                "analyze_sentiment": True,
-                "extract_entities": True,
-                "generate_summary": True
-            }
-        
-        # Create analysis request
-        analysis_request = FileAnalysisRequest(
-            categorize_content=analysis_options.get("categorize_content", True),
-            analyze_sentiment=analysis_options.get("analyze_sentiment", True),
-            extract_entities=analysis_options.get("extract_entities", True),
-            generate_summary=analysis_options.get("generate_summary", True)
+async def _process_file_using_service_methods(file_processing_service, db_file):
+    """Process file using FileProcessingService methods without transaction management"""
+    
+    # Get file content from storage using the service
+    file_content = await file_processing_service.file_service.storage_service.download_file(db_file.file_path)
+    if not file_content:
+        raise Exception("Unable to retrieve file content from storage")
+    
+    extracted_context = {}
+    
+    # Process based on file type using service methods
+    logger.info(f"File processing - MIME: {db_file.mime_type}, is_text_file: {db_file.is_text_file}")
+    
+    if db_file.is_text_file or db_file.mime_type == "application/pdf":
+        logger.info(f"Using document processing path")
+        document_data = await file_processing_service._extract_document_content(db_file, file_content)
+        extracted_context["document"] = document_data
+        db_file.extraction_method = "document_parser"
+    
+    elif db_file.is_image_file:
+        logger.info(f"Using image processing path")
+        image_data = await file_processing_service._extract_image_content(db_file, file_content)
+        extracted_context["image"] = image_data
+        db_file.extraction_method = "vision_ocr"
+    
+    elif db_file.is_media_file:
+        logger.info(f"Using audio processing path")
+        audio_data = await file_processing_service._extract_audio_content(db_file, file_content)
+        extracted_context["audio"] = audio_data
+        db_file.extraction_method = "speech_transcription"
+    
+    # Validate and clean extracted context
+    cleaned_context = file_processing_service._validate_and_clean_context(extracted_context)
+    db_file.extracted_context = cleaned_context
+    
+    # Generate AI summary using service method
+    all_text_content = file_processing_service._extract_text_from_context(extracted_context)
+    if all_text_content:
+        db_file.content_summary = await file_processing_service.ai_service.generate_summary(
+            all_text_content,
+            max_length=500
         )
-        
-        # Analyze file
-        result = await file_service.analyze_file(
-            db, UUID(file_id), analysis_request, db_file.uploaded_by
-        )
-        
-        if result:
-            return result.model_dump()
-        else:
-            raise Exception("File analysis failed")
+        db_file.language_detection = await file_processing_service.ai_service.detect_language(all_text_content)
+    else:
+        db_file.content_summary = f"Processed {db_file.file_type.value} file: {db_file.filename}"
+        db_file.language_detection = "en"
 
 
-async def _process_pending_files_async() -> int:
-    """Process all pending files"""
-    async with get_db_session() as db:
+def _process_pending_files_sync() -> int:
+    """Process all pending files using sync database session"""
+    from app.database import SessionLocal
+    from app.models.file import File, FileStatus
+    from sqlalchemy import select, and_
+    
+    db = SessionLocal()
+    
+    try:
         # Get files with UPLOADED status
         query = select(File).where(
             and_(
@@ -255,7 +264,7 @@ async def _process_pending_files_async() -> int:
             )
         )
         
-        result = await db.execute(query)
+        result = db.execute(query)
         pending_files = result.scalars().all()
         
         processed_count = 0
@@ -271,33 +280,44 @@ async def _process_pending_files_async() -> int:
                 continue
         
         return processed_count
+    
+    except Exception as e:
+        logger.error(f"Error processing pending files: {e}")
+        db.rollback()
+        raise e
+    
+    finally:
+        db.close()
 
 
-async def _cleanup_failed_uploads_async(older_than_hours: int) -> int:
-    """Clean up failed uploads"""
-    async with get_db_session() as db:
+def _cleanup_failed_uploads_sync(older_than_hours: int) -> int:
+    """Clean up failed uploads using sync database session"""
+    from app.database import SessionLocal
+    from app.models.file import File, FileStatus
+    from sqlalchemy import select, and_
+    from datetime import datetime, timezone, timedelta
+    
+    db = SessionLocal()
+    
+    try:
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
         
-        # Get files with ERROR status older than cutoff
+        # Get files with FAILED status older than cutoff
         query = select(File).where(
             and_(
-                File.status == FileStatus.ERROR,
+                File.status == FileStatus.FAILED,
                 File.created_at < cutoff_time,
                 File.is_deleted == False
             )
         )
         
-        result = await db.execute(query)
+        result = db.execute(query)
         failed_files = result.scalars().all()
         
         cleaned_count = 0
         
         for db_file in failed_files:
             try:
-                # Remove file from filesystem
-                if os.path.exists(db_file.storage_path):
-                    os.unlink(db_file.storage_path)
-                
                 # Soft delete from database
                 db_file.soft_delete()
                 cleaned_count += 1
@@ -306,110 +326,13 @@ async def _cleanup_failed_uploads_async(older_than_hours: int) -> int:
                 logger.error(f"Failed to cleanup file {db_file.id}: {str(e)}")
                 continue
         
-        await db.commit()
+        db.commit()
         return cleaned_count
-
-
-async def _generate_thumbnails_async(file_id: str, sizes: List[tuple]) -> Dict[str, Any]:
-    """Generate thumbnails for image files"""
-    async with get_db_session() as db:
-        file_service = FileService()
-        
-        # Get file record
-        db_file = await file_service.get_file(db, UUID(file_id))
-        if not db_file:
-            raise ValueError(f"File not found: {file_id}")
-        
-        # Check if file is an image
-        if db_file.file_type != FileType.IMAGE:
-            raise ValueError(f"File is not an image: {db_file.file_type}")
-        
-        # TODO: Implement thumbnail generation using PIL/Pillow
-        thumbnails_generated = []
-        
-        for width, height in sizes:
-            thumbnail_path = f"{db_file.storage_path}_thumb_{width}x{height}.jpg"
-            # Generate thumbnail logic here
-            thumbnails_generated.append({
-                "size": f"{width}x{height}",
-                "path": thumbnail_path
-            })
-        
-        # Update file record with thumbnail paths
-        if not db_file.processing_results:
-            db_file.processing_results = {}
-        
-        db_file.processing_results["thumbnails"] = thumbnails_generated
-        await db.commit()
-        
-        return {
-            "file_id": file_id,
-            "thumbnails": thumbnails_generated
-        }
-
-
-async def _extract_text_async(file_id: str, extraction_options: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Extract text from file"""
-    async with get_db_session() as db:
-        file_service = FileService()
-        
-        # Get file record  
-        db_file = await file_service.get_file(db, UUID(file_id))
-        if not db_file:
-            raise ValueError(f"File not found: {file_id}")
-        
-        # Get file content
-        content = await file_service.get_file_content(db, UUID(file_id))
-        if not content:
-            raise ValueError(f"Cannot read file content for: {file_id}")
-        
-        # Extract text based on file type
-        extracted_text = await file_service._extract_text(content, db_file.mime_type)
-        
-        # Update file record
-        if not db_file.processing_results:
-            db_file.processing_results = {}
-        
-        db_file.processing_results["extracted_text"] = extracted_text
-        db_file.processing_results["text_length"] = len(extracted_text)
-        
-        await db.commit()
-        
-        return {
-            "file_id": file_id,
-            "extracted_text": extracted_text,
-            "text_length": len(extracted_text)
-        }
-
-
-async def _scan_file_async(file_id: str) -> Dict[str, Any]:
-    """Scan file for viruses"""
-    async with get_db_session() as db:
-        file_service = FileService()
-        
-        # Get file record
-        db_file = await file_service.get_file(db, UUID(file_id))
-        if not db_file:
-            raise ValueError(f"File not found: {file_id}")
-        
-        # TODO: Implement actual ClamAV scanning
-        # For now, assume file is clean
-        scan_result = {
-            "status": "clean",
-            "scanned_at": datetime.now(timezone.utc).isoformat(),
-            "engine": "clamav",
-            "threats_found": 0
-        }
-        
-        # Update file record
-        if not db_file.processing_results:
-            db_file.processing_results = {}
-        
-        db_file.processing_results["virus_scan"] = scan_result
-        
-        await db.commit()
-        
-        return {
-            "file_id": file_id,
-            "scan_result": scan_result
-        }
+    
+    except Exception as e:
+        logger.error(f"Error cleaning up failed uploads: {e}")
+        db.rollback()
+        raise e
+    
+    finally:
+        db.close()

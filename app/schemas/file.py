@@ -399,3 +399,57 @@ class FileErrorResponse(BaseSchema):
     error_message: str = Field(description="Error message")
     retry_after: Optional[int] = Field(None, description="Seconds to wait before retry")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
+
+
+# New schemas for PRP implementation with extracted_context JSON structure
+class FileUploadResponse(BaseSchema):
+    """Response for file upload according to PRP specs"""
+    id: UUID = Field(description="Unique file identifier")
+    filename: str = Field(description="Original filename")
+    file_size: int = Field(description="File size in bytes")
+    mime_type: str = Field(description="MIME type of the file")
+    file_type: FileTypeSchema = Field(description="Detected file type")
+    status: FileStatusSchema = Field(description="Current processing status")
+    download_url: Optional[str] = Field(None, description="Temporary download URL")
+    processing_required: bool = Field(description="Whether file needs AI processing")
+
+
+class FileResponse(BaseSchema):
+    """Unified file response with extracted_context support"""
+    id: UUID = Field(description="Unique file identifier")
+    filename: str = Field(description="Original filename")
+    file_size: int = Field(description="File size in bytes")
+    mime_type: str = Field(description="MIME type")
+    file_type: FileTypeSchema = Field(description="File type category")
+    status: FileStatusSchema = Field(description="Processing status")
+    extraction_method: Optional[str] = Field(None, description="Method used for content extraction")
+    content_summary: Optional[str] = Field(None, description="AI-generated content summary")
+    extracted_context: Optional[Dict[str, Any]] = Field(None, description="Unified extracted content JSON")
+    language_detection: Optional[str] = Field(None, description="Detected language")
+    processing_started_at: Optional[datetime] = Field(None, description="Processing start time")
+    processing_completed_at: Optional[datetime] = Field(None, description="Processing completion time")
+    processing_error: Optional[str] = Field(None, description="Processing error message")
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
+
+
+class FileListResponse(BaseSchema):
+    """Response for file list endpoint"""
+    files: List[FileResponse] = Field(description="List of files")
+    total: int = Field(description="Total number of files")
+    skip: int = Field(description="Number of files skipped")
+    limit: int = Field(description="Maximum number of files returned")
+
+
+class FileProcessingStatusResponse(BaseSchema):
+    """Detailed processing status response"""
+    id: UUID = Field(description="File identifier") 
+    filename: str = Field(description="Filename")
+    status: str = Field(description="Processing status")
+    extraction_method: Optional[str] = Field(None, description="Extraction method used")
+    processing_started_at: Optional[datetime] = Field(None, description="Processing start time")
+    processing_completed_at: Optional[datetime] = Field(None, description="Processing completion time")
+    processing_error: Optional[str] = Field(None, description="Processing error message")
+    has_content: bool = Field(description="Whether file has extracted content")
+    content_summary: Optional[str] = Field(None, description="Content summary")
+    language_detection: Optional[str] = Field(None, description="Detected language")

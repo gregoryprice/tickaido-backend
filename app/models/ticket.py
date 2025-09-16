@@ -123,6 +123,13 @@ class Ticket(BaseModel):
         comment="Organization to which the ticket belongs"
     )
     
+    # File attachments - array of file IDs (replaces old foreign key relationship)
+    file_ids = Column(
+        JSON,
+        nullable=True,
+        comment="Array of file IDs associated with this ticket"
+    )
+    
     integration_id = Column(
         UUID(as_uuid=True),
         ForeignKey("integrations.id"),
@@ -368,11 +375,7 @@ class Ticket(BaseModel):
         foreign_keys=[escalated_by_id]
     )
     
-    files = relationship(
-        "File",
-        back_populates="ticket",
-        cascade="all, delete-orphan"
-    )
+    # Files are now handled via file_ids array instead of direct relationship
     
     integration = relationship(
         "Integration",

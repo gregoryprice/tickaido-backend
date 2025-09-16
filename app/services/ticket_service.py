@@ -50,7 +50,7 @@ class TicketService:
             # Build query with organization isolation
             query = select(Ticket).join(User, Ticket.created_by_id == User.id).options(
                 selectinload(Ticket.creator),
-                selectinload(Ticket.files)
+# selectinload(Ticket.files)  # Removed - files now via file_ids array
             ).filter(User.organization_id == organization_id)
             
             # Apply filters
@@ -226,7 +226,7 @@ class TicketService:
             # Load relationships
             query = select(Ticket).options(
                 selectinload(Ticket.creator),
-                selectinload(Ticket.files)
+# selectinload(Ticket.files)  # Removed - files now via file_ids array
             ).where(Ticket.id == ticket.id)
             
             result = await db.execute(query)
@@ -423,7 +423,7 @@ class TicketService:
         try:
             query = select(Ticket).join(User, Ticket.created_by_id == User.id).options(
                 selectinload(Ticket.creator),
-                selectinload(Ticket.files)
+# selectinload(Ticket.files)  # Removed - files now via file_ids array
             ).where(
                 and_(
                     Ticket.id == ticket_id,

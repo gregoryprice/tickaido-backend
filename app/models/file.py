@@ -97,21 +97,21 @@ class File(BaseModel):
         comment="Current processing status"
     )
     
-    # Relationships
-    ticket_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("tickets.id"),
-        nullable=True,
-        index=True,
-        comment="Associated ticket ID"
-    )
-    
+    # Relationships - removed ticket_id, files now referenced by ticket.file_ids array
     uploaded_by_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),
         nullable=False,
         index=True,
         comment="User who uploaded the file"
+    )
+    
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+        comment="Organization that owns this file"
     )
     
     # Processing metadata
@@ -140,7 +140,7 @@ class File(BaseModel):
         comment="Number of processing attempts"
     )
     
-    # AI Analysis Results
+    # AI Analysis Results - Simplified Structure
     ai_analysis_version = Column(
         String(20),
         nullable=True,
@@ -153,73 +153,17 @@ class File(BaseModel):
         comment="AI confidence in analysis (0-1)"
     )
     
-    # Text extraction (OCR/document parsing)
-    extracted_text = Column(
-        Text,
+    # Unified Content Extraction (NEW APPROACH) - as specified in PRP
+    extracted_context = Column(
+        JSON,
         nullable=True,
-        comment="Text extracted from file"
+        comment="Unified JSON structure for all content types (document, image, audio)"
     )
     
-    text_extraction_method = Column(
+    extraction_method = Column(
         String(50),
         nullable=True,
-        comment="Method used for text extraction (ocr, parsing, etc.)"
-    )
-    
-    text_extraction_confidence = Column(
-        String(10),
-        nullable=True,
-        comment="Confidence score for text extraction"
-    )
-    
-    # Audio transcription
-    transcription_text = Column(
-        Text,
-        nullable=True,
-        comment="Transcribed audio content"
-    )
-    
-    transcription_language = Column(
-        String(10),
-        nullable=True,
-        comment="Detected language of transcription"
-    )
-    
-    transcription_confidence = Column(
-        String(10),
-        nullable=True,
-        comment="Transcription confidence score"
-    )
-    
-    transcription_duration_seconds = Column(
-        Integer,
-        nullable=True,
-        comment="Duration of audio file in seconds"
-    )
-    
-    # Image analysis
-    image_description = Column(
-        Text,
-        nullable=True,
-        comment="AI-generated description of image content"
-    )
-    
-    detected_objects = Column(
-        JSON,
-        nullable=True,
-        comment="List of objects detected in image"
-    )
-    
-    image_text_regions = Column(
-        JSON,
-        nullable=True,
-        comment="Text regions found in image with coordinates"
-    )
-    
-    image_metadata = Column(
-        JSON,
-        nullable=True,
-        comment="EXIF and other image metadata"
+        comment="Method used for extraction (document_parser, vision_ocr, speech_transcription)"
     )
     
     # Content analysis
@@ -340,14 +284,14 @@ class File(BaseModel):
     )
     
     # Relationships
-    ticket = relationship(
-        "Ticket",
-        back_populates="files"
-    )
-    
     uploader = relationship(
         "User",
         back_populates="uploaded_files"
+    )
+    
+    organization = relationship(
+        "Organization",
+        back_populates="files"
     )
     
     def __repr__(self):
@@ -414,9 +358,7 @@ class File(BaseModel):
     def has_content(self) -> bool:
         """Check if file has extracted content"""
         return bool(
-            self.extracted_text or 
-            self.transcription_text or 
-            self.image_description or
+            self.extracted_context or
             self.content_summary
         )
     
@@ -458,20 +400,43 @@ class File(BaseModel):
         self.expires_at = datetime.now(timezone.utc) + timedelta(days=days)
     
     def get_all_content(self) -> str:
-        """Get combined content from all extraction methods"""
+        """Get combined content from extracted_context JSON structure"""
         content_parts = []
         
-        if self.extracted_text:
-            content_parts.append(f"Extracted Text:\n{self.extracted_text}")
-        
-        if self.transcription_text:
-            content_parts.append(f"Transcription:\n{self.transcription_text}")
-        
-        if self.image_description:
-            content_parts.append(f"Image Description:\n{self.image_description}")
+        if self.extracted_context:
+            context = self.extracted_context
+            
+            # Document content
+            if "document" in context:
+                doc = context["document"]
+                doc_text = ""
+                for page in doc.get("pages", []):
+                    doc_text += page.get("text", "")
+                if doc_text:
+                    content_parts.append(f"Document Content:\n{doc_text}")
+            
+            # Image content
+            if "image" in context:
+                img = context["image"]
+                if img.get("description"):
+                    content_parts.append(f"Image Description:\n{img['description']}")
+                
+                # Text found in image
+                text_regions = img.get("text_regions", [])
+                if text_regions:
+                    image_text = " ".join([region.get("text", "") for region in text_regions])
+                    if image_text:
+                        content_parts.append(f"Text in Image:\n{image_text}")
+            
+            # Audio content
+            if "audio" in context:
+                audio = context["audio"]
+                transcription = audio.get("transcription", {}).get("text", "")
+                if transcription:
+                    content_parts.append(f"Audio Transcription:\n{transcription}")
         
         if self.content_summary:
-            content_parts.append(f"Content Summary:\n{self.content_summary}")
+            content_parts.append(f"AI Summary:\n{self.content_summary}")
         
         return "\n\n---\n\n".join(content_parts)
     
@@ -481,9 +446,8 @@ class File(BaseModel):
         if self.status == FileStatus.PROCESSING:
             return False
         
-        # Check if file is referenced by active tickets
-        if self.ticket and not self.ticket.is_deleted:
-            return False
+        # Files are now referenced by ticket.file_ids arrays
+        # Additional validation can be added here if needed
         
         return True
     

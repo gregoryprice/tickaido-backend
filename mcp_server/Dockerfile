@@ -35,6 +35,9 @@ RUN poetry config virtualenvs.create false \
 COPY mcp_server/ ./mcp_server/
 COPY mcp_client/ ./mcp_client/
 
+# Set PYTHONPATH so imports work correctly
+ENV PYTHONPATH=/app:/app/mcp_server
+
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser \
     && chown -R appuser:appuser /app
