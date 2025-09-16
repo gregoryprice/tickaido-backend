@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "ai-ticket-creator-complete-2025",
 		"name": "AI Ticket Creator Backend API - Complete (Latest Architecture)",
-		"description": "Complete API collection for AI-powered ticket creation and management system with modern multi-agent architecture, comprehensive member management, and extensive integrations.\n\n## 🔐 Authentication Setup for Postman Testing\n\n### **Step 1: Get Clerk JWT Token**\n1. Open your frontend application in a browser\n2. Log in with your Clerk account\n3. Open browser developer console (F12)\n4. Run: `await window.Clerk.session.getToken()`\n5. Copy the returned JWT token\n6. Set it as `CLERK_JWT_TOKEN` in Postman environment\n\n### **Step 2: Generate API Key**\n1. Use the \"Generate API Key for Testing\" request\n2. This exchanges your Clerk JWT for a long-lived API key\n3. The API key is automatically saved as `ACCESS_TOKEN`\n4. Use this API key for all subsequent requests\n\n### **Alternative: Use Existing API Token Management**\n- Use the `/api/v1/api-tokens` endpoints to manage API keys\n- Generate tokens with custom names and permissions\n- Revoke tokens when no longer needed\n\n## Key Features\n\n### 🧑‍💼 Member Management\n- **Role-Based Access Control**: Admin and Member roles with proper permission enforcement\n- **Invitation System**: Secure token-based invitations with expiration tracking\n- **Organization Discovery**: Automatic domain-based organization matching\n- **Security Controls**: Self-role modification prevention, last admin protection\n- **Auto-Admin Promotion**: Intelligent admin promotion when needed\n- **Cross-Organization Isolation**: Complete data isolation between organizations\n\n### 🤖 AI Agent System\n- **Multi-Agent Architecture**: Multiple specialized agents per organization\n- **Rich Configuration**: 20+ typed configuration fields for precise agent behavior\n- **Change History**: Complete audit trail with rollback capabilities\n- **File Context Integration**: Process up to 20 files per agent for enhanced context\n- **Avatar Management**: Dedicated avatar upload/management system\n- **Task Processing**: Queue-based autonomous task handling\n\n### 💬 Agent-Centric Chat\n- **Thread Management**: Create, update, delete conversation threads per agent\n- **Context-Aware AI**: Agents use their specific configuration and file context\n- **Real-time Processing**: WebSocket support for live conversations\n- **Title Generation**: AI-powered thread title suggestions\n- **Message History**: Full conversation history with search and filtering\n\n### 🎫 Advanced Ticketing\n- **AI-Powered Creation**: Natural language ticket creation with context analysis\n- **Multi-Stage Workflow**: Status management with rich metadata\n- **File Attachments**: OCR, transcription, and document processing\n- **Integration Routing**: Automatic routing to appropriate external systems\n- **Analytics & Stats**: Comprehensive reporting and performance metrics\n\n### 🔗 Integration Platform\n- **Category-Based System**: 7 functional categories (ticketing, CRM, messaging, etc.)\n- **Platform Identification**: Support for JIRA, Salesforce, GitHub, Slack, Teams, Zoom\n- **Automatic Status Management**: Smart status handling and health monitoring\n- **Field Discovery**: Dynamic field mapping for JIRA and other systems\n- **Testing & Validation**: Built-in connection testing and validation\n\n### 👥 User Management\n- **Avatar System**: User avatar upload with multiple sizes and caching\n- **Profile Management**: Comprehensive user profile with preferences\n- **Organization Context**: Full organization membership and role management\n\n## Authentication Architecture\n- **Frontend Users**: Authenticate via Clerk (OAuth/SSO providers)\n- **API Testing**: Use Clerk JWT → API Key exchange for long-lived tokens\n- **Service-to-Service**: Direct API key authentication\n- **Hybrid Support**: System validates both Clerk JWTs and API keys\n\n## Environment Variables\nKey variables for testing:\n- `BASE_URL`: API base URL (default: http://localhost:8000)\n- `CLERK_JWT_TOKEN`: JWT from Clerk frontend authentication\n- `API_KEY`: Long-lived API key for testing (auto-generated)\n- `ACCESS_TOKEN`: Current token (auto-populated with API key)\n- `USER_ID`, `ORGANIZATION_ID`: User context (auto-populated)\n- Integration credentials for external system testing\n\n## Base URL\n- **Local Development**: http://localhost:8000\n- **API Documentation**: http://localhost:8000/docs\n- **Health Check**: http://localhost:8000/health",
+		"description": "Complete API collection for AI-powered ticket creation and management system with modern multi-agent architecture, comprehensive member management, and extensive integrations.\n\n## 🔐 Authentication Setup for Postman Testing\n\n### **Step 1: Get Clerk JWT Token**\n1. Open your frontend application in a browser\n2. Log in with your Clerk account\n3. Open browser developer console (F12)\n4. Run: `await window.Clerk.session.getToken()`\n5. Copy the returned JWT token\n6. Set it as `CLERK_JWT_TOKEN` in Postman environment\n\n### **Step 2: Generate API Key**\n1. Use the \"Generate API Key for Testing\" request\n2. This exchanges your Clerk JWT for a long-lived API key\n3. The API key is automatically saved as `ACCESS_TOKEN`\n4. Use this API key for all subsequent requests\n\n### **Alternative: Use Existing API Token Management**\n- Use the `/api/v1/api-tokens` endpoints to manage API keys\n- Generate tokens with custom names and permissions\n- Revoke tokens when no longer needed\n\n## Key Features\n\n### 🧑‍💼 Member Management\n- **Role-Based Access Control**: Admin and Member roles with proper permission enforcement\n- **Invitation System**: Secure token-based invitations with expiration tracking\n- **Organization Discovery**: Automatic domain-based organization matching\n- **Security Controls**: Self-role modification prevention, last admin protection\n- **Auto-Admin Promotion**: Intelligent admin promotion when needed\n- **Cross-Organization Isolation**: Complete data isolation between organizations\n\n### 🤖 AI Agent System\n- **Multi-Agent Architecture**: Multiple specialized agents per organization\n- **Rich Configuration**: 20+ typed configuration fields for precise agent behavior\n- **Change History**: Complete audit trail with rollback capabilities\n- **File Context Integration**: Process up to 20 files per agent for enhanced context\n- **Avatar Management**: Dedicated avatar upload/management system\n- **Task Processing**: Queue-based autonomous task handling\n\n### 💬 Agent-Centric Chat\n- **Thread Management**: Create, update, delete conversation threads per agent\n- **Context-Aware AI**: Agents use their specific configuration and file context\n- **Real-time Processing**: WebSocket support for live conversations\n- **Title Generation**: AI-powered thread title suggestions\n- **Message History**: Full conversation history with search and filtering\n\n### 📁 File Attachment System\n- **Universal File Upload**: Support for documents, images, audio, and video files\n- **AI Content Extraction**: PyMuPDF document parsing, Tesseract OCR, Whisper transcription\n- **Unified JSON Storage**: All extracted content in structured extracted_context field\n- **Background Processing**: Non-blocking AI processing with status tracking\n- **Organization Scoping**: Multi-tenant file isolation and access control\n- **Independent Upload**: Files uploaded separately, then associated with tickets/threads\n\n### 🎫 Advanced Ticketing\n- **AI-Powered Creation**: Natural language ticket creation with context analysis\n- **File-Enhanced AI**: Ticket categorization using file content analysis\n- **Multi-Stage Workflow**: Status management with rich metadata\n- **File Association**: file_ids array for flexible file-ticket relationships\n- **Integration Routing**: Automatic routing to appropriate external systems\n- **Analytics & Stats**: Comprehensive reporting and performance metrics\n\n### 🔗 Integration Platform\n- **Category-Based System**: 7 functional categories (ticketing, CRM, messaging, etc.)\n- **Platform Identification**: Support for JIRA, Salesforce, GitHub, Slack, Teams, Zoom\n- **Automatic Status Management**: Smart status handling and health monitoring\n- **Field Discovery**: Dynamic field mapping for JIRA and other systems\n- **Testing & Validation**: Built-in connection testing and validation\n\n### 👥 User Management\n- **Avatar System**: User avatar upload with multiple sizes and caching\n- **Profile Management**: Comprehensive user profile with preferences\n- **Organization Context**: Full organization membership and role management\n\n## Authentication Architecture\n- **Frontend Users**: Authenticate via Clerk (OAuth/SSO providers)\n- **API Testing**: Use Clerk JWT → API Key exchange for long-lived tokens\n- **Service-to-Service**: Direct API key authentication\n- **Hybrid Support**: System validates both Clerk JWTs and API keys\n\n## Environment Variables\nKey variables for testing:\n- `BASE_URL`: API base URL (default: http://localhost:8000)\n- `CLERK_JWT_TOKEN`: JWT from Clerk frontend authentication\n- `API_KEY`: Long-lived API key for testing (auto-generated)\n- `ACCESS_TOKEN`: Current token (auto-populated with API key)\n- `USER_ID`, `ORGANIZATION_ID`: User context (auto-populated)\n- Integration credentials for external system testing\n\n## Base URL\n- **Local Development**: http://localhost:8000\n- **API Documentation**: http://localhost:8000/docs\n- **Health Check**: http://localhost:8000/health",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "ai-ticket-creator"
 	},
@@ -1124,6 +1124,332 @@
 			"description": "Agent-centric chat system with thread management, message handling, and AI-powered responses. Each agent maintains separate conversation threads with context awareness."
 		},
 		{
+			"name": "📁 File Attachments",
+			"item": [
+				{
+					"name": "Upload File",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"description": "File to upload"
+								},
+								{
+									"key": "description",
+									"value": "Screenshot of login error dialog",
+									"type": "text",
+									"description": "Optional file description"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files/upload",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files", "upload"]
+						},
+						"description": "Upload a file with automatic processing. Files are uploaded independently and can be associated with tickets/threads later."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ File uploaded successfully');",
+									"    console.log('File ID:', response.id);",
+									"    console.log('Processing required:', response.processing_required);",
+									"    ",
+									"    // Save file_id for other requests",
+									"    pm.environment.set('UPLOADED_FILE_ID', response.id);",
+									"    ",
+									"    pm.test('File upload successful', function () {",
+									"        pm.expect(response.id).to.be.a('string');",
+									"        pm.expect(response.filename).to.be.a('string');",
+									"        pm.expect(response.file_size).to.be.a('number');",
+									"        pm.expect(response.processing_required).to.be.a('boolean');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get File Metadata",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files/{{UPLOADED_FILE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files", "{{UPLOADED_FILE_ID}}"]
+						},
+						"description": "Get file metadata and processing status."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ File metadata retrieved');",
+									"    console.log('Status:', response.status);",
+									"    console.log('Extraction method:', response.extraction_method);",
+									"    ",
+									"    pm.test('File metadata valid', function () {",
+									"        pm.expect(response.id).to.be.a('string');",
+									"        pm.expect(response.status).to.be.oneOf(['uploaded', 'processing', 'processed', 'failed']);",
+									"        if (response.content_summary) {",
+									"            pm.expect(response.content_summary).to.be.a('string');",
+									"        }",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Download File Content",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files/{{UPLOADED_FILE_ID}}/content",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files", "{{UPLOADED_FILE_ID}}", "content"]
+						},
+						"description": "Download file content with proper access control and organization scoping."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    console.log('✅ File download successful');",
+									"    console.log('Content-Type:', pm.response.headers.get('Content-Type'));",
+									"    console.log('Content-Length:', pm.response.headers.get('Content-Length'));",
+									"    ",
+									"    pm.test('File download headers', function () {",
+									"        pm.expect(pm.response.headers.get('Content-Disposition')).to.include('attachment');",
+									"        pm.expect(pm.response.headers.get('Content-Length')).to.be.a('string');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "List User Files",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files?skip=0&limit=20&file_type=document&status=processed",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files"],
+							"query": [
+								{
+									"key": "skip",
+									"value": "0",
+									"description": "Number of files to skip for pagination"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Maximum number of files to return"
+								},
+								{
+									"key": "file_type",
+									"value": "document",
+									"description": "Filter by file type (document, image, audio, video, etc.)"
+								},
+								{
+									"key": "status",
+									"value": "processed",
+									"description": "Filter by processing status"
+								}
+							]
+						},
+						"description": "List user's files with organization scoping and optional filters."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ Files listed successfully');",
+									"    console.log('Total files:', response.total);",
+									"    console.log('Returned files:', response.files.length);",
+									"    ",
+									"    pm.test('File list response', function () {",
+									"        pm.expect(response.files).to.be.an('array');",
+									"        pm.expect(response.total).to.be.a('number');",
+									"        pm.expect(response.skip).to.be.a('number');",
+									"        pm.expect(response.limit).to.be.a('number');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get File Processing Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files/{{UPLOADED_FILE_ID}}/processing-status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files", "{{UPLOADED_FILE_ID}}", "processing-status"]
+						},
+						"description": "Get detailed processing status for a file including extraction progress."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ Processing status retrieved');",
+									"    console.log('Status:', response.status);",
+									"    console.log('Has content:', response.has_content);",
+									"    console.log('Extraction method:', response.extraction_method);",
+									"    ",
+									"    pm.test('Processing status response', function () {",
+									"        pm.expect(response.status).to.be.oneOf(['uploaded', 'processing', 'processed', 'failed']);",
+									"        pm.expect(response.has_content).to.be.a('boolean');",
+									"        if (response.processing_error) {",
+									"            pm.expect(response.processing_error).to.be.a('string');",
+									"        }",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Reprocess File",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files/{{UPLOADED_FILE_ID}}/reprocess",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files", "{{UPLOADED_FILE_ID}}", "reprocess"]
+						},
+						"description": "Reprocess a file that failed or needs updated extraction. Triggers background processing."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ File reprocessing started');",
+									"    console.log('Message:', response.message);",
+									"    ",
+									"    pm.test('Reprocess initiated', function () {",
+									"        pm.expect(response.message).to.include('reprocessing');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Delete File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/files/{{UPLOADED_FILE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "files", "{{UPLOADED_FILE_ID}}"]
+						},
+						"description": "Delete a file with access control validation. File must be owned by user's organization."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ File deleted successfully');",
+									"    console.log('Message:', response.message);",
+									"    ",
+									"    pm.test('File deletion successful', function () {",
+									"        pm.expect(response.message).to.include('deleted');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				}
+			],
+			"description": "File attachment system with support for document parsing, OCR, audio transcription, and AI-powered content analysis. Files are uploaded independently and associated with tickets via file_ids arrays."
+		},
+		{
 			"name": "🎫 Ticket Management",
 			"item": [
 				{
@@ -1246,7 +1572,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"user_input\": \"Hey, I'm having a really frustrating issue with the mobile app. Every time I try to upload a photo to my profile, the app just crashes completely and I have to restart it. This has been happening for the past week on my iPhone 14 Pro running iOS 16.5. I've tried deleting and reinstalling the app but it's still not working. My photos are really important to me and I need this fixed ASAP because I'm trying to update my business profile before a big meeting tomorrow. Can someone please help me figure out what's going on?\",\n  \"uploaded_files\": [],\n  \"conversation_context\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"I mentioned earlier that I'm using the latest version of the app\",\n      \"timestamp\": \"2024-01-15T10:30:00Z\"\n    }\n  ],\n  \"user_preferences\": {\n    \"priority_preference\": \"urgent\",\n    \"communication_style\": \"direct\",\n    \"technical_level\": \"intermediate\"\n  },\n  \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
+							"raw": "{\n  \"user_input\": \"Hey, I'm having a really frustrating issue with the mobile app. Every time I try to upload a photo to my profile, the app just crashes completely and I have to restart it. This has been happening for the past week on my iPhone 14 Pro running iOS 16.5. I've tried deleting and reinstalling the app but it's still not working. My photos are really important to me and I need this fixed ASAP because I'm trying to update my business profile before a big meeting tomorrow. Can someone please help me figure out what's going on?\",\n  \"uploaded_files\": [\"{{UPLOADED_FILE_ID}}\"],\n  \"conversation_context\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"I mentioned earlier that I'm using the latest version of the app\",\n      \"timestamp\": \"2024-01-15T10:30:00Z\"\n    }\n  ],\n  \"user_preferences\": {\n    \"priority_preference\": \"urgent\",\n    \"communication_style\": \"direct\",\n    \"technical_level\": \"intermediate\"\n  },\n  \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/tickets/ai-create",
@@ -1393,9 +1719,63 @@
 						},
 						"description": "Soft delete a ticket (marks as deleted but preserves data for audit purposes)."
 					}
+				},
+				{
+					"name": "Create Ticket with File Attachments",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Login Error with Screenshot\",\n  \"description\": \"Unable to login - see attached screenshot and error log for details\",\n  \"category\": \"technical\",\n  \"priority\": \"high\",\n  \"file_ids\": [\"{{UPLOADED_FILE_ID}}\"],\n  \"create_externally\": false\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets"]
+						},
+						"description": "Create a ticket with file attachments. Files must be uploaded first via Files API, then referenced by file_ids."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ Ticket with files created successfully');",
+									"    console.log('Ticket ID:', response.id);",
+									"    console.log('File IDs:', response.ids);",
+									"    console.log('AI Category:', response.category);",
+									"    console.log('AI Confidence:', response.ai_confidence_score);",
+									"    ",
+									"    // Save ticket ID for other requests",
+									"    pm.environment.set('TICKET_WITH_FILES_ID', response.id);",
+									"    ",
+									"    pm.test('Ticket creation with files', function () {",
+									"        pm.expect(response.id).to.be.a('string');",
+									"        pm.expect(response.ids).to.be.an('array');",
+									"        pm.expect(response.ids.length).to.be.above(0);",
+									"        pm.expect(response.category).to.be.a('string');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
 				}
 			],
-			"description": "Comprehensive ticket management system with AI-powered creation, flexible updates, and detailed analytics. Supports both manual and AI-assisted ticket creation workflows."
+			"description": "Comprehensive ticket management system with AI-powered creation, flexible updates, and detailed analytics. Supports file attachments via file_ids arrays with AI-enhanced categorization."
 		},
 		{
 			"name": "🔗 Integration Management",

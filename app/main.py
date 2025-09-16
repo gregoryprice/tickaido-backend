@@ -70,6 +70,9 @@ from fastapi.openapi.utils import get_openapi
 from app.config.settings import get_settings
 from app.database import check_database_connection
 
+# Import Celery app to ensure it's initialized
+from app.celery_app import celery_app
+
 # Import middleware
 from app.middleware.rate_limiting import FastAPIRateLimitMiddleware
 
@@ -85,6 +88,7 @@ from app.api.v1.invitations import router as invitations_router
 from app.routers.auth import router as auth_router
 from app.routers.integration import router as integration_router
 from app.websocket.chat import router as chat_websocket_router
+from app.api.v1.files import router as files_router
 
 def wait_for_database_ready(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
@@ -364,7 +368,7 @@ from app.routers.clerk_webhooks import router as clerk_webhook_router
 from app.routers.api_tokens import router as api_token_router
 app.include_router(clerk_webhook_router, prefix="/api/v1")
 app.include_router(api_token_router, prefix="/api/v1")
-# app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
+app.include_router(files_router, prefix="/api/v1/files", tags=["Files"])
 # app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(chat_websocket_router, prefix="/api/v1")
 # app.include_router(agent.router, prefix="/api/v1/agent", tags=["AI Agent"])

@@ -30,7 +30,7 @@ services:
     command: >
       sh -c "
         alembic upgrade head &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level info
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -109,6 +109,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - LOG_LEVEL=DEBUG
       - DEBUG=true
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY:-4}
     depends_on:
       - postgres
       - redis
@@ -116,10 +117,11 @@ services:
     networks:
       - app-network
     volumes:
+      - .:/app
       - ./uploads:/app/uploads
     command: >
       sh -c "
-        celery -A app.celery_app worker --loglevel=info
+        celery -A app.celery_app worker --loglevel=debug --concurrency=${CELERY_WORKER_CONCURRENCY:-4} --queues=file_processing
       "
     healthcheck:
       test: ["CMD", "celery", "-A", "app.celery_app", "inspect", "ping"]

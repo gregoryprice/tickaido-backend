@@ -61,6 +61,11 @@ greenlet = "^3.2.4"
 tiktoken = "^0.11.0"
 clerk-backend-api = "^3.3.0"
 itsdangerous = "^2.2.0"
+python-magic = "^0.4.27"  # MIME type detection
+openpyxl = "^3.1.2"  # Excel document parsing  
+anthropic = "^0.52.0"  # Claude API client
+pytesseract = "^0.3.13"  # OCR text extraction from images
+pymupdf = "^1.26.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.0.0"
@@ -69,6 +74,11 @@ mypy = "^1.8.0"
 ruff = "^0.1.0"
 pytest-mock = "^3.14.1"
 debugpy = "^1.8.16"
+
+# ML dependencies are installed at runtime in the app container
+# to avoid LLVM build issues during Docker build process
+# Install manually with: 
+# pip install pymupdf==1.26.4 pytesseract==0.3.13
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

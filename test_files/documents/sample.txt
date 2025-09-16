@@ -1,0 +1,31 @@
+Sample Text Document for Testing
+
+This is a test document containing various types of content for validation.
+
+Technical Information:
+- API Endpoint: /api/v1/users
+- Error Code: 404 
+- Status: Connection timeout
+
+Issue Description:
+The user authentication system is experiencing intermittent failures when processing login requests. The database connection appears to timeout after 30 seconds, causing HTTP 500 errors.
+
+Steps to Reproduce:
+1. Navigate to login page
+2. Enter valid credentials
+3. Submit form
+4. Observe timeout error after 30 seconds
+
+Expected Behavior:
+User should be authenticated and redirected to dashboard within 5 seconds.
+
+Actual Behavior:
+Connection timeout occurs, displaying "Internal Server Error" message.
+
+Environment Details:
+- Browser: Chrome 118.0
+- Operating System: Windows 11
+- Network: Corporate VPN
+- Time: 2024-01-15 14:30:00 UTC
+
+This document contains keywords that should be detected by the AI analysis system: login, authentication, timeout, database, error, credentials.

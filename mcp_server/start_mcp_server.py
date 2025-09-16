@@ -13,13 +13,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     # Try relative imports first (when used as module)
-    from .auth.middleware import create_token_auth_middleware
     from .tools.ticket_tools import register_all_ticket_tools
     from .tools.integration_tools import register_all_integration_tools  
     from .tools.system_tools import register_all_system_tools
 except ImportError:
     # Fall back to absolute imports (when run directly)
-    from auth.middleware import create_token_auth_middleware
     from tools.ticket_tools import register_all_ticket_tools
     from tools.integration_tools import register_all_integration_tools
     from tools.system_tools import register_all_system_tools
@@ -44,15 +42,8 @@ if not tool_logger.handlers:
 # Initialize FastMCP server
 mcp = FastMCP("AI Ticket Creator Tools")
 
-# Configure JWT authentication middleware
-jwt_secret_key = os.getenv("JWT_SECRET_KEY")
-if jwt_secret_key:
-    logger.info("JWT auth temporarily disabled for debugging - Configuring JWT token authentication for MCP server")
-    # auth_middleware = create_token_auth_middleware(secret_key=jwt_secret_key)
-    # mcp.add_middleware(auth_middleware)
-    logger.warning("🚨 AUTHENTICATION TEMPORARILY DISABLED FOR DEBUGGING 🚨")
-else:
-    logger.warning("JWT_SECRET_KEY not found - MCP server will run without authentication")
+# Configure JWT authentication - disabled for now (auth module not available)
+logger.warning("🚨 AUTHENTICATION DISABLED - AUTH MODULE NOT AVAILABLE 🚨")
 
 # Register all MCP tools
 register_all_ticket_tools(mcp)

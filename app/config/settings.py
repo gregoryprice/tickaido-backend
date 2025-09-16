@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     # File Upload Settings
     max_file_size: int = Field(default=100 * 1024 * 1024, description="Maximum file size in bytes (100MB)")
     upload_directory: str = Field(default="uploads", description="Directory for file uploads")
+    hard_delete_files: bool = Field(default=True, description="Whether to hard delete files (True) or soft delete (False)")
     allowed_file_types: List[str] = Field(
         default=[
             "image/jpeg", "image/png", "image/gif",
@@ -77,6 +78,8 @@ class Settings(BaseSettings):
     # Celery Settings
     celery_broker_url: Optional[str] = Field(default=None, description="Celery broker URL (defaults to redis_url)")
     celery_result_backend: Optional[str] = Field(default=None, description="Celery result backend (defaults to redis_url)")
+    celery_worker_concurrency: int = Field(default=4, description="Number of concurrent worker processes")
+    celery_worker_prefetch_multiplier: int = Field(default=1, description="Worker prefetch multiplier")
     
     # Third-party Integration Settings
     salesforce_client_id: Optional[str] = Field(default=None, description="Salesforce client ID")

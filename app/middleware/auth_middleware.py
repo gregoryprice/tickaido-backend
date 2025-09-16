@@ -166,21 +166,16 @@ class AuthMiddleware:
         """Validate API token and return user with organization context"""
         
         try:
-            logger.debug(f"Validating API token: {token[:20]}...")
             # Parse environment-specific token format: ai_env_token
             parts = token.split('_', 2)
-            logger.debug(f"Token parts: {parts}")
             if len(parts) != 3 or parts[0] != 'ai':
-                logger.debug(f"Invalid token format: expected 3 parts starting with 'ai', got {len(parts)} parts")
                 return None
             
             env_prefix, raw_token = parts[1], parts[2]
-            logger.debug(f"Environment prefix: {env_prefix}, raw_token length: {len(raw_token)}")
             
             # Validate environment matches current environment
             settings = get_settings()
             expected_env = settings.environment[:3]  # pro, sta, dev
-            logger.debug(f"Expected environment: {expected_env}, got: {env_prefix}")
             if env_prefix != expected_env:
                 logger.warning(f"Token environment mismatch: expected {expected_env}, got {env_prefix}")
                 return None
@@ -188,7 +183,6 @@ class AuthMiddleware:
             # Hash the raw token for database lookup using the same method as creation
             import hashlib
             token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-            logger.debug(f"Token hash: {token_hash}")
             
             async with AsyncSessionLocal() as db:
                 # Find token by hash with organization and user data
@@ -208,7 +202,7 @@ class AuthMiddleware:
                 )
                 
                 token_data = result.first()
-                logger.debug(f"Database query result: {token_data}")
+                
                 if not token_data:
                     logger.debug("No matching API token found in database")
                     return None

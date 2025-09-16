@@ -29,6 +29,13 @@ from app.config.settings import get_settings
 from app.services.storage.factory import get_storage_service
 
 
+class DuplicateFileError(Exception):
+    """Exception raised when attempting to upload a duplicate file"""
+    def __init__(self, message: str, existing_file_id: UUID):
+        super().__init__(message)
+        self.existing_file_id = existing_file_id
+
+
 class FileService:
     """Service class for file operations using unified storage"""
     
@@ -280,16 +287,16 @@ class FileService:
         db: AsyncSession,
         file_id: UUID,
         user_id: UUID,
-        hard_delete: bool = False
+        hard_delete: Optional[bool] = None
     ) -> bool:
         """
-        Delete file (soft delete by default)
+        Delete file with configurable hard/soft delete behavior
         
         Args:
             db: Database session
             file_id: File ID
             user_id: ID of deleting user
-            hard_delete: Whether to permanently delete
+            hard_delete: Optional override for delete behavior. If None, uses settings.hard_delete_files
             
         Returns:
             True if deleted successfully
@@ -303,8 +310,11 @@ class FileService:
             # TODO: Check if user is admin
             pass
         
-        if hard_delete:
-            # Delete from storage service
+        # Determine delete strategy
+        should_hard_delete = hard_delete if hard_delete is not None else self.settings.hard_delete_files
+        
+        if should_hard_delete:
+            # Hard delete: remove from storage and database
             try:
                 await self.storage_service.delete_file(db_file.file_path)
             except Exception:
@@ -314,7 +324,7 @@ class FileService:
             # Delete from database
             await db.delete(db_file)
         else:
-            # Soft delete
+            # Soft delete: mark as deleted
             db_file.soft_delete()
             db_file.status = FileStatus.DELETED
         
@@ -615,3 +625,130 @@ class FileService:
         if len(text) > 100:
             return text[:100] + "..."
         return text
+    
+    async def create_file_record(
+        self,
+        db: AsyncSession,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+        file_content: bytes,
+        uploaded_by_id: UUID,
+        organization_id: UUID,
+        description: Optional[str] = None
+    ) -> File:
+        """
+        Create a new file record with simplified parameters for PRP implementation.
+        Handles soft-deleted files with same hash by reusing or updating them.
+        """
+        import hashlib
+        
+        # Calculate file hash first
+        file_hash = hashlib.sha256(file_content).hexdigest()
+        
+        # Check for existing file with same hash (including soft-deleted ones)
+        existing_query = select(File).where(
+            and_(
+                File.file_hash == file_hash,
+                File.organization_id == organization_id,
+                File.uploaded_by_id == uploaded_by_id
+            )
+        )
+        result = await db.execute(existing_query)
+        existing_file = result.scalar_one_or_none()
+        
+        # If we find an existing file (active or soft-deleted)
+        if existing_file:
+            if existing_file.is_deleted:
+                # Restore the soft-deleted file
+                existing_file.filename = filename
+                existing_file.mime_type = mime_type
+                existing_file.file_size = file_size
+                existing_file.file_type = self._detect_file_type(mime_type)
+                existing_file.status = FileStatus.UPLOADED
+                existing_file.is_deleted = False
+                existing_file.deleted_at = None
+                existing_file.updated_at = datetime.now(timezone.utc)
+                
+                await db.commit()
+                await db.refresh(existing_file)
+                
+                return existing_file
+            else:
+                # File already exists and is active - this is a true duplicate
+                raise DuplicateFileError(f"File with hash {file_hash} already exists and is active", existing_file.id)
+        
+        # Generate unique file ID and storage key for new file
+        file_id = uuid.uuid4()
+        file_extension = Path(filename).suffix
+        
+        # Create storage key with date organization
+        now = datetime.now()
+        storage_key = f"attachments/{now.year}/{now.month:02d}/{file_id}{file_extension}"
+        
+        # Upload file using storage service
+        file_url = await self.storage_service.upload_content(
+            content=file_content,
+            storage_key=storage_key,
+            content_type=mime_type,
+            metadata={
+                "file_id": str(file_id),
+                "user_id": str(uploaded_by_id),
+                "organization_id": str(organization_id),
+                "original_filename": filename,
+                "file_size": str(file_size)
+            }
+        )
+        
+        # Create database record with new model structure
+        db_file = File(
+            id=file_id,
+            filename=filename,
+            file_path=storage_key,
+            mime_type=mime_type,
+            file_size=file_size,
+            file_hash=file_hash,
+            file_type=self._detect_file_type(mime_type),
+            uploaded_by_id=uploaded_by_id,
+            organization_id=organization_id,
+            status=FileStatus.UPLOADED
+        )
+        
+        db.add(db_file)
+        await db.commit()
+        await db.refresh(db_file)
+        
+        return db_file
+    
+    async def get_files_for_organization(
+        self,
+        db: AsyncSession,
+        organization_id: UUID,
+        user_id: UUID,
+        filters: Optional[Dict[str, Any]] = None,
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[File]:
+        """
+        Get files scoped to organization with filters for PRP implementation
+        """
+        query = select(File).where(
+            and_(
+                File.organization_id == organization_id,
+                File.is_deleted == False,
+                File.uploaded_by_id == user_id  # Phase 1: Only user's own files
+            )
+        )
+        
+        # Apply filters
+        if filters:
+            if filters.get("file_type"):
+                query = query.where(File.file_type == filters["file_type"])
+            if filters.get("status"):
+                query = query.where(File.status == filters["status"])
+        
+        # Add pagination
+        query = query.offset(skip).limit(limit)
+        
+        result = await db.execute(query)
+        return result.scalars().all()
