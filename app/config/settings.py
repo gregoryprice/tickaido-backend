@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30, description="Access token expiration time")
     
     # File Upload Settings
-    max_file_size: int = Field(default=100 * 1024 * 1024, description="Maximum file size in bytes (100MB)")
+    max_file_size: int = Field(default=25 * 1024 * 1024, description="Maximum file size in bytes (25MB)", env="MAX_FILE_SIZE_BYTES")
     upload_directory: str = Field(default="uploads", description="Directory for file uploads")
     hard_delete_files: bool = Field(default=True, description="Whether to hard delete files (True) or soft delete (False)")
     allowed_file_types: List[str] = Field(

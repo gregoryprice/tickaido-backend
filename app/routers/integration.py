@@ -30,7 +30,7 @@ from ..schemas.integration import (
 )
 from ..middleware.auth_middleware import get_current_user
 from ..services.integration_service import IntegrationService
-from ..services.jira_integration import JiraIntegration
+from ..integrations.jira import JiraIntegration
 
 logger = logging.getLogger(__name__)
 

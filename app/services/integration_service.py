@@ -28,8 +28,8 @@ from app.schemas.integration import (
 )
 from app.config.settings import get_settings
 from app.utils.http_debug_logger import log_http_request_response_pair
-from .integration_interface import IntegrationInterface
-from .jira_integration import JiraIntegration
+from app.integrations.base.integration_interface import IntegrationInterface
+from app.integrations.jira import JiraIntegration
 
 
 class IntegrationService:

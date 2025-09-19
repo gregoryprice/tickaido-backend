@@ -19,7 +19,7 @@ class TestTicketAuthentication:
         client = TestClient(app)
         response = client.get("/api/v1/tickets/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "Not authenticated" in response.json()["detail"]
+        assert "Authentication required" in response.json()["detail"]
     
     def test_create_ticket_requires_authentication(self):
         """Test that creating tickets requires authentication"""

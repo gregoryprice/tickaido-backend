@@ -366,7 +366,11 @@ class File(BaseModel):
         """Mark file as processing started"""
         self.status = FileStatus.PROCESSING
         self.processing_started_at = datetime.now(timezone.utc)
-        self.processing_attempts += 1
+        # Handle None value for processing_attempts (in tests)
+        if self.processing_attempts is None:
+            self.processing_attempts = 1
+        else:
+            self.processing_attempts += 1
     
     def complete_processing(self):
         """Mark file processing as completed"""
@@ -439,6 +443,113 @@ class File(BaseModel):
             content_parts.append(f"AI Summary:\n{self.content_summary}")
         
         return "\n\n---\n\n".join(content_parts)
+    
+    def get_text_for_ai_model(self, max_length: Optional[int] = 2000) -> str:
+        """
+        Extract text content optimized for AI model consumption with token limits.
+        
+        Uses priority order:
+        1. content_summary (always included - concise AI summary)
+        2. extracted_context structured data (rich content)
+        3. Formatted content based on file type
+        
+        Args:
+            max_length: Maximum character length to return (approximate token limit)
+            
+        Returns:
+            str: Formatted text content ready for AI processing
+        """
+        content_parts = []
+        
+        # Priority 1: Always include content summary (concise and most important)
+        if self.content_summary:
+            content_parts.append(f"Summary: {self.content_summary}")
+        
+        # Priority 2: Add structured content based on file type and extracted_context
+        if self.extracted_context:
+            context = self.extracted_context
+            
+            # Text-based files (documents, text, code, spreadsheets)
+            if self.is_text_file and "document" in context:
+                doc = context["document"]
+                doc_text = ""
+                for page in doc.get("pages", []):
+                    page_text = page.get("text", "")
+                    if page_text:
+                        doc_text += page_text + "\n"
+                
+                if doc_text.strip():
+                    # Format based on file type
+                    if self.file_type == FileType.SPREADSHEET:
+                        content_parts.append(f"Table Data:\n{self._format_spreadsheet_content(doc_text[:1000])}")
+                    elif self.file_type == FileType.CODE:
+                        content_parts.append(f"Code Content:\n```\n{doc_text[:800]}\n```")
+                    else:
+                        content_parts.append(f"Document Text:\n{doc_text[:1000]}")
+            
+            # Image files with OCR
+            elif self.is_image_file and "image" in context:
+                img = context["image"]
+                
+                # Include image description
+                if img.get("description"):
+                    content_parts.append(f"Visual Description: {img['description']}")
+                
+                # Include extracted text from OCR
+                text_regions = img.get("text_regions", [])
+                if text_regions:
+                    ocr_text = " ".join([region.get("text", "") for region in text_regions])
+                    if ocr_text.strip():
+                        content_parts.append(f"Text in Image: {ocr_text[:600]}")
+            
+            # Audio/Video files with transcription
+            elif self.is_media_file and "audio" in context:
+                audio = context["audio"]
+                transcription = audio.get("transcription", {}).get("text", "")
+                if transcription:
+                    content_parts.append(f"Transcription: {transcription[:800]}")
+        
+        # Combine all content
+        full_content = "\n\n".join(content_parts)
+        
+        # Apply length limits with intelligent truncation
+        if max_length and len(full_content) > max_length:
+            # Always keep the summary, truncate other content
+            if self.content_summary and len(content_parts) > 1:
+                summary = content_parts[0]
+                remaining_length = max_length - len(summary) - 20  # Buffer for separators
+                
+                if remaining_length > 100:  # Only include additional content if there's meaningful space
+                    additional_content = "\n\n".join(content_parts[1:])
+                    if len(additional_content) > remaining_length:
+                        additional_content = additional_content[:remaining_length] + "... [truncated]"
+                    full_content = f"{summary}\n\n{additional_content}"
+                else:
+                    full_content = summary
+            else:
+                # No summary, just truncate the content
+                full_content = full_content[:max_length] + "... [truncated]"
+        
+        return full_content or f"File: {self.filename} ({self.file_type.value})"
+    
+    def _format_spreadsheet_content(self, content: str) -> str:
+        """Format spreadsheet content for better AI consumption"""
+        lines = content.strip().split('\n')
+        if len(lines) <= 1:
+            return content
+        
+        # Simple CSV-like formatting for AI
+        formatted_lines = []
+        for i, line in enumerate(lines[:10]):  # Limit to first 10 rows
+            if i == 0:
+                formatted_lines.append(f"Headers: {line}")
+            else:
+                formatted_lines.append(f"Row {i}: {line}")
+        
+        if len(lines) > 10:
+            formatted_lines.append(f"... ({len(lines) - 10} more rows)")
+        
+        return "\n".join(formatted_lines)
     
     def can_be_deleted(self) -> bool:
         """Check if file can be safely deleted"""

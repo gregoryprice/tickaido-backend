@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "ai-ticket-creator-complete-2025",
 		"name": "AI Ticket Creator Backend API - Complete (Latest Architecture)",
-		"description": "Complete API collection for AI-powered ticket creation and management system with modern multi-agent architecture, comprehensive member management, and extensive integrations.\n\n## 🔐 Authentication Setup for Postman Testing\n\n### **Step 1: Get Clerk JWT Token**\n1. Open your frontend application in a browser\n2. Log in with your Clerk account\n3. Open browser developer console (F12)\n4. Run: `await window.Clerk.session.getToken()`\n5. Copy the returned JWT token\n6. Set it as `CLERK_JWT_TOKEN` in Postman environment\n\n### **Step 2: Generate API Key**\n1. Use the \"Generate API Key for Testing\" request\n2. This exchanges your Clerk JWT for a long-lived API key\n3. The API key is automatically saved as `ACCESS_TOKEN`\n4. Use this API key for all subsequent requests\n\n### **Alternative: Use Existing API Token Management**\n- Use the `/api/v1/api-tokens` endpoints to manage API keys\n- Generate tokens with custom names and permissions\n- Revoke tokens when no longer needed\n\n## Key Features\n\n### 🧑‍💼 Member Management\n- **Role-Based Access Control**: Admin and Member roles with proper permission enforcement\n- **Invitation System**: Secure token-based invitations with expiration tracking\n- **Organization Discovery**: Automatic domain-based organization matching\n- **Security Controls**: Self-role modification prevention, last admin protection\n- **Auto-Admin Promotion**: Intelligent admin promotion when needed\n- **Cross-Organization Isolation**: Complete data isolation between organizations\n\n### 🤖 AI Agent System\n- **Multi-Agent Architecture**: Multiple specialized agents per organization\n- **Rich Configuration**: 20+ typed configuration fields for precise agent behavior\n- **Change History**: Complete audit trail with rollback capabilities\n- **File Context Integration**: Process up to 20 files per agent for enhanced context\n- **Avatar Management**: Dedicated avatar upload/management system\n- **Task Processing**: Queue-based autonomous task handling\n\n### 💬 Agent-Centric Chat\n- **Thread Management**: Create, update, delete conversation threads per agent\n- **Context-Aware AI**: Agents use their specific configuration and file context\n- **Real-time Processing**: WebSocket support for live conversations\n- **Title Generation**: AI-powered thread title suggestions\n- **Message History**: Full conversation history with search and filtering\n\n### 📁 File Attachment System\n- **Universal File Upload**: Support for documents, images, audio, and video files\n- **AI Content Extraction**: PyMuPDF document parsing, Tesseract OCR, Whisper transcription\n- **Unified JSON Storage**: All extracted content in structured extracted_context field\n- **Background Processing**: Non-blocking AI processing with status tracking\n- **Organization Scoping**: Multi-tenant file isolation and access control\n- **Independent Upload**: Files uploaded separately, then associated with tickets/threads\n\n### 🎫 Advanced Ticketing\n- **AI-Powered Creation**: Natural language ticket creation with context analysis\n- **File-Enhanced AI**: Ticket categorization using file content analysis\n- **Multi-Stage Workflow**: Status management with rich metadata\n- **File Association**: file_ids array for flexible file-ticket relationships\n- **Integration Routing**: Automatic routing to appropriate external systems\n- **Analytics & Stats**: Comprehensive reporting and performance metrics\n\n### 🔗 Integration Platform\n- **Category-Based System**: 7 functional categories (ticketing, CRM, messaging, etc.)\n- **Platform Identification**: Support for JIRA, Salesforce, GitHub, Slack, Teams, Zoom\n- **Automatic Status Management**: Smart status handling and health monitoring\n- **Field Discovery**: Dynamic field mapping for JIRA and other systems\n- **Testing & Validation**: Built-in connection testing and validation\n\n### 👥 User Management\n- **Avatar System**: User avatar upload with multiple sizes and caching\n- **Profile Management**: Comprehensive user profile with preferences\n- **Organization Context**: Full organization membership and role management\n\n## Authentication Architecture\n- **Frontend Users**: Authenticate via Clerk (OAuth/SSO providers)\n- **API Testing**: Use Clerk JWT → API Key exchange for long-lived tokens\n- **Service-to-Service**: Direct API key authentication\n- **Hybrid Support**: System validates both Clerk JWTs and API keys\n\n## Environment Variables\nKey variables for testing:\n- `BASE_URL`: API base URL (default: http://localhost:8000)\n- `CLERK_JWT_TOKEN`: JWT from Clerk frontend authentication\n- `API_KEY`: Long-lived API key for testing (auto-generated)\n- `ACCESS_TOKEN`: Current token (auto-populated with API key)\n- `USER_ID`, `ORGANIZATION_ID`: User context (auto-populated)\n- Integration credentials for external system testing\n\n## Base URL\n- **Local Development**: http://localhost:8000\n- **API Documentation**: http://localhost:8000/docs\n- **Health Check**: http://localhost:8000/health",
+		"description": "Complete API collection for AI-powered ticket creation and management system with modern multi-agent architecture, comprehensive member management, and extensive integrations.\n\n## 🔐 Authentication Setup for Postman Testing\n\n### **Step 1: Get Clerk JWT Token**\n1. Open your frontend application in a browser\n2. Log in with your Clerk account\n3. Open browser developer console (F12)\n4. Run: `await window.Clerk.session.getToken()`\n5. Copy the returned JWT token\n6. Set it as `CLERK_JWT_TOKEN` in Postman environment\n\n### **Step 2: Generate API Key**\n1. Use the \"Generate API Key for Testing\" request\n2. This exchanges your Clerk JWT for a long-lived API key\n3. The API key is automatically saved as `ACCESS_TOKEN`\n4. Use this API key for all subsequent requests\n\n### **Alternative: Use Existing API Token Management**\n- Use the `/api/v1/api-tokens` endpoints to manage API keys\n- Generate tokens with custom names and permissions\n- Revoke tokens when no longer needed\n\n## Key Features\n\n### 🧑‍💼 Member Management\n- **Role-Based Access Control**: Admin and Member roles with proper permission enforcement\n- **Invitation System**: Secure token-based invitations with expiration tracking\n- **Organization Discovery**: Automatic domain-based organization matching\n- **Security Controls**: Self-role modification prevention, last admin protection\n- **Auto-Admin Promotion**: Intelligent admin promotion when needed\n- **Cross-Organization Isolation**: Complete data isolation between organizations\n\n### 🤖 AI Agent System\n- **Multi-Agent Architecture**: Multiple specialized agents per organization\n- **Rich Configuration**: 20+ typed configuration fields for precise agent behavior\n- **Change History**: Complete audit trail with rollback capabilities\n- **File Context Integration**: Process up to 20 files per agent for enhanced context\n- **Avatar Management**: Dedicated avatar upload/management system\n- **Task Processing**: Queue-based autonomous task handling\n\n### 💬 Agent-Centric Chat\n- **Thread Management**: Create, update, delete conversation threads per agent\n- **Context-Aware AI**: Agents use their specific configuration and file context\n- **Real-time Processing**: WebSocket support for live conversations\n- **Title Generation**: AI-powered thread title suggestions\n- **Message History**: Full conversation history with search and filtering\n\n### 📁 File Attachment System\n- **Standardized Format**: Both messages and tickets use consistent [{'file_id':'uuid'}] attachment format\n- **Universal File Upload**: Support for documents, images, audio, and video files\n- **AI Content Extraction**: PyMuPDF document parsing, Tesseract OCR, Whisper transcription\n- **Unified JSON Storage**: All extracted content in structured extracted_context field\n- **Background Processing**: Non-blocking AI processing with status tracking\n- **Organization Scoping**: Multi-tenant file isolation and access control\n- **Independent Upload**: Files uploaded separately, then associated with tickets/threads\n- **Cascade Deletion**: Files automatically deleted when threads/tickets are removed\n- **Orphan Cleanup**: Administrative tools for managing unreferenced files\n\n### 🎫 Advanced Ticketing\n- **AI-Powered Creation**: Natural language ticket creation with context analysis\n- **File-Enhanced AI**: Ticket categorization using file content analysis\n- **Standardized Attachments**: Consistent [{'file_id':'uuid'}] format for all file associations\n- **Multi-Stage Workflow**: Status management with rich metadata\n- **File Association**: Attachments array for flexible file-ticket relationships\n- **Integration Routing**: Automatic routing to appropriate external systems\n- **Analytics & Stats**: Comprehensive reporting and performance metrics\n- **Cascade Cleanup**: Files automatically deleted when tickets are removed\n\n### 🔗 Integration Platform\n- **Category-Based System**: 7 functional categories (ticketing, CRM, messaging, etc.)\n- **Platform Identification**: Support for JIRA, Salesforce, GitHub, Slack, Teams, Zoom\n- **Automatic Status Management**: Smart status handling and health monitoring\n- **Field Discovery**: Dynamic field mapping for JIRA and other systems\n- **Testing & Validation**: Built-in connection testing and validation\n\n### 👥 User Management\n- **Avatar System**: User avatar upload with multiple sizes and caching\n- **Profile Management**: Comprehensive user profile with preferences\n- **Organization Context**: Full organization membership and role management\n\n## Authentication Architecture\n- **Frontend Users**: Authenticate via Clerk (OAuth/SSO providers)\n- **API Testing**: Use Clerk JWT → API Key exchange for long-lived tokens\n- **Service-to-Service**: Direct API key authentication\n- **Hybrid Support**: System validates both Clerk JWTs and API keys\n\n## Environment Variables\nKey variables for testing:\n- `BASE_URL`: API base URL (default: http://localhost:8000)\n- `CLERK_JWT_TOKEN`: JWT from Clerk frontend authentication\n- `API_KEY`: Long-lived API key for testing (auto-generated)\n- `ACCESS_TOKEN`: Current token (auto-populated with API key)\n- `USER_ID`, `ORGANIZATION_ID`: User context (auto-populated)\n- Integration credentials for external system testing\n\n## Base URL\n- **Local Development**: http://localhost:8000\n- **API Documentation**: http://localhost:8000/docs\n- **Health Check**: http://localhost:8000/health",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "ai-ticket-creator"
 	},
@@ -1018,7 +1018,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"content\": \"Hello! I need help with my account. I'm having trouble logging in and resetting my password. Can you guide me through the process?\",\n  \"attachments\": []\n}"
+							"raw": "{\n  \"content\": \"Hello! I need help with my account. I'm having trouble logging in and resetting my password. Can you guide me through the process?\",\n  \"attachments\": [{\"file_id\": \"{{UPLOADED_FILE_ID}}\"}]\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}/messages",
@@ -1026,6 +1026,32 @@
 							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}", "messages"]
 						},
 						"description": "Send a message to an agent and receive AI response. Supports file attachments and context awareness."
+					}
+				},
+				{
+					"name": "Send Message with Multiple Attachments",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"I've attached the error log, screenshot, and system info file. Please analyze these to help diagnose the issue.\",\n  \"attachments\": [\n    {\"file_id\": \"{{UPLOADED_FILE_ID}}\"},\n    {\"file_id\": \"{{UPLOADED_FILE_ID_2}}\"},\n    {\"file_id\": \"{{UPLOADED_FILE_ID_3}}\"}\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/chat/{{AGENT_ID}}/threads/{{THREAD_ID}}/messages",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "chat", "{{AGENT_ID}}", "threads", "{{THREAD_ID}}", "messages"]
+						},
+						"description": "Send a message with multiple file attachments using the new standardized format. Each attachment is an object with file_id property."
 					}
 				},
 				{
@@ -1445,9 +1471,130 @@
 							}
 						}
 					]
+				},
+				{
+					"name": "Scan Orphaned Files",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/admin/file-cleanup/orphaned-files/scan",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "admin", "file-cleanup", "orphaned-files", "scan"]
+						},
+						"description": "Scan for orphaned files that are no longer referenced by any thread or ticket. This is a dry-run operation that only counts files without deleting them."
+					},
+					"response": [
+						{
+							"name": "Orphaned Files Scan Result",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": ""
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/admin/file-cleanup/orphaned-files/scan",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "admin", "file-cleanup", "orphaned-files", "scan"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"message\": \"Orphaned file scan completed\",\n  \"organization_id\": \"12345678-1234-1234-1234-123456789012\",\n  \"orphaned_files_found\": 5,\n  \"action\": \"scan_only\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Cleanup Orphaned Files",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/admin/file-cleanup/orphaned-files/cleanup?confirm=true",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "admin", "file-cleanup", "orphaned-files", "cleanup"],
+							"query": [
+								{
+									"key": "confirm",
+									"value": "true",
+									"description": "Must be true to actually delete files"
+								}
+							]
+						},
+						"description": "Delete orphaned files that are no longer referenced. Requires confirmation parameter to prevent accidental deletion."
+					},
+					"response": [
+						{
+							"name": "Files Cleanup Result",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									}
+								],
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/admin/file-cleanup/orphaned-files/cleanup?confirm=true",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "admin", "file-cleanup", "orphaned-files", "cleanup"],
+									"query": [
+										{
+											"key": "confirm",
+											"value": "true"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"message\": \"Orphaned file cleanup completed\",\n  \"organization_id\": \"12345678-1234-1234-1234-123456789012\",\n  \"files_deleted\": 5,\n  \"action\": \"cleanup_performed\"\n}"
+						}
+					]
 				}
 			],
-			"description": "File attachment system with support for document parsing, OCR, audio transcription, and AI-powered content analysis. Files are uploaded independently and associated with tickets via file_ids arrays."
+			"description": "File attachment system with standardized attachment format [{'file_id':'uuid'}] for messages and tickets. Supports document parsing, OCR, audio transcription, AI-powered content analysis, and cascade deletion when threads/tickets are removed."
 		},
 		{
 			"name": "🎫 Ticket Management",
@@ -1528,7 +1675,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"title\": \"Application Login Issue - Unable to Access Dashboard\",\n  \"description\": \"Users are reporting inability to log into the application. After entering correct credentials, the page redirects to a blank screen instead of the dashboard. This appears to affect multiple users across different browsers. Steps to reproduce: 1. Navigate to login page 2. Enter valid credentials 3. Click login button 4. Observe blank page instead of dashboard.\",\n  \"category\": \"technical\",\n  \"priority\": \"high\",\n  \"urgency\": \"high\",\n  \"department\": \"Engineering\",\n  \"assigned_to_id\": null,\n  \"integration_id\": \"{{INTEGRATION_ID}}\",\n  \"create_externally\": true,\n  \"custom_fields\": {\n    \"environment\": \"production\",\n    \"browser_versions\": \"Chrome 118+, Firefox 119+\",\n    \"affected_users\": \"~50 users\"\n  },\n  \"file_ids\": []\n}"
+							"raw": "{\n  \"title\": \"Application Login Issue - Unable to Access Dashboard\",\n  \"description\": \"Users are reporting inability to log into the application. After entering correct credentials, the page redirects to a blank screen instead of the dashboard. This appears to affect multiple users across different browsers. Steps to reproduce: 1. Navigate to login page 2. Enter valid credentials 3. Click login button 4. Observe blank page instead of dashboard.\",\n  \"category\": \"technical\",\n  \"priority\": \"high\",\n  \"urgency\": \"high\",\n  \"department\": \"Engineering\",\n  \"assigned_to_id\": null,\n  \"integration_id\": \"{{INTEGRATION_ID}}\",\n  \"create_externally\": true,\n  \"custom_fields\": {\n    \"environment\": \"production\",\n    \"browser_versions\": \"Chrome 118+, Firefox 119+\",\n    \"affected_users\": \"~50 users\"\n  },\n  \"attachments\": [{\"file_id\": \"{{UPLOADED_FILE_ID}}\"}]\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/tickets",
@@ -1572,7 +1719,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"user_input\": \"Hey, I'm having a really frustrating issue with the mobile app. Every time I try to upload a photo to my profile, the app just crashes completely and I have to restart it. This has been happening for the past week on my iPhone 14 Pro running iOS 16.5. I've tried deleting and reinstalling the app but it's still not working. My photos are really important to me and I need this fixed ASAP because I'm trying to update my business profile before a big meeting tomorrow. Can someone please help me figure out what's going on?\",\n  \"uploaded_files\": [\"{{UPLOADED_FILE_ID}}\"],\n  \"conversation_context\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"I mentioned earlier that I'm using the latest version of the app\",\n      \"timestamp\": \"2024-01-15T10:30:00Z\"\n    }\n  ],\n  \"user_preferences\": {\n    \"priority_preference\": \"urgent\",\n    \"communication_style\": \"direct\",\n    \"technical_level\": \"intermediate\"\n  },\n  \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
+							"raw": "{\n  \"user_input\": \"Hey, I'm having a really frustrating issue with the mobile app. Every time I try to upload a photo to my profile, the app just crashes completely and I have to restart it. This has been happening for the past week on my iPhone 14 Pro running iOS 16.5. I've tried deleting and reinstalling the app but it's still not working. My photos are really important to me and I need this fixed ASAP because I'm trying to update my business profile before a big meeting tomorrow. Can someone please help me figure out what's going on?\",\n  \"uploaded_files\": [{\"file_id\": \"{{UPLOADED_FILE_ID}}\"}],\n  \"conversation_context\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"I mentioned earlier that I'm using the latest version of the app\",\n      \"timestamp\": \"2024-01-15T10:30:00Z\"\n    }\n  ],\n  \"user_preferences\": {\n    \"priority_preference\": \"urgent\",\n    \"communication_style\": \"direct\",\n    \"technical_level\": \"intermediate\"\n  },\n  \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/tickets/ai-create",
@@ -1736,7 +1883,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"title\": \"Login Error with Screenshot\",\n  \"description\": \"Unable to login - see attached screenshot and error log for details\",\n  \"category\": \"technical\",\n  \"priority\": \"high\",\n  \"file_ids\": [\"{{UPLOADED_FILE_ID}}\"],\n  \"create_externally\": false\n}"
+							"raw": "{\n  \"title\": \"Login Error with Screenshot\",\n  \"description\": \"Unable to login - see attached screenshot and error log for details\",\n  \"category\": \"technical\",\n  \"priority\": \"high\",\n  \"attachments\": [{\"file_id\": \"{{UPLOADED_FILE_ID}}\"}],\n  \"create_externally\": false\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/api/v1/tickets",
@@ -1773,9 +1920,73 @@
 							}
 						}
 					]
+				},
+				{
+					"name": "Create Comprehensive Ticket with Multiple Attachments",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Database Performance Issue with Supporting Documentation\",\n  \"description\": \"Critical database performance degradation affecting multiple services. Attached files include: performance metrics report (PDF), error log from application server (TXT), screenshot of monitoring dashboard (PNG), and audio recording from incident call (MP3).\",\n  \"category\": \"technical\",\n  \"priority\": \"critical\",\n  \"urgency\": \"critical\",\n  \"department\": \"Infrastructure\",\n  \"attachments\": [\n    {\"file_id\": \"{{PERFORMANCE_REPORT_ID}}\"},\n    {\"file_id\": \"{{ERROR_LOG_ID}}\"},\n    {\"file_id\": \"{{DASHBOARD_SCREENSHOT_ID}}\"},\n    {\"file_id\": \"{{INCIDENT_AUDIO_ID}}\"}\n  ],\n  \"custom_fields\": {\n    \"severity\": \"critical\",\n    \"affected_services\": \"api, web, mobile\",\n    \"incident_started\": \"2024-01-15T12:00:00Z\",\n    \"on_call_engineer\": \"jane.smith@company.com\"\n  },\n  \"create_externally\": true,\n  \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets"]
+						},
+						"description": "Create a comprehensive ticket with multiple file attachments of different types (PDF, TXT, PNG, MP3) using the new standardized attachment format. Response includes attachments array with file_id references. Use GET /api/v1/files/{file_id} to fetch detailed file information."
+					},
+					"response": [
+						{
+							"name": "Comprehensive Ticket with Files Response",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{ACCESS_TOKEN}}"
+									},
+									{
+										"key": "Content-Type", 
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"Database Performance Issue with Supporting Documentation\",\n  \"attachments\": [\n    {\"file_id\": \"{{PERFORMANCE_REPORT_ID}}\"},\n    {\"file_id\": \"{{ERROR_LOG_ID}}\"},\n    {\"file_id\": \"{{DASHBOARD_SCREENSHOT_ID}}\"},\n    {\"file_id\": \"{{INCIDENT_AUDIO_ID}}\"}\n  ]\n}"
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/api/v1/tickets",
+									"host": ["{{BASE_URL}}"],
+									"path": ["api", "v1", "tickets"]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"id\": \"tick_12345678-1234-1234-1234-123456789012\",\n  \"title\": \"Database Performance Issue with Supporting Documentation\",\n  \"description\": \"Critical database performance degradation affecting multiple services...\",\n  \"category\": \"technical\",\n  \"priority\": \"critical\",\n  \"status\": \"new\",\n  \"attachments\": [\n    {\"file_id\": \"12345678-1234-1234-1234-123456789012\"},\n    {\"file_id\": \"87654321-4321-4321-4321-210987654321\"},\n    {\"file_id\": \"11111111-2222-3333-4444-555555555555\"},\n    {\"file_id\": \"66666666-7777-8888-9999-000000000000\"}\n  ],\n  \"files\": [],\n  \"ai_analysis\": {\n    \"confidence_score\": 0.95,\n    \"reasoning\": \"High confidence classification based on keywords in description and file content analysis\",\n    \"tags\": [\"database\", \"performance\", \"critical\", \"infrastructure\"],\n    \"business_impact\": \"critical\"\n  },\n  \"created_by\": {\n    \"id\": \"{{USER_ID}}\",\n    \"email\": \"user@example.com\",\n    \"display_name\": \"John Doe\"\n  },\n  \"created_at\": \"2024-01-15T12:00:00Z\",\n  \"updated_at\": \"2024-01-15T12:00:00Z\"\n}"
+						}
+					]
 				}
 			],
-			"description": "Comprehensive ticket management system with AI-powered creation, flexible updates, and detailed analytics. Supports file attachments via file_ids arrays with AI-enhanced categorization."
+			"description": "Comprehensive ticket management system with AI-powered creation and standardized attachment format [{'file_id':'uuid'}]. Supports flexible updates, detailed analytics, and cascade file deletion when tickets are removed."
 		},
 		{
 			"name": "🔗 Integration Management",

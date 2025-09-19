@@ -55,8 +55,8 @@ class TicketCreationResult(BaseModel):
     tags: List[str] = Field(default_factory=list, description="Relevant tags for the issue")
 
 
-class CustomerSupportContext(BaseModel):
-    """Context for customer support operations"""
+class AgentContext(BaseModel):
+    """Generic context for AI agent operations"""
     user_input: str = Field(description="User's input/request")
     uploaded_files: List[str] = Field(default=[], description="List of uploaded file paths")
     conversation_history: List[Dict[str, Any]] = Field(default=[], description="Previous conversation")
@@ -64,3 +64,7 @@ class CustomerSupportContext(BaseModel):
     organization_id: Optional[str] = Field(None, description="Organization ID for scoped operations")
     session_id: Optional[str] = Field(None, description="Session identifier")
     integration_preference: Optional[str] = Field(None, description="Preferred integration for routing")
+
+
+# Backward compatibility alias
+CustomerSupportContext = AgentContext

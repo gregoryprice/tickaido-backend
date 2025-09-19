@@ -3,11 +3,11 @@ import uuid
 from uuid import UUID
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.ai_chat_service import ai_chat_service
+from app.services.ai_chat_service import ai_chat_service, MessageFormat
 
 @pytest.mark.asyncio
-async def test_get_thread_history_for_agent():
-    """Test enhanced thread history retrieval with context limits."""
+async def test_get_thread_history_simple_format():
+    """Test thread history retrieval in simple format with context limits."""
     thread_id = str(uuid.uuid4())
     user_id = "test_user"
     agent_id = str(uuid.uuid4())
@@ -37,11 +37,12 @@ async def test_get_thread_history_for_agent():
         # Configure mock to return thread first, then messages
         mock_db.execute.side_effect = [thread_result, messages_result]
         
-        # Test the method
-        history = await ai_chat_service.get_thread_history_for_agent(
+        # Test the method using the new consolidated API
+        history = await ai_chat_service.get_thread_history(
             thread_id=thread_id,
             user_id=user_id,
             agent_id=agent_id,
+            format_type=MessageFormat.SIMPLE,
             max_context_size=1000,
             use_memory_context=True
         )
@@ -78,10 +79,11 @@ async def test_memory_context_disabled():
     user_id = "test_user"
     agent_id = str(uuid.uuid4())
     
-    history = await ai_chat_service.get_thread_history_for_agent(
+    history = await ai_chat_service.get_thread_history(
         thread_id=thread_id,
         user_id=user_id,
         agent_id=agent_id,
+        format_type=MessageFormat.SIMPLE,
         use_memory_context=False
     )
     
@@ -125,7 +127,7 @@ async def test_context_limits_fallback():
         assert len(limited) == 10  # Fallback limit
 
 @pytest.mark.asyncio
-async def test_get_thread_history_for_agent_thread_not_found():
+async def test_get_thread_history_thread_not_found():
     """Test handling when thread is not found."""
     thread_id = str(uuid.uuid4())
     user_id = "test_user"
@@ -142,10 +144,11 @@ async def test_get_thread_history_for_agent_thread_not_found():
         mock_db.execute.return_value = thread_result
         
         # Test the method
-        history = await ai_chat_service.get_thread_history_for_agent(
+        history = await ai_chat_service.get_thread_history(
             thread_id=thread_id,
             user_id=user_id,
             agent_id=agent_id,
+            format_type=MessageFormat.SIMPLE,
             max_context_size=1000,
             use_memory_context=True
         )
@@ -154,7 +157,7 @@ async def test_get_thread_history_for_agent_thread_not_found():
         assert history == []
 
 @pytest.mark.asyncio
-async def test_get_thread_history_for_agent_with_context_limits():
+async def test_get_thread_history_with_context_limits():
     """Test message filtering with context limits."""
     thread_id = str(uuid.uuid4())
     user_id = "test_user"
@@ -192,10 +195,11 @@ async def test_get_thread_history_for_agent_with_context_limits():
         mock_apply_limits.return_value = limited_messages
         
         # Test the method with context limits
-        history = await ai_chat_service.get_thread_history_for_agent(
+        history = await ai_chat_service.get_thread_history(
             thread_id=thread_id,
             user_id=user_id,
             agent_id=agent_id,
+            format_type=MessageFormat.SIMPLE,
             max_context_size=100,  # Small limit
             use_memory_context=True
         )

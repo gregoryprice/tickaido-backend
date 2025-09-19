@@ -95,10 +95,8 @@ from app.schemas.ticket import (
     
     # Response schemas
     TicketUserInfo,
-    TicketFileInfo,
     TicketAIAnalysis,
     TicketBaseResponse,
-    TicketListResponse,
     TicketDetailResponse,
     TicketPublicResponse,
     TicketStatsResponse,
@@ -297,10 +295,8 @@ __all__ = [
     "TicketBulkCategoryRequest",
     "TicketAICreateRequest",
     "TicketUserInfo",
-    "TicketFileInfo",
     "TicketAIAnalysis",
     "TicketBaseResponse",
-    "TicketListResponse",
     "TicketDetailResponse",
     "TicketPublicResponse",
     "TicketStatsResponse",
@@ -413,7 +409,7 @@ SCHEMA_REGISTRY = {
     "ticket": {
         "create": TicketCreateRequest,
         "update": TicketUpdateRequest,
-        "list": TicketListResponse,
+        "list": TicketDetailResponse,
         "detail": TicketDetailResponse,
         "public": TicketPublicResponse,
     },

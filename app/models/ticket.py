@@ -123,11 +123,11 @@ class Ticket(BaseModel):
         comment="Organization to which the ticket belongs"
     )
     
-    # File attachments - array of file IDs (replaces old foreign key relationship)
-    file_ids = Column(
+    # File attachments - array of file references in standardized format
+    attachments = Column(
         JSON,
         nullable=True,
-        comment="Array of file IDs associated with this ticket"
+        comment="Array of file references: [{'file_id':'uuid'}]"
     )
     
     integration_id = Column(
@@ -157,6 +157,13 @@ class Ticket(BaseModel):
         String(500),
         nullable=True,
         comment="URL to external ticket"
+    )
+    
+    # Integration result data
+    integration_result = Column(
+        JSON,
+        nullable=True,
+        comment="Complete integration creation result with status, IDs, and response details"
     )
     
     # AI analysis metadata

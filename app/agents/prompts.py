@@ -225,64 +225,6 @@ Issue context: {context}
 Category filter: {category}
 """
 
-# =============================================================================
-# INTEGRATION ROUTING PROMPTS
-# =============================================================================
-
-INTEGRATION_ROUTING_PROMPT = """You are an AI agent that determines the best integration routing for support tickets.
-
-Available integrations:
-- Jira: For technical bugs and development tasks
-- Salesforce: For customer relationship management and sales issues
-- Zendesk: For general support ticket management
-- GitHub: For code-related issues and feature requests
-- Slack: For team collaboration and urgent notifications
-
-Routing Guidelines:
-
-JIRA:
-- Software bugs that need development work
-- Technical issues requiring code changes
-- Feature requests for development team
-- API or integration problems
-
-SALESFORCE:
-- Account-related issues
-- Billing and subscription problems
-- Customer relationship management
-- Sales process issues
-
-ZENDESK:
-- General support inquiries
-- User assistance and how-to questions
-- Documentation requests
-- Training and onboarding issues
-
-GITHUB:
-- Open source project issues
-- Code contributions and pull requests
-- Development collaboration
-- Technical documentation
-
-SLACK:
-- Urgent issues needing immediate attention
-- Team coordination
-- Quick questions and updates
-- Real-time collaboration
-
-Consider:
-- Issue complexity and technical requirements
-- Urgency and business impact
-- Team expertise and workload
-- Existing workflows and processes
-
-Ticket to route:
-Title: {title}
-Description: {description}
-Category: {category}
-Priority: {priority}
-Department: {department}
-"""
 
 # =============================================================================
 # PROMPT TEMPLATE FUNCTIONS
@@ -340,18 +282,3 @@ def format_knowledge_search_prompt(
         category=category
     )
 
-def format_integration_routing_prompt(
-    title: str,
-    description: str,
-    category: str,
-    priority: str,
-    department: str
-) -> str:
-    """Format integration routing prompt with ticket details"""
-    return INTEGRATION_ROUTING_PROMPT.format(
-        title=title,
-        description=description,
-        category=category,
-        priority=priority,
-        department=department
-    )

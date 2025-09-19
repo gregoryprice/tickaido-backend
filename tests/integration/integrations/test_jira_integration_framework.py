@@ -6,8 +6,9 @@ Validates the new integration interface and ticket creation workflow
 
 import pytest
 from unittest.mock import MagicMock
-from app.services.integration_interface import IntegrationInterface, IntegrationTestResult, IntegrationTicketResult
-from app.services.jira_integration import JiraIntegration
+from app.integrations.base.integration_interface import IntegrationInterface
+from app.integrations.base.integration_result import IntegrationTestResult, IntegrationTicketResult
+from app.integrations.jira import JiraIntegration
 from app.services.integration_service import IntegrationService
 from app.schemas.ticket import TicketCreateRequest
 from app.schemas.integration import IntegrationTestRequest

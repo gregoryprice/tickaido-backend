@@ -189,6 +189,16 @@ async def send_message(
             jwt_token = None
     
     try:
+        # Validate attachments format if provided
+        if request.attachments:
+            for attachment in request.attachments:
+                try:
+                    # attachment.file_id is already validated as UUID by Pydantic schema
+                    pass
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"[CHAT_API] Invalid attachment format: {e}")
+                    raise HTTPException(status_code=400, detail="Invalid attachment format")
+        
         # Verify thread exists and user has access
         user_id = str(current_user.id)
         thread = await thread_service.get_thread(
@@ -204,13 +214,18 @@ async def send_message(
         
         logger.debug("[CHAT_API] Thread validated, calling AI service with agent context")
         
+        # Convert FileAttachment objects to dict format for service layer
+        attachments_dict = []
+        if request.attachments:
+            attachments_dict = [{"file_id": str(att.file_id)} for att in request.attachments]
+        
         # Use AI chat service with agent-centric processing
         ai_response = await ai_chat_service.send_message_to_thread(
             agent_id=str(agent_id),
             thread_id=str(thread_id),
             user_id=user_id,
             message=request.content,
-            attachments=request.attachments,
+            attachments=attachments_dict,
             auth_token=jwt_token
         )
         

@@ -7,9 +7,11 @@ Handles JIRA Cloud API v3 integration for ticket creation, attachments, and comm
 import logging
 import time
 from typing import Dict, Any, Optional, List
+from uuid import UUID
 import httpx
 
-from .integration_interface import IntegrationInterface, IntegrationTestResult, IntegrationTicketResult
+from ..base.integration_interface import IntegrationInterface
+from ..base.integration_result import IntegrationTestResult, IntegrationTicketResult
 from app.utils.http_debug_logger import log_http_request_response_pair
 
 logger = logging.getLogger(__name__)
@@ -339,7 +341,7 @@ class JiraIntegration(IntegrationInterface):
     
     async def add_attachment(self, issue_key: str, file_content: bytes, filename: str) -> List[Dict[str, Any]]:
         """
-        Add attachment to JIRA issue.
+        Add attachment to JIRA issue with enhanced error handling and retry logic.
         
         Args:
             issue_key: JIRA issue key (e.g., "TEST-123")
@@ -348,46 +350,185 @@ class JiraIntegration(IntegrationInterface):
             
         Returns:
             List of attachment dictionaries
+            
+        Raises:
+            ValueError: For various attachment failure scenarios with specific error messages
         """
-        try:
-            # JIRA attachment API requires multipart/form-data
-            files = {
-                "file": (filename, file_content)
-            }
-            
-            # Remove JSON content type for file upload
-            headers = {"Accept": "application/json"}
-            
-            response = await self.client.post(
-                f"{self.base_url}/rest/api/3/issue/{issue_key}/attachments",
-                files=files,
-                headers=headers
-            )
-            response.raise_for_status()
-            attachments = response.json()
-            
-            logger.info(f"✅ Added attachment {filename} to {issue_key}")
-            
-            return [
-                {
-                    "id": attachment.get("id"),
-                    "filename": attachment.get("filename"),
-                    "size": attachment.get("size"),
-                    "content_url": attachment.get("content"),
-                    "thumbnail_url": attachment.get("thumbnail"),
-                    "author": attachment.get("author", {}).get("displayName"),
-                    "created": attachment.get("created")
+        import asyncio
+        
+        # Validate inputs
+        if not file_content:
+            raise ValueError("File content is empty or None")
+        
+        if not filename or not filename.strip():
+            raise ValueError("Filename is required and cannot be empty")
+        
+        # Validate file size (JIRA default limit is typically 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB in bytes
+        if len(file_content) > max_size:
+            size_mb = len(file_content) / (1024 * 1024)
+            raise ValueError(f"File size ({size_mb:.1f}MB) exceeds JIRA attachment limit (10MB)")
+        
+        # Sanitize filename for JIRA
+        safe_filename = filename.replace('/', '_').replace('\\', '_')[:255]
+        
+        # Retry configuration
+        max_retries = 3
+        base_delay = 1.0
+        
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Uploading attachment {safe_filename} to {issue_key} (attempt {attempt + 1}/{max_retries})")
+                
+                # JIRA attachment API requires multipart/form-data
+                # Based on official JIRA v3 API documentation:
+                # curl --form 'file=@"myfile.txt"' -H 'X-Atlassian-Token: no-check'
+                
+                import mimetypes
+                mime_type, _ = mimetypes.guess_type(safe_filename)
+                if not mime_type:
+                    # Default based on file extension
+                    if safe_filename.lower().endswith('.png'):
+                        mime_type = 'image/png'
+                    elif safe_filename.lower().endswith('.jpg') or safe_filename.lower().endswith('.jpeg'):
+                        mime_type = 'image/jpeg'
+                    elif safe_filename.lower().endswith('.pdf'):
+                        mime_type = 'application/pdf'
+                    else:
+                        mime_type = 'application/octet-stream'
+                
+                # Format files according to JIRA API requirements
+                files = {
+                    "file": (safe_filename, file_content, mime_type)
                 }
-                for attachment in attachments
-            ]
-            
-        except httpx.HTTPStatusError as e:
-            error_msg = f"Failed to add attachment to {issue_key}: {e.response.status_code}"
-            logger.error(f"❌ {error_msg}")
-            raise ValueError(error_msg)
-        except Exception as e:
-            logger.error(f"❌ Failed to add attachment: {e}")
-            raise ValueError(f"Attachment failed: {str(e)}")
+                
+                # Headers exactly as specified in JIRA v3 documentation
+                headers = {
+                    "Accept": "application/json",
+                    "X-Atlassian-Token": "no-check"  # Required for CSRF protection
+                }
+                
+                # Create a clean client without conflicting headers
+                async with httpx.AsyncClient(
+                    auth=self.auth,
+                    timeout=60.0,
+                    # No default headers that could conflict with multipart
+                ) as upload_client:
+                    
+                    logger.debug(f"JIRA attachment request: POST {self.base_url}/rest/api/3/issue/{issue_key}/attachments")
+                    logger.debug(f"Headers: {headers}")
+                    logger.debug(f"File: {safe_filename} ({mime_type}, {len(file_content)} bytes)")
+                    
+                    # Use JIRA API v3 with proper multipart form data
+                    response = await upload_client.post(
+                        f"{self.base_url}/rest/api/3/issue/{issue_key}/attachments",
+                        files=files,
+                        headers=headers
+                    )
+                
+                # Enhanced error handling based on status codes
+                if response.status_code == 404:
+                    raise ValueError(f"JIRA issue {issue_key} not found")
+                elif response.status_code == 403:
+                    raise ValueError("Permission denied - unable to add attachments to this JIRA issue")
+                elif response.status_code == 413:
+                    raise ValueError("File is too large for JIRA attachment limits")
+                elif response.status_code == 415:
+                    raise ValueError(f"File type not supported by JIRA (filename: {safe_filename})")
+                elif response.status_code == 429:
+                    # Rate limit - should retry
+                    rate_limit_reset = response.headers.get("X-RateLimit-Reset")
+                    if attempt < max_retries - 1:
+                        delay = min(base_delay * (2 ** attempt), 30)
+                        logger.warning(f"Rate limited by JIRA API, retrying in {delay}s")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        raise ValueError("JIRA API rate limit exceeded")
+                
+                response.raise_for_status()
+                attachments = response.json()
+                
+                if not attachments:
+                    raise ValueError("JIRA returned empty response for attachment upload")
+                
+                logger.info(f"✅ Successfully uploaded attachment {safe_filename} to {issue_key}")
+                
+                # Return standardized attachment data
+                return [
+                    {
+                        "id": attachment.get("id"),
+                        "filename": attachment.get("filename"),
+                        "size": attachment.get("size"),
+                        "content_url": attachment.get("content"),
+                        "thumbnail_url": attachment.get("thumbnail"),
+                        "author": attachment.get("author", {}).get("displayName", "Unknown"),
+                        "created": attachment.get("created")
+                    }
+                    for attachment in attachments
+                ]
+                
+            except httpx.TimeoutException as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Timeout uploading to {issue_key}, retrying in {delay}s")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"❌ Timeout after {max_retries} attempts uploading {safe_filename} to {issue_key}")
+                    raise ValueError(f"Upload timeout after {max_retries} attempts")
+                    
+            except httpx.ConnectError as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Connection error to JIRA, retrying in {delay}s")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"❌ Connection failed after {max_retries} attempts")
+                    raise ValueError("Unable to connect to JIRA service")
+                    
+            except httpx.HTTPStatusError as e:
+                # For HTTP errors, check if we should retry
+                if e.response.status_code in [500, 502, 503, 504] and attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"JIRA server error {e.response.status_code}, retrying in {delay}s")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    error_details = ""
+                    try:
+                        error_response = e.response.json()
+                        if "errorMessages" in error_response:
+                            error_details = f": {', '.join(error_response['errorMessages'])}"
+                    except:
+                        pass
+                    
+                    error_msg = f"JIRA API error {e.response.status_code}{error_details}"
+                    logger.error(f"❌ {error_msg}")
+                    raise ValueError(error_msg)
+                    
+            except ValueError:
+                # Re-raise validation errors without retry
+                raise
+                
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Unexpected error uploading attachment, retrying in {delay}s: {e}")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"❌ Failed to upload attachment after {max_retries} attempts: {e}")
+                    raise ValueError(f"Attachment upload failed: {str(e)}")
+        
+        # If we get here, all retries failed
+        raise ValueError(f"Failed to upload attachment after {max_retries} attempts. Last error: {str(last_error)}")
     
     async def add_comment(self, issue_key: str, comment_text: str) -> Dict[str, Any]:
         """
@@ -816,18 +957,27 @@ class JiraIntegration(IntegrationInterface):
         cls,
         integration: "Integration",
         ticket_data: "Ticket",
-        original_priority_provided: bool = True  # Keep for backward compatibility but unused
+        db: Optional["AsyncSession"] = None,
+        user_id: Optional["UUID"] = None,
+        attachment_file_ids: Optional[List["UUID"]] = None,
+        organization_id: Optional["UUID"] = None,
+        original_priority_provided: bool = True
     ) -> Dict[str, Any]:
         """
-        Create JIRA ticket from internal ticket data.
+        Create JIRA ticket from internal ticket data with attachment support.
         This is the integration-specific logic moved from TicketService.
         
         Args:
             integration: Integration model instance
             ticket_data: Internal ticket model instance
+            db: Database session for attachment processing
+            user_id: User ID for access control
+            attachment_file_ids: List of validated file IDs to attach to the ticket
+            organization_id: Organization ID for access control
+            original_priority_provided: Whether priority was explicitly provided
             
         Returns:
-            Dict with standardized creation result
+            Dict with standardized creation result including attachment information
         """
         try:
             # Get credentials
@@ -896,6 +1046,36 @@ class JiraIntegration(IntegrationInterface):
                 
                 # Create JIRA issue using the interface method
                 result = await jira.create_ticket(jira_data)
+                
+                # Handle attachments if ticket creation succeeded and attachment file IDs are provided
+                attachment_summary = None
+                if result.get("success") and attachment_file_ids and db and user_id and organization_id:
+                    try:
+                        logger.info(f"Processing {len(attachment_file_ids)} file attachments for JIRA issue {result['details']['key']}")
+                        
+                        from .jira_attachment_service import JiraAttachmentService
+                        
+                        attachment_service = JiraAttachmentService()
+                        attachment_summary = await attachment_service.upload_ticket_attachments(
+                            db=db,
+                            jira=jira,
+                            issue_key=result["details"]["key"],
+                            file_ids=attachment_file_ids,
+                            user_id=user_id,
+                            organization_id=organization_id
+                        )
+                        
+                        logger.info(f"Processed {len(attachment_file_ids)} attachments for JIRA issue {result['details']['key']}: "
+                                  f"{attachment_summary.successful_uploads} successful, {attachment_summary.failed_uploads} failed")
+                    
+                    except Exception as attachment_error:
+                        logger.error(f"Failed to process attachments for JIRA issue {result.get('details', {}).get('key', 'unknown')}: {attachment_error}")
+                        # Don't fail the entire ticket creation due to attachment errors
+                
+                # Add attachment information to the result if available
+                if attachment_summary:
+                    result["details"]["attachments"] = [r.to_dict() for r in attachment_summary.results]
+                    result["details"]["attachment_summary"] = attachment_summary.to_dict()
                 
                 # Track integration usage
                 integration.record_request(success=result.get("success", False))

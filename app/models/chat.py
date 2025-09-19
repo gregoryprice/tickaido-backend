@@ -70,7 +70,7 @@ class Message(BaseModel):
     tool_calls = Column(JSON, nullable=True)  # Array of tool call objects
     
     # Attachments support  
-    attachments = Column(JSON, nullable=True)  # Array of attachment references
+    attachments = Column(JSON, nullable=True, comment="Array of file references: [{'file_id':'uuid'}]")
     
     # Message metadata matches migration column
     message_metadata = Column("message_metadata", JSON, nullable=True)

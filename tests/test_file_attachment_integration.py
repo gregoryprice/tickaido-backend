@@ -21,11 +21,24 @@ class TestFileAttachmentIntegration:
     """End-to-end integration tests for file attachment system"""
     
     @pytest.fixture
-    async def mock_db_session(self):
+    def mock_db_session(self):
         """Mock database session for testing"""
         session = AsyncMock(spec=AsyncSession)
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
+        session.rollback = AsyncMock()
+        session.add = AsyncMock()
+        session.flush = AsyncMock()
+        
+        # Mock the execute method to return a mock result
+        from unittest.mock import MagicMock
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_result.scalars.return_value = mock_scalars
+        session.execute = AsyncMock(return_value=mock_result)
+        
         return session
     
     @pytest.fixture
@@ -168,9 +181,11 @@ class TestFileAttachmentIntegration:
         file_service = FileService()
         
         # Mock database query
-        from sqlalchemy import select
-        mock_result = AsyncMock()
-        mock_result.scalars.return_value.all.return_value = []
+        from unittest.mock import MagicMock
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_result.scalars.return_value = mock_scalars
         mock_db_session.execute = AsyncMock(return_value=mock_result)
         
         files = await file_service.get_files_for_organization(
@@ -193,50 +208,69 @@ class TestFileAttachmentIntegration:
         attachment_service = TicketAttachmentService()
         
         # Mock file validation
+        from app.models.file import FileType
         mock_file = File(
             id=uuid.uuid4(),
             filename="error_log.txt",
             organization_id=sample_user.organization_id,
             status=FileStatus.PROCESSED,
+            file_type=FileType.TEXT,
             extracted_context={"document": {"pages": [{"text": "Error details"}]}}
         )
         
         attachment_service.file_service.get_file = AsyncMock(return_value=mock_file)
         
-        # Mock ticket service
+        # Mock ticket 
         from unittest.mock import MagicMock
         mock_ticket = MagicMock()
         mock_ticket.title = "Login Issue"
         mock_ticket.description = "Cannot log in"
         mock_ticket.id = uuid.uuid4()
         
-        attachment_service.ticket_service = AsyncMock()
-        attachment_service.ticket_service.create_ticket = AsyncMock(return_value=mock_ticket)
-        attachment_service.file_processor.process_uploaded_file = AsyncMock()
-        attachment_service.ai_service.analyze_ticket_with_attachments = AsyncMock()
+        # Mock TicketService to avoid file validation issues
+        from unittest.mock import patch
+        with patch('app.services.ticket_service.TicketService') as mock_ticket_service_class:
+            mock_ticket_service_instance = AsyncMock()
+            mock_ticket_service_instance.create_ticket = AsyncMock(return_value=mock_ticket)
+            mock_ticket_service_class.return_value = mock_ticket_service_instance
+            
+            attachment_service.file_processor.process_uploaded_file = AsyncMock()
+            
+            # Mock AI service response
+            from unittest.mock import MagicMock
+            mock_analysis = MagicMock()
+            mock_analysis.confidence = 0.9
+            mock_analysis.suggested_category = "technical"
+            mock_analysis.suggested_priority = "medium"
+            mock_analysis.reasoning = "Test reasoning"
+            attachment_service.ai_service.analyze_ticket_with_attachments = AsyncMock(return_value=mock_analysis)
         
-        # Test ticket creation with files
-        ticket_data = {
-            "title": "Login Issue",
-            "description": "Cannot log in"
-        }
-        
-        file_ids = [mock_file.id]
-        
-        result = await attachment_service.create_ticket_with_files(
-            db=mock_db_session,
-            ticket_data=ticket_data,
-            file_ids=file_ids,
-            user=sample_user
-        )
-        
-        # Verify file validation was called
-        assert attachment_service.file_service.get_file.called
-        assert attachment_service.ticket_service.create_ticket.called
-        
-        # Verify ticket_data was updated with file_ids
-        call_args = attachment_service.ticket_service.create_ticket.call_args
-        assert "file_ids" in call_args[1]["ticket_data"]
+            # Test ticket creation with files
+            ticket_data = {
+                "title": "Login Issue",
+                "description": "Cannot log in"
+            }
+            
+            file_ids = [mock_file.id]
+            
+            result = await attachment_service.create_ticket_with_files(
+                db=mock_db_session,
+                ticket_data=ticket_data,
+                file_ids=file_ids,
+                user=sample_user
+            )
+            
+            # Verify file validation was called
+            attachment_service.file_service.get_file.assert_called_with(mock_db_session, mock_file.id)
+            
+            # Verify ticket service was called
+            mock_ticket_service_instance.create_ticket.assert_called_once()
+            
+            # Verify ticket_data was updated with attachments
+            call_args = mock_ticket_service_instance.create_ticket.call_args
+            ticket_data_arg = call_args[1]["ticket_data"]
+            assert "attachments" in ticket_data_arg
+            assert ticket_data_arg["attachments"] == [{"file_id": str(mock_file.id)}]
     
     @pytest.mark.asyncio
     async def test_content_extraction_pipeline(self, mock_db_session, sample_user, sample_file_content):
@@ -295,7 +329,8 @@ class TestFileAttachmentIntegration:
         )
         
         processor = FileProcessingService()
-        processor.file_service.get_file_content = AsyncMock(return_value=b"\x00\xFF" * 50)
+        # Mock get_file_content to raise an exception to simulate processing failure
+        processor.file_service.get_file_content = AsyncMock(side_effect=Exception("Corrupted file content"))
         
         # Process should handle error gracefully
         await processor.process_uploaded_file(mock_db_session, invalid_file)

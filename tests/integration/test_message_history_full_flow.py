@@ -10,6 +10,7 @@ from app.models.organization import Organization
 from app.services.dynamic_agent_factory import dynamic_agent_factory
 from app.services.message_history_service import message_history_service
 from app.services.token_counter_service import token_counter_service
+from app.services.ai_chat_service import MessageFormat
 from app.schemas.ai_response import ChatResponse, CustomerSupportContext
 
 @pytest.mark.asyncio
@@ -125,7 +126,7 @@ async def test_dynamic_agent_factory_full_integration():
         mock_create.return_value = mock_pydantic_agent
         
         # Mock AI chat service
-        mock_ai_chat_service.get_thread_history_as_model_messages = AsyncMock(return_value=mock_history)
+        mock_ai_chat_service.get_thread_history = AsyncMock(return_value=mock_history)
         
         # Test agent processing with history
         response = await dynamic_agent_factory.process_message_with_agent(
@@ -142,10 +143,11 @@ async def test_dynamic_agent_factory_full_integration():
         assert "12345" in response.content  # Should reference previous order number
         
         # Verify history was loaded
-        mock_ai_chat_service.get_thread_history_as_model_messages.assert_called_once_with(
+        mock_ai_chat_service.get_thread_history.assert_called_once_with(
             thread_id=thread_id,
             user_id='system',
             agent_id=str(agent_model.id),
+            format_type=MessageFormat.MODEL_MESSAGE,
             max_context_size=1000,
             use_memory_context=True
         )
@@ -233,7 +235,7 @@ async def test_memory_context_flag_behavior():
         mock_pydantic_agent.run.return_value = mock_result
         mock_create.return_value = mock_pydantic_agent
         
-        mock_ai_chat_service.get_thread_history_as_model_messages = AsyncMock(return_value=[])
+        mock_ai_chat_service.get_thread_history = AsyncMock(return_value=[])
         
         # Test with memory enabled
         await dynamic_agent_factory.process_message_with_agent(
@@ -246,10 +248,10 @@ async def test_memory_context_flag_behavior():
         )
         
         # Should call history service when memory is enabled
-        assert mock_ai_chat_service.get_thread_history_as_model_messages.call_count == 1
+        assert mock_ai_chat_service.get_thread_history.call_count == 1
         
         # Reset mock
-        mock_ai_chat_service.get_thread_history_as_model_messages.reset_mock()
+        mock_ai_chat_service.get_thread_history.reset_mock()
         
         # Test with memory disabled
         await dynamic_agent_factory.process_message_with_agent(
@@ -262,4 +264,4 @@ async def test_memory_context_flag_behavior():
         )
         
         # Should NOT call history service when memory is disabled
-        mock_ai_chat_service.get_thread_history_as_model_messages.assert_not_called()
+        mock_ai_chat_service.get_thread_history.assert_not_called()

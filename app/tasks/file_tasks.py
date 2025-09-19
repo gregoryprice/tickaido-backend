@@ -30,6 +30,12 @@ def process_file_upload(self, file_id: str, processing_options: Dict[str, Any] =
         return result
         
     except Exception as exc:
+        # Check if it's a cancellation (from actual revoke calls)
+        from celery.exceptions import WorkerLostError
+        if isinstance(exc, WorkerLostError) or "revoked" in str(exc).lower():
+            logger.info(f"File processing cancelled for file_id: {file_id}")
+            return {"status": "cancelled", "file_id": file_id}
+            
         logger.error(f"File processing failed for file_id: {file_id}, error: {str(exc)}")
         # Retry with exponential backoff
         self.retry(exc=exc, countdown=60 * (self.request.retries + 1))

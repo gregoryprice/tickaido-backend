@@ -410,7 +410,7 @@ class FileUploadResponse(BaseSchema):
     mime_type: str = Field(description="MIME type of the file")
     file_type: FileTypeSchema = Field(description="Detected file type")
     status: FileStatusSchema = Field(description="Current processing status")
-    download_url: Optional[str] = Field(None, description="Temporary download URL")
+    url: str = Field(description="Direct access URL for file content")
     processing_required: bool = Field(description="Whether file needs AI processing")
 
 
@@ -422,6 +422,7 @@ class FileResponse(BaseSchema):
     mime_type: str = Field(description="MIME type")
     file_type: FileTypeSchema = Field(description="File type category")
     status: FileStatusSchema = Field(description="Processing status")
+    url: str = Field(description="Direct access URL for file content")
     extraction_method: Optional[str] = Field(None, description="Method used for content extraction")
     content_summary: Optional[str] = Field(None, description="AI-generated content summary")
     extracted_context: Optional[Dict[str, Any]] = Field(None, description="Unified extracted content JSON")

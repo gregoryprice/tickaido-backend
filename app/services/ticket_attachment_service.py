@@ -45,11 +45,12 @@ class TicketAttachmentService:
                 raise ValueError(f"File {file_id} not found or not accessible")
             validated_files.append(file_obj)
         
-        # Create ticket with file_ids array
+        # Create ticket with attachments array (correct field name)
         from app.services.ticket_service import TicketService
         ticket_service = TicketService()
         
-        ticket_data["file_ids"] = [str(fid) for fid in file_ids]  # Store as string array
+        # Format file_ids as attachments array for the ticket model
+        ticket_data["attachments"] = [{"file_id": str(fid)} for fid in file_ids]
         ticket = await ticket_service.create_ticket(
             db=db,
             ticket_data=ticket_data,
@@ -118,13 +119,15 @@ class TicketAttachmentService:
             if not file_obj or file_obj.organization_id != user.organization_id:
                 raise ValueError(f"File {file_id} not accessible")
         
-        # Update ticket file_ids array
-        current_file_ids = ticket.file_ids or []
-        # Convert to strings and add new files
-        current_file_strs = [str(fid) for fid in current_file_ids]
+        # Update ticket attachments array
+        current_attachments = ticket.attachments or []
+        # Extract current file_ids
+        current_file_ids = [att.get("file_id") for att in current_attachments if isinstance(att, dict) and att.get("file_id")]
+        # Add new file IDs
         new_file_strs = [str(fid) for fid in new_file_ids]
-        updated_file_ids = list(set(current_file_strs + new_file_strs))
-        ticket.file_ids = updated_file_ids
+        all_file_ids = list(set(current_file_ids + new_file_strs))
+        # Update attachments array
+        ticket.attachments = [{"file_id": fid} for fid in all_file_ids]
         
         await db.commit()
         return ticket
@@ -136,11 +139,15 @@ class TicketAttachmentService:
         result = await db.execute(stmt)
         ticket = result.scalar_one_or_none()
         
-        if not ticket or not ticket.file_ids:
+        if not ticket or not ticket.attachments:
             return []
         
         files = []
-        for file_id_str in ticket.file_ids:
+        # Extract file IDs from attachments array
+        for attachment in ticket.attachments:
+            if not isinstance(attachment, dict) or "file_id" not in attachment:
+                continue
+            file_id_str = attachment["file_id"]
             try:
                 file_id = UUID(file_id_str)
                 file_obj = await self.file_service.get_file(db, file_id)
@@ -173,13 +180,14 @@ class TicketAttachmentService:
         if not ticket:
             raise ValueError("Ticket not found")
         
-        if not ticket.file_ids:
+        if not ticket.attachments:
             return ticket
         
-        # Remove file ID from array
+        # Remove file ID from attachments array
         file_id_str = str(file_id)
-        updated_file_ids = [fid for fid in ticket.file_ids if fid != file_id_str]
-        ticket.file_ids = updated_file_ids
+        updated_attachments = [att for att in ticket.attachments 
+                             if not (isinstance(att, dict) and att.get("file_id") == file_id_str)]
+        ticket.attachments = updated_attachments
         
         await db.commit()
         return ticket

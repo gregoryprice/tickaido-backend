@@ -16,7 +16,7 @@ from app.models.api_token import APIToken
 from app.models.organization_invitation import OrganizationRole
 from app.services.clerk_service import clerk_service
 from app.services.clerk_organization_service import clerk_org_service
-from app.middleware.clerk_middleware import AuthMiddleware
+from app.middleware.auth_middleware import AuthMiddleware
 from app.middleware.organization_middleware import OrganizationContext
 
 client = TestClient(app)
@@ -203,12 +203,12 @@ class TestAPIRoutes:
     async def test_api_token_generation_endpoint_structure(self):
         """Test API token generation endpoint exists and has correct structure"""
         # This tests that the route is properly defined and importable
-        from app.routers.api_tokens import generate_api_token, list_api_tokens, revoke_api_token
+        from app.routers.api_tokens import generate_api_token, list_api_tokens, delete_api_token
         
         # Routes should be callable functions
         assert callable(generate_api_token)
         assert callable(list_api_tokens)
-        assert callable(revoke_api_token)
+        assert callable(delete_api_token)
     
     def test_webhook_endpoints_exist(self):
         """Test webhook endpoints are properly defined"""
@@ -225,8 +225,13 @@ class TestWebhookHandlers:
         """Test user created webhook handler structure"""
         from app.routers.clerk_webhooks import handle_user_created
         
-        # Mock database session
+        # Mock database session with proper async mocking
         mock_db = AsyncMock()
+        
+        # Mock the database query result
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = None  # User doesn't exist
+        mock_db.execute.return_value = mock_result
         
         # Mock user data
         user_data = {
@@ -250,7 +255,13 @@ class TestWebhookHandlers:
         """Test organization created webhook handler structure"""
         from app.routers.clerk_webhooks import handle_organization_created
         
+        # Mock database session with proper async mocking
         mock_db = AsyncMock()
+        
+        # Mock the database query result
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = None  # Organization doesn't exist
+        mock_db.execute.return_value = mock_result
         
         org_data = {
             'id': 'clerk_org_123',
@@ -301,7 +312,11 @@ class TestSchemaValidation:
             name="Test Token",
             permissions=["*"],
             created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+            last_used_at=None,
+            is_active=True,
+            is_expired=False,
             organization_id=uuid4(),
             organization_name="Test Org"
         )
