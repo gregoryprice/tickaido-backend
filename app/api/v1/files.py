@@ -93,7 +93,7 @@ async def upload_file(
             mime_type=file_obj.mime_type,
             file_type=file_obj.file_type,
             status=file_obj.status,
-            download_url=f"/api/v1/files/{file_obj.id}/content",
+            url=f"/api/v1/files/{file_obj.id}/content",
             processing_required=processing_required
         )
         
@@ -107,7 +107,7 @@ async def upload_file(
             detail={
                 "message": "File with this content already exists",
                 "existing_file_id": str(e.existing_file_id),
-                "existing_file_url": f"/api/v1/files/{e.existing_file_id}"
+                "existing_file_url": f"/api/v1/files/{e.existing_file_id}/content"
             }
         )
     except ValueError as e:
@@ -152,6 +152,7 @@ async def get_file_metadata(
         mime_type=file_obj.mime_type,
         file_type=file_obj.file_type,
         status=file_obj.status,
+        url=f"/api/v1/files/{file_obj.id}/content",
         extraction_method=file_obj.extraction_method,
         content_summary=file_obj.content_summary,
         extracted_context=file_obj.extracted_context,
@@ -231,6 +232,15 @@ async def delete_file(
         raise HTTPException(status_code=400, detail="File cannot be deleted")
     
     try:
+        # Cancel any active processing tasks for this file
+        from app.services.task_cancellation_service import TaskCancellationService
+        task_canceller = TaskCancellationService()
+        
+        # Cancel processing if file is being processed
+        if file_obj.status == FileStatus.PROCESSING:
+            cancellation_result = task_canceller.cancel_file_processing_tasks(str(file_id))
+            logger.info(f"Task cancellation for file {file_id}: {cancellation_result}")
+        
         # Delete file from storage and database
         await file_service.delete_file(db, file_id, current_user.id)
         
@@ -250,7 +260,12 @@ async def list_user_files(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user)
 ):
-    """List user's files with organization scoping"""
+    """
+    List user's files with organization scoping
+    
+    Note: Deleted files are automatically excluded from results.
+    Valid status filters: uploaded, processing, processed, failed, quarantined
+    """
     
     file_service = FileService()
     
@@ -259,6 +274,12 @@ async def list_user_files(
     if file_type:
         filters["file_type"] = file_type
     if status:
+        # Prevent querying for deleted files since they're filtered out anyway
+        if status == FileStatus.DELETED:
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot filter by deleted status. Deleted files are not included in results."
+            )
         filters["status"] = status
     
     try:
@@ -280,6 +301,7 @@ async def list_user_files(
                 mime_type=file_obj.mime_type,
                 file_type=file_obj.file_type,
                 status=file_obj.status,
+                url=f"/api/v1/files/{file_obj.id}/content",
                 extraction_method=file_obj.extraction_method,
                 content_summary=file_obj.content_summary,
                 language_detection=file_obj.language_detection,

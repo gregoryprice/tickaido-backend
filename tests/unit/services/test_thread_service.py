@@ -289,31 +289,37 @@ async def test_delete_thread_hard_delete(test_agent, test_thread):
     mock_delete_result = MagicMock()
     mock_delete_result.rowcount = 3  # 3 messages deleted
     
-    mock_db.execute.side_effect = [
-        mock_agent_result,  # Agent validation query
-        mock_thread_result,  # Thread query
-        mock_delete_result   # Delete messages query
-    ]
-    mock_db.commit = AsyncMock()
-    mock_db.delete = AsyncMock()
-    
-    service = ThreadService()
-    
-    # Test thread deletion
-    deleted = await service.delete_thread(
-        db=mock_db,
-        agent_id=test_agent.id,
-        thread_id=test_thread.id,
-        user_id="test_user"
-    )
-    
-    # Verify deletion success
-    assert deleted == True
-    
-    # Verify database operations - hard delete, not soft delete
-    mock_db.delete.assert_called_once_with(test_thread)  # Thread hard deleted
-    mock_db.commit.assert_called_once()
-    assert mock_db.execute.call_count == 3  # Agent query + thread query + delete messages query
+    # Mock file cleanup service to avoid additional database calls
+    from unittest.mock import patch
+    with patch('app.services.file_cleanup_service.file_cleanup_service') as mock_cleanup:
+        mock_cleanup.cascade_delete_thread_files = AsyncMock(return_value=2)  # 2 files deleted
+        
+        mock_db.execute.side_effect = [
+            mock_agent_result,  # Agent validation query (from get_thread)
+            mock_thread_result,  # Thread query (from get_thread)
+            mock_delete_result   # Delete messages query
+        ]
+        mock_db.commit = AsyncMock()
+        mock_db.delete = AsyncMock()
+        mock_db.rollback = AsyncMock()
+        
+        service = ThreadService()
+        
+        # Test thread deletion
+        deleted = await service.delete_thread(
+            db=mock_db,
+            agent_id=test_agent.id,
+            thread_id=test_thread.id,
+            user_id="test_user"
+        )
+        
+        # Verify deletion success
+        assert deleted == True
+        
+        # Verify database operations - hard delete, not soft delete
+        mock_db.delete.assert_called_once_with(test_thread)  # Thread hard deleted
+        mock_db.commit.assert_called_once()
+        assert mock_db.execute.call_count == 3  # Agent query + thread query + delete messages query
 
 
 @pytest.mark.asyncio

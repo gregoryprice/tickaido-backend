@@ -383,7 +383,7 @@ class ThreadService:
         user_id: str
     ) -> bool:
         """
-        Hard delete a thread and all its associated messages.
+        Hard delete a thread and all its associated messages and attached files.
         
         Args:
             db: Database session
@@ -403,8 +403,13 @@ class ThreadService:
                 logger.warning(f"[THREAD_SERVICE] Cannot delete - thread {thread_id} not found or not accessible")
                 return False
             
+            # Cascade delete all files attached to messages in this thread
+            from app.services.file_cleanup_service import file_cleanup_service
+            deleted_files = await file_cleanup_service.cascade_delete_thread_files(
+                db, thread_id, thread.organization_id
+            )
+            
             # Delete all messages associated with this thread first
-            # Delete messages
             delete_messages_query = delete(Message).where(Message.thread_id == thread_id)
             result = await db.execute(delete_messages_query)
             messages_deleted = result.rowcount
@@ -413,7 +418,7 @@ class ThreadService:
             await db.delete(thread)
             await db.commit()
             
-            logger.info(f"[THREAD_SERVICE] Hard deleted thread {thread_id} and {messages_deleted} associated messages")
+            logger.info(f"[THREAD_SERVICE] Hard deleted thread {thread_id}, {messages_deleted} messages, and {deleted_files} files")
             return True
             
         except Exception as e:

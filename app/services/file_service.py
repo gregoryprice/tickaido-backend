@@ -5,6 +5,7 @@ File Service - Business logic for file management, processing, and analysis usin
 
 import os
 import uuid
+import logging
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timezone
@@ -27,6 +28,8 @@ from app.schemas.file import (
 )
 from app.config.settings import get_settings
 from app.services.storage.factory import get_storage_service
+
+logger = logging.getLogger(__name__)
 
 
 class DuplicateFileError(Exception):
@@ -558,8 +561,70 @@ class FileService:
                 analyzed_at=datetime.now(timezone.utc)
             )
     
+    async def reprocess_file(
+        self,
+        db: AsyncSession,
+        file_id: UUID,
+        user_id: Optional[UUID] = None
+    ) -> bool:
+        """
+        Reprocess a file that failed or needs updating.
+        
+        Args:
+            db: Database session
+            file_id: File ID to reprocess
+            user_id: Optional user ID for permission checking
+            
+        Returns:
+            bool: True if reprocessing was successful or not needed, False if failed
+        """
+        try:
+            # Get file object
+            db_file = await self.get_file(db, file_id)
+            if not db_file:
+                logger.error(f"File {file_id} not found for reprocessing")
+                return False
+            
+            # Check if file is soft-deleted
+            if db_file.is_deleted:
+                logger.warning(f"Skipping reprocessing for soft-deleted file: {file_id}")
+                return False
+            
+            # Check permissions if user_id provided
+            if user_id and db_file.uploaded_by_id != user_id:
+                # TODO: Check if user has admin permissions or access via ticket
+                pass
+            
+            # Check if file needs reprocessing
+            if db_file.status == FileStatus.PROCESSED and db_file.has_content:
+                logger.info(f"File {file_id} already processed with content, skipping reprocessing")
+                return True
+            
+            # Import file processing service here to avoid circular imports
+            from app.services.file_processing_service import FileProcessingService
+            
+            logger.info(f"Reprocessing file {file_id} (current status: {db_file.status})")
+            
+            # Use file processing service to reprocess
+            file_processing_service = FileProcessingService()
+            await file_processing_service.process_uploaded_file(db, db_file)
+            
+            # Refresh file to get updated status
+            await db.refresh(db_file)
+            
+            if db_file.status == FileStatus.PROCESSED:
+                logger.info(f"Successfully reprocessed file {file_id}")
+                return True
+            else:
+                logger.warning(f"File {file_id} reprocessing completed but status is {db_file.status}")
+                return db_file.status != FileStatus.ERROR  # Consider non-error statuses as success
+                
+        except Exception as e:
+            logger.error(f"Failed to reprocess file {file_id}: {e}")
+            return False
+    
     def _detect_file_type(self, mime_type: str) -> FileType:
-        """Detect file type from MIME type"""
+        """Detect file type from MIME type with enhanced support for structured data"""
         if mime_type.startswith('image/'):
             return FileType.IMAGE
         elif mime_type.startswith('audio/'):
@@ -570,8 +635,14 @@ class FileService:
             return FileType.DOCUMENT
         elif mime_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
             return FileType.DOCUMENT
-        elif mime_type == 'text/plain':
+        elif mime_type in ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+            return FileType.SPREADSHEET
+        elif mime_type == 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+            return FileType.PRESENTATION
+        elif mime_type in ['text/plain', 'text/markdown', 'application/json']:
             return FileType.TEXT
+        elif mime_type.startswith('text/') and mime_type in ['text/html', 'text/css', 'text/javascript', 'text/xml']:
+            return FileType.CODE
         else:
             return FileType.OTHER
     
@@ -665,7 +736,16 @@ class FileService:
                 existing_file.mime_type = mime_type
                 existing_file.file_size = file_size
                 existing_file.file_type = self._detect_file_type(mime_type)
-                existing_file.status = FileStatus.UPLOADED
+                
+                # Smart status restoration: check if file was previously processed
+                # If processing_completed_at exists, the file was successfully processed before deletion
+                if existing_file.processing_completed_at is not None:
+                    # File was previously processed successfully, restore to PROCESSED
+                    existing_file.status = FileStatus.PROCESSED
+                else:
+                    # File was never processed or failed, set to UPLOADED for processing
+                    existing_file.status = FileStatus.UPLOADED
+                
                 existing_file.is_deleted = False
                 existing_file.deleted_at = None
                 existing_file.updated_at = datetime.now(timezone.utc)
@@ -676,7 +756,7 @@ class FileService:
                 return existing_file
             else:
                 # File already exists and is active - this is a true duplicate
-                raise DuplicateFileError(f"File with hash {file_hash} already exists and is active", existing_file.id)
+                raise DuplicateFileError(f"File with hash {file_hash} already exists", existing_file.id)
         
         # Generate unique file ID and storage key for new file
         file_id = uuid.uuid4()
@@ -752,3 +832,87 @@ class FileService:
         
         result = await db.execute(query)
         return result.scalars().all()
+    
+    async def get_file_content_for_external_upload(
+        self,
+        db: AsyncSession,
+        file_id: UUID,
+        user_id: UUID,
+        organization_id: UUID
+    ) -> Optional[bytes]:
+        """
+        Get file content specifically for external integration uploads with enhanced validation.
+        
+        This method provides strict access control and validation specifically for
+        external integrations like JIRA attachments.
+        
+        Args:
+            db: Database session
+            file_id: File ID to retrieve
+            user_id: User requesting the file (for access control)
+            organization_id: Organization ID for boundary validation
+            
+        Returns:
+            File content if accessible and valid, None otherwise
+            
+        Raises:
+            PermissionError: If user doesn't have access to file
+            ValueError: If file is not in valid state for external upload
+        """
+        try:
+            # Get file with full validation
+            db_file = await self.get_file(db, file_id)
+            if not db_file:
+                logger.warning(f"File {file_id} not found for external upload")
+                return None
+            
+            # Strict organization boundary check
+            if db_file.organization_id != organization_id:
+                logger.warning(
+                    f"Organization boundary violation for file {file_id}. "
+                    f"File org: {db_file.organization_id}, Request org: {organization_id}"
+                )
+                raise PermissionError("File belongs to different organization")
+            
+            # Check file status - must be ready for external upload
+            if db_file.status not in [FileStatus.UPLOADED, FileStatus.PROCESSED]:
+                logger.warning(f"File {file_id} not ready for external upload (status: {db_file.status})")
+                raise ValueError(f"File is not ready for upload (status: {db_file.status.value})")
+            
+            # Check if file was deleted
+            if db_file.is_deleted:
+                logger.warning(f"Attempted to upload deleted file {file_id}")
+                raise ValueError("File has been deleted")
+            
+            # Additional security: verify user has access to this file
+            # This could be expanded with more sophisticated access control
+            if not db_file.is_public and db_file.uploaded_by_id != user_id:
+                # For now, require either public file or same user
+                # Future: check if user has access via ticket ownership, team membership, etc.
+                logger.warning(f"User {user_id} denied access to private file {file_id}")
+                raise PermissionError("Access denied to private file")
+            
+            # Retrieve file content from storage
+            content = await self.storage_service.download_file(db_file.file_path)
+            
+            if content is None:
+                logger.error(f"File content not available for {file_id} at path {db_file.file_path}")
+                return None
+            
+            # Validate content size matches database record
+            if len(content) != db_file.file_size:
+                logger.error(
+                    f"File size mismatch for {file_id}: "
+                    f"DB shows {db_file.file_size} bytes, got {len(content)} bytes"
+                )
+                raise ValueError("File content size mismatch")
+            
+            logger.info(f"Successfully retrieved file content for external upload: {file_id}")
+            return content
+            
+        except (PermissionError, ValueError):
+            # Re-raise validation errors
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving file {file_id} for external upload: {e}")
+            return None

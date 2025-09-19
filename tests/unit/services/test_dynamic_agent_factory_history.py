@@ -5,6 +5,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, User
 from pydantic_ai.usage import Usage
 from datetime import datetime, timezone
 from app.services.dynamic_agent_factory import dynamic_agent_factory
+from app.services.ai_chat_service import MessageFormat
 from app.schemas.ai_response import ChatResponse, CustomerSupportContext
 
 @pytest.mark.asyncio
@@ -42,7 +43,7 @@ async def test_process_message_with_history():
         mock_create.return_value = mock_agent
         
         # Mock chat service history method - use correct method name
-        mock_chat_service.get_thread_history_as_model_messages = AsyncMock(return_value=mock_history)
+        mock_chat_service.get_thread_history = AsyncMock(return_value=mock_history)
         
         # Create context with user metadata
         context = CustomerSupportContext(
@@ -91,7 +92,7 @@ async def test_process_message_without_history():
         mock_create.return_value = mock_agent
         
         # Mock empty history
-        mock_chat_service.get_thread_history_for_agent = AsyncMock(return_value=[])
+        mock_chat_service.get_thread_history = AsyncMock(return_value=[])
         
         # Process without thread_id (no history)
         context = CustomerSupportContext(user_input="Hello", user_metadata={"user_id": "test_user"})
@@ -144,7 +145,7 @@ async def test_memory_context_disabled():
         )
         
         # History service should not be called when memory is disabled
-        mock_chat_service.get_thread_history_for_agent.assert_not_called()
+        mock_chat_service.get_thread_history.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_process_message_history_service_error():
@@ -174,7 +175,7 @@ async def test_process_message_history_service_error():
         mock_create.return_value = mock_agent
         
         # Mock chat service to raise exception
-        mock_chat_service.get_thread_history_as_model_messages = AsyncMock(side_effect=Exception("Database error"))
+        mock_chat_service.get_thread_history = AsyncMock(side_effect=Exception("Database error"))
         
         # Create context
         context = CustomerSupportContext(
@@ -226,7 +227,7 @@ async def test_process_message_with_context_user_id():
         mock_agent.run.return_value = mock_result
         mock_create.return_value = mock_agent
         
-        mock_chat_service.get_thread_history_as_model_messages = AsyncMock(return_value=[])
+        mock_chat_service.get_thread_history = AsyncMock(return_value=[])
         
         # Create context with specific user_id
         context = CustomerSupportContext(
@@ -242,11 +243,12 @@ async def test_process_message_with_context_user_id():
             thread_id=thread_id
         )
         
-        # Verify the correct user_id was passed to get_thread_history_as_model_messages
-        mock_chat_service.get_thread_history_as_model_messages.assert_called_once_with(
+        # Verify the correct user_id was passed to get_thread_history
+        mock_chat_service.get_thread_history.assert_called_once_with(
             thread_id=thread_id,
             user_id=test_user_id,  # Should use the specific user_id from context
             agent_id=str(agent_model.id),
+            format_type=MessageFormat.MODEL_MESSAGE,
             max_context_size=agent_model.max_context_size,
             use_memory_context=agent_model.use_memory_context
         )
@@ -271,7 +273,7 @@ async def test_process_message_fallback_user_id():
         mock_agent.run.return_value = mock_result
         mock_create.return_value = mock_agent
         
-        mock_chat_service.get_thread_history_as_model_messages = AsyncMock(return_value=[])
+        mock_chat_service.get_thread_history = AsyncMock(return_value=[])
         
         # Create context without user_id in metadata
         context = CustomerSupportContext(
@@ -288,6 +290,6 @@ async def test_process_message_fallback_user_id():
         )
         
         # Verify fallback user_id 'system' was used
-        mock_chat_service.get_thread_history_as_model_messages.assert_called_once()
-        call_args = mock_chat_service.get_thread_history_as_model_messages.call_args
+        mock_chat_service.get_thread_history.assert_called_once()
+        call_args = mock_chat_service.get_thread_history.call_args
         assert call_args.kwargs['user_id'] == 'system'

@@ -111,7 +111,6 @@ class AIService:
                 "priority": ai_result.priority.upper() if ai_result.priority else None,
                 "urgency": ai_result.urgency.upper() if ai_result.urgency else None,
                 "department": ai_result.department,
-                "integration_routing": ai_result.recommended_integration,
                 "ai_confidence_score": str(ai_result.confidence_score),
                 "source_channel": "ai_agent",
                 "created_by_id": current_user.id  # Use authenticated user ID

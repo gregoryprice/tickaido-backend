@@ -242,12 +242,12 @@ class TestFileProcessingIntegration:
         
         status = await processor.get_file_processing_status(None, str(file_obj.id))
         
-        assert status["file_id"] == file_obj.id
-        assert status["status"] == "processed"
-        assert status["extraction_method"] == "document_parser"
-        assert status["has_content"] is True
-        assert status["content_summary"] == "Test summary"
-        assert status["language_detection"] == "en"
+        assert status.id == file_obj.id
+        assert status.status == "processed"
+        assert status.extraction_method == "document_parser"
+        assert status.has_content is True
+        assert status.content_summary == "Test summary"
+        assert status.language_detection == "en"
     
     @pytest.mark.asyncio
     async def test_content_extraction_error_handling(self):

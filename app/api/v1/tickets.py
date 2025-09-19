@@ -29,6 +29,9 @@ from app.models.user import User
 router = APIRouter(prefix="/tickets")
 
 
+# Helper function removed - detailed file info should be fetched via GET /api/v1/files/{file_id}
+
+
 @router.get("/", response_model=PaginatedResponse)
 async def list_tickets(
     pagination: PaginationParams = Depends(),
@@ -106,6 +109,15 @@ async def create_ticket(
     Create a new support ticket.
     """
     try:
+        # Validate attachments format if provided
+        if ticket_data.attachments:
+            for attachment in ticket_data.attachments:
+                try:
+                    # attachment.file_id is already validated as UUID by Pydantic schema
+                    pass
+                except (ValueError, AttributeError) as e:
+                    raise HTTPException(status_code=400, detail="Invalid attachment format")
+        
         # Check if integration is specified for external creation
         if ticket_data.integration_id and ticket_data.create_externally:
             # Add organization_id to ticket data
@@ -117,10 +129,8 @@ async def create_ticket(
                 created_by_id=current_user.id
             )
             
-            # Include integration result in response
-            response_data = TicketDetailResponse.model_validate(ticket)
-            response_data.integration_result = integration_result
-            return response_data
+            # Return response with integration_result from database
+            return TicketDetailResponse.model_validate(ticket)
         else:
             # Standard internal-only ticket creation
             # Add organization_id to ticket data
@@ -129,10 +139,12 @@ async def create_ticket(
             ticket = await ticket_service.create_ticket(
                 db=db,
                 ticket_data=ticket_data_dict,
-                created_by_id=current_user.id
+                created_by_id=current_user.id,
+                organization_id=current_user.organization_id
             )
             
-            return TicketDetailResponse.model_validate(ticket)
+            response = TicketDetailResponse.model_validate(ticket)
+            return response
         
     except ValueError as e:
         raise HTTPException(
@@ -206,7 +218,8 @@ async def get_ticket(
                 detail="Ticket not found"
             )
         
-        return TicketDetailResponse.model_validate(ticket)
+        response = TicketDetailResponse.model_validate(ticket)
+        return response
         
     except HTTPException:
         raise
@@ -278,7 +291,13 @@ async def patch_ticket(
     """
     try:
         # Get only the fields that were actually provided (exclude None values)
+        # Special handling for attachments - empty array should be preserved
         update_data = patch_data.model_dump(exclude_unset=True, exclude_none=True)
+        
+        # Re-add attachments if it was explicitly set (even if empty)
+        raw_data = patch_data.model_dump(exclude_unset=True)
+        if 'attachments' in raw_data and 'attachments' not in update_data:
+            update_data['attachments'] = raw_data['attachments']
         
         if not update_data:
             raise HTTPException(

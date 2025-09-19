@@ -12,6 +12,11 @@ from enum import Enum
 from app.schemas.base import BaseSchema, BaseResponse
 
 
+class FileAttachment(BaseSchema):
+    """File attachment reference"""
+    file_id: UUID = Field(description="File UUID reference")
+
+
 class MessageRoleSchema(str, Enum):
     """Message role enum schema"""
     USER = "user"
@@ -73,9 +78,9 @@ class MessageResponse(BaseResponse):
         None,
         description="Array of tool call objects used by the agent"
     )
-    attachments: Optional[List[Dict[str, Any]]] = Field(
+    attachments: Optional[List[FileAttachment]] = Field(
         None,
-        description="Array of attachment references"
+        description="Array of file attachment references"
     )
     message_metadata: Optional[Dict[str, Any]] = Field(
         None,
@@ -112,9 +117,9 @@ class SendMessageRequest(BaseSchema):
         default="user",
         description="Message role (user or assistant)"
     )
-    attachments: Optional[List[Dict[str, Any]]] = Field(
+    attachments: Optional[List[FileAttachment]] = Field(
         None,
-        description="Optional message attachments"
+        description="File attachments"
     )
     message_metadata: Optional[Dict[str, Any]] = Field(
         None,

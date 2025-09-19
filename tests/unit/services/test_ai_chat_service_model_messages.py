@@ -4,17 +4,18 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
-from app.services.ai_chat_service import ai_chat_service
+from app.services.ai_chat_service import ai_chat_service, MessageFormat
 
 @pytest.mark.asyncio
-async def test_get_thread_history_as_model_messages():
-    """Test retrieving thread history as ModelMessage format."""
+async def test_get_thread_history_model_message_format():
+    """Test retrieving thread history in ModelMessage format."""
     
     # Test with memory disabled - should return empty
-    history = await ai_chat_service.get_thread_history_as_model_messages(
+    history = await ai_chat_service.get_thread_history(
         thread_id="any-thread",
         user_id="any-user", 
         agent_id="any-agent",
+        format_type=MessageFormat.MODEL_MESSAGE,
         use_memory_context=False
     )
     
@@ -29,10 +30,11 @@ async def test_get_thread_history_model_messages_memory_disabled():
     user_id = "test_user"
     agent_id = str(uuid.uuid4())
     
-    history = await ai_chat_service.get_thread_history_as_model_messages(
+    history = await ai_chat_service.get_thread_history(
         thread_id=thread_id,
         user_id=user_id,
         agent_id=agent_id,
+        format_type=MessageFormat.MODEL_MESSAGE,
         use_memory_context=False
     )
     
@@ -46,7 +48,7 @@ async def test_get_thread_history_model_messages_thread_not_found():
     user_id = "test_user"
     agent_id = str(uuid.uuid4())
     
-    with patch('app.database.get_async_db_session') as mock_db_session:
+    with patch('app.services.ai_chat_service.get_async_db_session') as mock_db_session:
         # Mock database setup
         mock_db = AsyncMock()
         mock_db_session.return_value.__aenter__.return_value = mock_db
@@ -56,11 +58,12 @@ async def test_get_thread_history_model_messages_thread_not_found():
         thread_result.scalar_one_or_none.return_value = None
         mock_db.execute.return_value = thread_result
         
-        # Test the method
-        history = await ai_chat_service.get_thread_history_as_model_messages(
+        # Test the method using the consolidated API
+        history = await ai_chat_service.get_thread_history(
             thread_id=thread_id,
             user_id=user_id,
             agent_id=agent_id,
+            format_type=MessageFormat.MODEL_MESSAGE,
             use_memory_context=True
         )
         
@@ -106,7 +109,7 @@ async def test_get_thread_history_model_messages_converter_error():
     user_id = "test_user"
     agent_id = str(uuid.uuid4())
     
-    with patch('app.database.get_async_db_session') as mock_db_session, \
+    with patch('app.services.ai_chat_service.get_async_db_session') as mock_db_session, \
          patch('app.services.message_converter_service.message_converter_service') as mock_converter:
         
         # Mock database setup
@@ -135,11 +138,12 @@ async def test_get_thread_history_model_messages_converter_error():
         # Mock converter service to raise exception
         mock_converter.convert_db_messages_to_model_messages.side_effect = Exception("Conversion error")
         
-        # Test the method - should handle error gracefully
-        history = await ai_chat_service.get_thread_history_as_model_messages(
+        # Test the method using the consolidated API - should handle error gracefully
+        history = await ai_chat_service.get_thread_history(
             thread_id=thread_id,
             user_id=user_id,
             agent_id=agent_id,
+            format_type=MessageFormat.MODEL_MESSAGE,
             use_memory_context=True
         )
         

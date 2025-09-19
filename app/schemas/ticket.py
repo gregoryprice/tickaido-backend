@@ -10,6 +10,7 @@ from pydantic import Field, field_validator, model_validator, computed_field
 from enum import Enum
 
 from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse
+from app.schemas.chat import FileAttachment
 
 
 class TicketStatusSchema(str, Enum):
@@ -44,6 +45,25 @@ class TicketCategorySchema(str, Enum):
     SECURITY = "security"
 
 
+# Attachment result schemas
+class AttachmentUploadResult(BaseSchema):
+    """Schema for individual attachment upload result"""
+    file_id: str = Field(description="File ID that was uploaded")
+    filename: str = Field(description="Original filename")
+    upload_status: str = Field(description="Upload status: 'success' or 'failed'")
+    jira_attachment_id: Optional[str] = Field(None, description="JIRA attachment ID if successful")
+    error_message: Optional[str] = Field(None, description="Error message if upload failed")
+
+
+class AttachmentUploadSummary(BaseSchema):
+    """Schema for attachment upload summary statistics"""
+    total_files: int = Field(description="Total number of files processed")
+    successful_uploads: int = Field(description="Number of successful uploads")
+    failed_uploads: int = Field(description="Number of failed uploads")
+
+
+
+
 # Request schemas
 class TicketCreateRequest(BaseCreate):
     """Schema for creating a new ticket"""
@@ -57,7 +77,7 @@ class TicketCreateRequest(BaseCreate):
     integration_id: Optional[UUID] = Field(None, description="Integration ID for external ticket creation")
     create_externally: bool = Field(True, description="Create ticket in external system when integration specified")
     custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom field values")
-    file_ids: Optional[List[UUID]] = Field(None, description="Attached file IDs")
+    attachments: Optional[List[FileAttachment]] = Field(None, description="Attached file references")
     
     @field_validator('title')
     @classmethod
@@ -88,6 +108,7 @@ class TicketUpdateRequest(BaseUpdate):
     custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom field values")
     internal_notes: Optional[str] = Field(None, description="Internal notes")
     resolution_summary: Optional[str] = Field(None, description="Resolution summary")
+    attachments: Optional[List[FileAttachment]] = Field(None, description="Attached file references")
     
     @field_validator('title')
     @classmethod
@@ -182,6 +203,9 @@ class TicketPatchRequest(BaseSchema):
     internal_notes: Optional[str] = Field(None, description="Add internal notes")
     resolution_summary: Optional[str] = Field(None, description="Resolution summary")
     
+    # File attachments
+    attachments: Optional[List[FileAttachment]] = Field(None, description="Update file attachments")
+    
     @field_validator('title')
     @classmethod
     def validate_title(cls, v):
@@ -267,15 +291,6 @@ class TicketUserInfo(BaseSchema):
     avatar_url: Optional[str] = Field(None, description="User avatar URL")
 
 
-class TicketFileInfo(BaseSchema):
-    """File information for ticket responses"""
-    id: UUID = Field(description="File ID")
-    filename: str = Field(description="File name")
-    file_size: int = Field(description="File size in bytes")
-    file_type: str = Field(description="File type")
-    mime_type: str = Field(description="MIME type")
-    status: str = Field(description="Processing status")
-    created_at: datetime = Field(description="Upload timestamp")
 
 
 class TicketAIAnalysis(BaseSchema):
@@ -309,16 +324,6 @@ class TicketBaseResponse(BaseResponse):
     assigned_to_id: Optional[UUID] = Field(None, description="ID of assigned user")
 
 
-class TicketListResponse(TicketBaseResponse):
-    """Ticket information for list views"""
-    last_activity_at: datetime = Field(description="Last activity timestamp")
-    communication_count: int = Field(description="Number of communications")
-    file_count: Optional[int] = Field(None, description="Number of attachments")
-    is_overdue: bool = Field(description="Whether ticket is overdue")
-    is_high_priority: bool = Field(description="Whether ticket is high priority")
-    age_in_hours: float = Field(description="Ticket age in hours")
-    escalation_level: int = Field(description="Current escalation level")
-
 
 class TicketDetailResponse(TicketBaseResponse):
     """Detailed ticket information"""
@@ -344,23 +349,19 @@ class TicketDetailResponse(TicketBaseResponse):
     escalated_at: Optional[datetime] = Field(None, description="Escalation timestamp")
     escalation_reason: Optional[str] = Field(None, description="Escalation reason")
     
-    # External integration
-    integration_routing: Optional[str] = Field(None, description="Integration routing (legacy)")
-    external_ticket_id: Optional[str] = Field(None, description="External ticket ID")
-    external_ticket_url: Optional[str] = Field(None, description="External ticket URL")
-    
     # Customer satisfaction
     satisfaction_rating: Optional[int] = Field(None, description="Customer satisfaction rating")
     satisfaction_feedback: Optional[str] = Field(None, description="Satisfaction feedback")
     
     # Files and attachments
-    files: List[TicketFileInfo] = Field(default=[], description="Attached files")
+    attachments: Optional[List[FileAttachment]] = Field(None, description="File attachments in format [{'file_id': 'uuid'}]")
     
     # AI analysis
     ai_analysis: Optional[TicketAIAnalysis] = Field(None, description="AI analysis results")
     
-    # Integration result
-    integration_result: Optional[Dict[str, Any]] = Field(None, description="External integration creation result")
+    # Integration result with platform info included
+    integration_result: Optional[Dict[str, Any]] = Field(None, description="External integration creation result with platform_name")
+    
     
     # Computed properties
     @computed_field

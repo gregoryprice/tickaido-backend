@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.dynamic_agent_factory import dynamic_agent_factory
-from app.services.ai_chat_service import ai_chat_service
+from app.services.ai_chat_service import ai_chat_service, MessageFormat
 from app.schemas.ai_response import ChatResponse, CustomerSupportContext
 
 @pytest.mark.asyncio
@@ -22,7 +22,7 @@ async def test_simplified_message_history_flow():
     
     # Test the integration between dynamic_agent_factory and ai_chat_service
     with patch.object(dynamic_agent_factory, 'create_agent_from_model') as mock_create, \
-         patch.object(ai_chat_service, 'get_thread_history_as_model_messages') as mock_get_history:
+         patch.object(ai_chat_service, 'get_thread_history') as mock_get_history:
         
         # Mock Pydantic AI agent behavior
         mock_agent = AsyncMock()
@@ -69,6 +69,7 @@ async def test_simplified_message_history_flow():
             thread_id=thread_id,
             user_id="test_user",
             agent_id=str(agent_model.id),
+            format_type=MessageFormat.MODEL_MESSAGE,
             max_context_size=agent_model.max_context_size,
             use_memory_context=agent_model.use_memory_context
         )
@@ -96,7 +97,7 @@ async def test_memory_disabled_flow():
     thread_id = str(uuid.uuid4())
     
     with patch.object(dynamic_agent_factory, 'create_agent_from_model') as mock_create, \
-         patch.object(ai_chat_service, 'get_thread_history_as_model_messages') as mock_get_history:
+         patch.object(ai_chat_service, 'get_thread_history') as mock_get_history:
         
         mock_agent = AsyncMock()
         mock_result = MagicMock()
@@ -153,7 +154,7 @@ async def test_context_limits_applied_integration():
     
     # Test that context limits are respected in the integration
     with patch.object(dynamic_agent_factory, 'create_agent_from_model') as mock_create, \
-         patch.object(ai_chat_service, 'get_thread_history_as_model_messages') as mock_get_history:
+         patch.object(ai_chat_service, 'get_thread_history') as mock_get_history:
         
         mock_agent = AsyncMock()
         mock_result = MagicMock()
@@ -200,6 +201,7 @@ async def test_context_limits_applied_integration():
             thread_id=thread_id,
             user_id="test_user",
             agent_id=str(agent_model.id),
+            format_type=MessageFormat.MODEL_MESSAGE,
             max_context_size=100,  # Small limit should be passed through
             use_memory_context=True
         )

@@ -43,17 +43,6 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Set specific app loggers to debug level if in debug mode
-    if debug_mode:
-        app_logger_names = [
-            'app.middleware.rate_limiting',
-            'app.api.v1.agents',
-            'app.services.agent_service'
-        ]
-        
-        for logger_name in app_logger_names:
-            logging.getLogger(logger_name).setLevel(logging.DEBUG)
-    
     # Create and return a logger for this module
     logger = logging.getLogger(__name__)
     return logger
@@ -89,6 +78,7 @@ from app.routers.auth import router as auth_router
 from app.routers.integration import router as integration_router
 from app.websocket.chat import router as chat_websocket_router
 from app.api.v1.files import router as files_router
+from app.api.v1.file_cleanup import router as file_cleanup_router
 
 def wait_for_database_ready(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
@@ -369,6 +359,7 @@ from app.routers.api_tokens import router as api_token_router
 app.include_router(clerk_webhook_router, prefix="/api/v1")
 app.include_router(api_token_router, prefix="/api/v1")
 app.include_router(files_router, prefix="/api/v1/files", tags=["Files"])
+app.include_router(file_cleanup_router, prefix="/api/v1", tags=["File Cleanup"])
 # app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(chat_websocket_router, prefix="/api/v1")
 # app.include_router(agent.router, prefix="/api/v1/agent", tags=["AI Agent"])

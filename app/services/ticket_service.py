@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc, asc
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.ticket import Ticket, TicketStatus, TicketPriority
 from app.models.user import User
@@ -149,7 +150,8 @@ class TicketService:
         self,
         db: AsyncSession,
         ticket_data: Dict[str, Any],
-        created_by_id: Optional[UUID] = None
+        created_by_id: Optional[UUID] = None,
+        organization_id: Optional[UUID] = None
     ) -> Ticket:
         """
         Create a new ticket.
@@ -170,8 +172,20 @@ class TicketService:
                 ticket_dict = ticket_data.copy()  # Make copy to avoid modifying original
             
             # Remove fields from ticket_dict that are not Ticket model fields
-            file_ids = ticket_dict.pop('file_ids', None)
+            attachments = ticket_dict.pop('attachments', None)
             create_externally = ticket_dict.pop('create_externally', None)
+            
+            # Validate file attachments if provided
+            validated_file_ids = []
+            if attachments and organization_id:
+                from app.services.file_validation_service import FileValidationService
+                file_validator = FileValidationService()
+                validated_file_ids = await file_validator.validate_file_attachments(
+                    db, attachments, organization_id
+                )
+                # Format attachments for storage
+                ticket_dict['attachments'] = await file_validator.format_attachments_for_storage(attachments)
+                logger.info(f"Validated {len(validated_file_ids)} file attachments for ticket")
             
             # Set created_by_id if provided
             if created_by_id:
@@ -264,8 +278,28 @@ class TicketService:
         # Track if priority was explicitly provided before defaults are applied
         original_priority_provided = 'priority' in ticket_data and ticket_data.get('priority') is not None
         
+        # Get user's organization_id for attachment validation
+        user_query = select(User).where(User.id == created_by_id)
+        user_result = await db.execute(user_query)
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise ValueError(f"User {created_by_id} not found")
+        
+        organization_id = user.organization_id
+        
+        # Extract and validate attachments before creating internal ticket
+        attachments = ticket_data.get('attachments', None)
+        validated_file_ids = []
+        if attachments and organization_id:
+            from app.services.file_validation_service import FileValidationService
+            file_validator = FileValidationService()
+            validated_file_ids = await file_validator.validate_file_attachments(
+                db, attachments, organization_id
+            )
+            logger.info(f"Validated {len(validated_file_ids)} file attachments for integration ticket")
+        
         # 1. Create internal ticket
-        internal_ticket = await self.create_ticket(db, ticket_data, created_by_id)
+        internal_ticket = await self.create_ticket(db, ticket_data, created_by_id, organization_id)
         
         # 2. Handle external integration if specified
         integration_result = {
@@ -293,9 +327,12 @@ class TicketService:
             
             # Create external ticket first - fail if this fails
             external_result = await self._create_external_ticket(
+                db=db,
                 integration=integration,
                 ticket_data=internal_ticket,
                 user_id=created_by_id,
+                attachment_file_ids=validated_file_ids,
+                organization_id=organization_id,
                 original_priority_provided=original_priority_provided
             )
             
@@ -316,6 +353,7 @@ class TicketService:
                 "integration_id": str(integration_id),
                 "external_ticket_id": external_result["external_ticket_id"],
                 "external_ticket_url": external_result["external_ticket_url"],
+                "platform_name": integration.platform_name,  # Add platform_name from loaded integration
                 "response": external_result["details"]
             })
             
@@ -323,6 +361,8 @@ class TicketService:
             internal_ticket.external_ticket_id = external_result["external_ticket_id"]
             internal_ticket.external_ticket_url = external_result["external_ticket_url"]
             internal_ticket.integration_id = integration_id
+            # Store complete integration result for future retrieval
+            internal_ticket.integration_result = integration_result
             
             await db.commit()
             
@@ -366,9 +406,12 @@ class TicketService:
     
     async def _create_external_ticket(
         self,
+        db: AsyncSession,
         integration: Integration,
         ticket_data: Ticket,
         user_id: UUID,
+        attachment_file_ids: List[UUID],
+        organization_id: UUID,
         original_priority_provided: bool = True
     ) -> Dict[str, Any]:
         """
@@ -377,9 +420,17 @@ class TicketService:
         try:
             # Use integration-specific factory methods
             if integration.platform_name == "jira":
-                from .jira_integration import JiraIntegration
+                from app.integrations.jira import JiraIntegration
+                
+                # Create JIRA ticket with attachment support
                 return await JiraIntegration.create_ticket_from_internal(
-                    integration, ticket_data, original_priority_provided=original_priority_provided
+                    integration=integration,
+                    ticket_data=ticket_data, 
+                    db=db,
+                    user_id=user_id,
+                    attachment_file_ids=attachment_file_ids,
+                    organization_id=organization_id,
+                    original_priority_provided=original_priority_provided
                 )
             # elif integration.platform_name == "salesforce":
             #     from .salesforce_integration import SalesforceIntegration
@@ -476,6 +527,32 @@ class TicketService:
             # Track changes for audit logging
             changes = {}
             
+            # Handle attachments special case (same as update_ticket)
+            if 'attachments' in update_data:
+                new_attachments = update_data.pop('attachments')
+                old_attachments = ticket.attachments
+                if new_attachments is not None:
+                    # Replace all attachments with the new ones (PATCH behavior for attachments)
+                    new_file_attachments = []
+                    for attachment in new_attachments:
+                        # attachment is already a dict from JSON, not a FileAttachment object
+                        file_id = str(attachment['file_id'])
+                        new_file_attachments.append({'file_id': file_id})
+                    
+                    # Set the new attachments (completely replace existing ones)
+                    ticket.attachments = new_file_attachments
+                    
+                    # Explicitly mark the JSON field as modified for SQLAlchemy
+                    flag_modified(ticket, 'attachments')
+                    
+                    changes['attachments'] = {"from": old_attachments, "to": new_file_attachments}
+                    logger.info(f"Replaced attachments on ticket {ticket_id} with {len(new_file_attachments)} attachments")
+                    logger.info(f"Current attachments: {ticket.attachments}")
+                else:
+                    # Clear attachments if None provided
+                    ticket.attachments = None
+                    changes['attachments'] = {"from": old_attachments, "to": None}
+            
             # Apply all provided updates
             for field, value in update_data.items():
                 if hasattr(ticket, field):
@@ -538,6 +615,29 @@ class TicketService:
             ticket = await self.get_ticket(db, ticket_id, organization_id)
             if not ticket:
                 return None
+            
+            # Handle attachments special case
+            if 'attachments' in update_data:
+                new_attachments = update_data.pop('attachments')
+                if new_attachments is not None:
+                    # Replace all attachments with the new ones (PUT behavior)
+                    new_file_attachments = []
+                    for attachment in new_attachments:
+                        # attachment is already a dict from JSON, not a FileAttachment object
+                        file_id = str(attachment['file_id'])
+                        new_file_attachments.append({'file_id': file_id})
+                    
+                    # Set the new attachments (completely replace existing ones)
+                    ticket.attachments = new_file_attachments
+                    
+                    # Explicitly mark the JSON field as modified for SQLAlchemy
+                    flag_modified(ticket, 'attachments')
+                    
+                    logger.info(f"Replaced attachments on ticket {ticket_id} with {len(new_file_attachments)} attachments")
+                    logger.info(f"Current attachments: {ticket.attachments}")
+                else:
+                    # Clear attachments if None provided
+                    ticket.attachments = None
             
             # Update fields
             nullable_fields = {'assigned_to_id', 'department', 'resolution_summary', 'internal_notes', 'custom_fields'}
@@ -691,7 +791,7 @@ class TicketService:
         organization_id: UUID
     ) -> bool:
         """
-        Soft delete a ticket with organization isolation.
+        Soft delete a ticket with organization isolation and cascade delete attached files.
         
         Args:
             db: Database session
@@ -706,12 +806,18 @@ class TicketService:
             if not ticket:
                 return False
             
-            # Soft delete
+            # Cascade delete all files attached to this ticket
+            from app.services.file_cleanup_service import file_cleanup_service
+            deleted_files = await file_cleanup_service.cascade_delete_ticket_files(
+                db, ticket_id, organization_id
+            )
+            
+            # Soft delete the ticket
             ticket.soft_delete()
             
             await db.commit()
             
-            logger.info(f"Deleted ticket {ticket_id}")
+            logger.info(f"Deleted ticket {ticket_id} and {deleted_files} attached files")
             return True
             
         except Exception as e:

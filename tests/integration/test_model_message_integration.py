@@ -124,7 +124,7 @@ async def test_dynamic_agent_factory_model_message_integration():
         mock_create.return_value = mock_agent
         
         # Mock AI Chat Service to return ModelMessage format
-        mock_chat_service.get_thread_history_as_model_messages = AsyncMock(return_value=mock_model_messages)
+        mock_chat_service.get_thread_history = AsyncMock(return_value=mock_model_messages)
         
         # Test the integration
         context = CustomerSupportContext(
