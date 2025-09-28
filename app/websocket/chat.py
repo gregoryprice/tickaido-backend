@@ -399,7 +399,7 @@ async def handle_get_agent_status(
                     "agent_type": agent.agent_type,
                     "is_active": agent.is_active,
                     "status": agent.status,
-                    "tools_enabled": agent.tools or [],
+                    "tools": agent.tools or [],
                     "tools_count": len(agent.tools or [])
                 }
             }, connection_id)

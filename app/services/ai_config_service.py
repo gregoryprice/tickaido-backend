@@ -26,7 +26,7 @@ class AIAgentConfigUpdate(BaseModel):
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Model temperature")
     max_tokens: Optional[int] = Field(None, gt=0, le=10000, description="Max tokens")
     timeout: Optional[int] = Field(None, gt=0, le=300, description="Timeout in seconds")
-    tools_enabled: Optional[List[str]] = Field(None, description="Enabled MCP tools")
+    tools: Optional[List[str]] = Field(None, description="Enabled MCP tools")
     confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence threshold")
 
 
@@ -224,13 +224,13 @@ class AIConfigService:
                         errors.append(f"Unknown model name '{config_update.model_name}' for provider '{config_update.model_provider}'")
             
             # Validate tools
-            if config_update.tools_enabled:
+            if config_update.tools:
                 valid_tools = [
                     "analyze_file", "create_ticket", "categorize_issue", 
                     "search_knowledge_base", "extract_text_from_image", "transcribe_audio"
                 ]
                 
-                invalid_tools = [tool for tool in config_update.tools_enabled if tool not in valid_tools]
+                invalid_tools = [tool for tool in config_update.tools if tool not in valid_tools]
                 if invalid_tools:
                     errors.append(f"Unknown tools: {invalid_tools}")
             

@@ -5,7 +5,7 @@ Handles user registration, login, token refresh, and profile management
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 from uuid import UUID
 
@@ -293,7 +293,7 @@ async def generate_api_key_for_testing(
         # Get environment prefix
         from app.config.settings import get_settings
         settings = get_settings()
-        env_prefix = settings.environment[:4]  # dev, stag, prod, test
+        env_prefix = settings.environment[:4]  # pro, san, dev
         
         # Create API token record
         api_token = APIToken(

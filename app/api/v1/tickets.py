@@ -416,14 +416,14 @@ async def add_files_to_ticket(
         )
 
 
-@router.get("/{ticket_id}/files")
-async def get_ticket_files(
+@router.get("/{ticket_id}/attachments")
+async def get_ticket_attachments(
     ticket_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
-    Get all files associated with a ticket.
+    Get all attachments associated with a ticket.
     """
     try:
         from app.services.ticket_attachment_service import TicketAttachmentService

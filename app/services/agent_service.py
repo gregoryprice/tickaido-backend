@@ -252,7 +252,7 @@ class AgentService:
                     "communication_style", "use_streaming", "response_length",
                     "memory_retention", "show_suggestions_after_each_message",
                     "suggestions_prompt", "max_context_size", "use_memory_context",
-                    "max_iterations", "timeout_seconds", "tools_enabled"
+                    "max_iterations", "timeout_seconds", "tools"
                 }
                 
                 config_updates = {k: v for k, v in updates.items() if k in config_fields}
@@ -625,12 +625,6 @@ class AgentService:
                 
                 result = await session.execute(stmt)
                 agent = result.scalar_one_or_none()
-                
-                if agent:
-                    logger.debug(f"Found system title generation agent: {agent.id}")
-                else:
-                    logger.warning("System title generation agent not found. Run migration to create it.")
-                
                 return agent
                 
             except Exception as e:

@@ -31,9 +31,12 @@ COPY pyproject.toml poetry.lock* ./
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --no-root
 
-# Copy MCP server code
+# Copy MCP server code and app dependencies
 COPY mcp_server/ ./mcp_server/
 COPY mcp_client/ ./mcp_client/
+COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
 # Set PYTHONPATH so imports work correctly
 ENV PYTHONPATH=/app:/app/mcp_server
@@ -50,5 +53,5 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Run the MCP server
-CMD ["python", "mcp_server/start_mcp_server.py", "--port", "8001"]
+# Run the Principal-based MCP server
+CMD ["python", "mcp_server/auth_server.py", "--port", "8001"]

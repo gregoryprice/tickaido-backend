@@ -22,15 +22,17 @@ from typing import List, Dict, Any, Optional, AsyncIterator, Union
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent as PydanticAgent
-from pydantic_ai.usage import UsageLimits
 from sqlalchemy import select
 
 from app.models.chat import Thread, Message
 from app.models.ai_agent import Agent as AgentModel
 from app.database import get_async_db_session
-from app.services.ai_agent_service import ai_agent_service
-from app.schemas.ai_response import ChatResponse, CustomerSupportContext
+from app.services.agent_service import agent_service
+from app.schemas.ai_response import ChatResponse
+
+# Use dynamic agent factory for generic context building and MCP integration
+from app.services.dynamic_agent_factory import dynamic_agent_factory
+from app.services.file_validation_service import FileValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -57,16 +59,16 @@ async def get_organization_agent_model(organization_id: UUID):
     """
     try:
         # Use service layer to ensure organization has an agent
-        agent_model = await ai_agent_service.ensure_organization_agent(organization_id)
+        agent_model = await agent_service.ensure_organization_agent(organization_id)
         
         if not agent_model:
             logger.error(f"Failed to ensure agent for organization {organization_id}")
             return None
         
         config = agent_model.get_configuration()
-        tools_enabled = config.get("tools_enabled", [])
+        tools = config.get("tools", [])
         
-        logger.info(f"✅ Organization {organization_id} agent model ready: {agent_model.id} with {len(tools_enabled)} tools")
+        logger.info(f"✅ Organization {organization_id} agent model ready: {agent_model.id} with {len(tools)} tools")
         return agent_model
         
     except Exception as e:
@@ -115,10 +117,6 @@ class ThreadContext(BaseModel):
                 self._original_token is not None)
 
 
-class TitleGenerationResponse(BaseModel):
-    """Structured response for title generation"""
-    title: str = Field(description="Generated thread title")
-    confidence: float = Field(description="Confidence in title generation (0-1)", ge=0, le=1)
 
 
 class AIChatService:
@@ -143,32 +141,14 @@ class AIChatService:
             self.title_agent = await self._create_title_generation_agent()
             self._title_agent_initialized = True
     
-    async def _create_title_generation_agent(self) -> PydanticAgent:
-        """Create a specialized agent for generating thread titles"""
-        try:
-            agent = PydanticAgent(
-                "openai:gpt-3.5-turbo",
-                output_type=TitleGenerationResponse,
-                system_prompt="""You are a Customer Support Thread Title Generator. Create concise, 
-                descriptive titles for customer support chat threads. Guidelines:
-                - Create titles that are 3-8 words long
-                - Focus on the main issue or request being discussed
-                - Use customer support terminology when appropriate
-                - Make titles searchable and meaningful for support staff
-                - Avoid generic titles like "Customer Support Chat"
-                Examples: "Login Issues with Password Reset", "Email Integration Setup Help", 
-                "Billing Discrepancy Resolution", "Feature Request: Export Functionality"""
-            )
-            logger.info("✅ Title generation agent created")
-            return agent
-        except Exception as e:
-            logger.error(f"❌ Failed to create title generation agent: {e}")
-            # Emergency fallback
-            return PydanticAgent(
-                "openai:gpt-3.5-turbo",
-                output_type=TitleGenerationResponse,
-                system_prompt="Generate a concise title for this customer support thread."
-            )
+    async def _create_title_generation_agent(self):
+        """Get the global title generation agent"""
+        from app.agents.title_generation_agent import title_generation_agent
+        
+        # Ensure the global agent is initialized
+        await title_generation_agent.ensure_initialized()
+        logger.info("✅ Using global title generation agent")
+        return title_generation_agent
     
     async def get_thread_history(
         self, 
@@ -325,7 +305,7 @@ class AIChatService:
         user_id: str, 
         message: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
-        auth_token: Optional[str] = None
+        principal: Optional[Dict[str, Any]] = None
     ) -> ChatResponse:
         """
         Send message to a thread with agent-centric processing.
@@ -336,7 +316,7 @@ class AIChatService:
             user_id: ID of the user sending the message
             message: User's message content
             attachments: Optional file attachments in format [{"file_id": "uuid"}]
-            auth_token: Optional JWT token for MCP authentication
+            principal: Principal object for authorization (from AuthMiddleware)
             
         Returns:
             ChatResponse: Structured AI response with tool calls and metadata
@@ -346,7 +326,7 @@ class AIChatService:
             # Validate file attachments if provided
             validated_file_ids = []
             if attachments:
-                from app.services.file_validation_service import FileValidationService
+                
                 
                 # Get organization_id from agent model
                 agent_model = await self._get_agent_model(UUID(agent_id))
@@ -371,25 +351,13 @@ class AIChatService:
             session_history=message_history
         )
         
-        # Handle authentication if token provided
-        # Validate auth token if provided, otherwise use non-authenticated processing
-        validated_auth_token = None
-        if auth_token:
-            try:
-                from app.middleware.auth_middleware import auth_service
-                payload = auth_service.verify_token(auth_token)
-                if payload:  # Use the payload to check if token is valid
-                    logger.info(f"[AI_CHAT_SERVICE] Valid JWT token for user {user_id} in thread {thread_id}")
-                    validated_auth_token = auth_token
-                else:
-                    logger.warning(f"[AI_CHAT_SERVICE] JWT token verification returned None")
-            except Exception as e:
-                logger.warning(f"[AI_CHAT_SERVICE] JWT token validation failed: {e}")
+        # Use Principal-based authorization (proper architecture)
+        if principal:
+            logger.info(f"🔍 [TRACE] Step 1: AI_CHAT_SERVICE - Using Principal for user {principal.email} in org {principal.organization_id}")
         
-        # Use consolidated message processing with optional authentication
-        return await self._send_message(context, message, attachments, auth_token=validated_auth_token)
+        return await self._send_message(context, message, attachments, principal=principal)
     
-    async def _send_message(self, context: ThreadContext, message: str, attachments: List[dict] = None, auth_token: Optional[str] = None) -> ChatResponse:
+    async def _send_message(self, context: ThreadContext, message: str, attachments: List[dict] = None, principal: Optional[Dict[str, Any]] = None) -> ChatResponse:
         """
         Consolidated method for processing thread messages with optional authentication.
         
@@ -400,7 +368,7 @@ class AIChatService:
             context: Thread context with user and agent information
             message: User's message content
             attachments: Optional file attachments
-            auth_token: Optional JWT token for MCP authentication
+            principal: Principal object for authorization (from AuthMiddleware)
             
         Returns:
             ChatResponse: AI response with tool calls and metadata
@@ -408,7 +376,7 @@ class AIChatService:
         async with get_async_db_session() as db:
             try:
                 start_time = datetime.now(timezone.utc)
-                auth_status = "authenticated" if auth_token else "non-authenticated"
+                auth_status = "authenticated" if principal else "non-authenticated"
                 logger.info(f"[AI_CHAT_SERVICE] Processing {auth_status} message for thread {context.thread_id}")
                 
                 # Get agent model
@@ -416,7 +384,7 @@ class AIChatService:
                 
                 if not agent_model:
                     logger.error(f"[AI_CHAT_SERVICE] Agent {context.agent_id} not available")
-                    ai_response = await self._create_fallback_response("I'm currently unavailable. Please try again later.")
+                    ai_response = await self._create_fallback_response(f"Agent {context.agent_id} not available")
                 elif not agent_model.is_active:
                     logger.warning(f"[AI_CHAT_SERVICE] Organization agent {context.agent_id} not active")
                     ai_response = ChatResponse(
@@ -431,11 +399,17 @@ class AIChatService:
                     if attachments:
                         file_context = await self._process_attachments(attachments)
                     
-                    # Use dynamic agent factory for generic context building and MCP integration
-                    from app.services.dynamic_agent_factory import dynamic_agent_factory
+                    
                     
                     # Build generic context based on agent type
                     agent_type = agent_model.agent_type or "customer_support"  # Default to customer support
+                    
+                    # Extract file IDs from attachments for tool calls
+                    file_ids = []
+                    if attachments:
+                        file_ids = [att.get("file_id") for att in attachments if att.get("file_id")]
+                        logger.info(f"[AI_CHAT_SERVICE] Extracted file_ids for agent context: {file_ids}")
+                    
                     agent_context = await dynamic_agent_factory.build_context(
                         agent_type=agent_type,
                         message=message,
@@ -447,7 +421,8 @@ class AIChatService:
                             "thread_id": context.thread_id
                         },
                         session_id=context.thread_id,
-                        organization_id=context.organization_id
+                        organization_id=context.organization_id,
+                        file_ids=file_ids  # Pass file IDs as direct parameter
                     )
                     
                     logger.info(f"[AI_CHAT_SERVICE] Processing with dynamic agent for {agent_model.id}")
@@ -458,7 +433,7 @@ class AIChatService:
                             agent_model=agent_model, 
                             message=message, 
                             context=agent_context,
-                            auth_token=auth_token,  # Pass through auth token (may be None)
+                            principal=principal,  # Pass Principal for authorization
                             thread_id=context.thread_id,  # Enable message history
                             db=db  # Pass database session
                         )
@@ -617,9 +592,14 @@ class AIChatService:
                 )
                 db.add(user_msg)
                 
-                # Prepare tool calls data
+                # Prepare tool calls data - use actual tool call data if available
                 tool_calls_data = None
-                if hasattr(ai_response, 'tools_used') and ai_response.tools_used:
+                if hasattr(ai_response, '_tool_calls_data') and ai_response._tool_calls_data:
+                    # Use detailed tool call data from Pydantic AI result
+                    tool_calls_data = ai_response._tool_calls_data
+                    logger.debug(f"Using detailed tool calls data: {len(tool_calls_data)} calls")
+                elif hasattr(ai_response, 'tools_used') and ai_response.tools_used:
+                    # Fallback to simple tool names list (legacy format)
                     tool_calls_data = [
                         {
                             "tool_name": tool_name,
@@ -628,6 +608,7 @@ class AIChatService:
                         }
                         for tool_name in ai_response.tools_used
                     ]
+                    logger.debug(f"Using fallback tool calls data: {len(tool_calls_data)} calls")
                 
                 # Store AI response with tool calls
                 ai_msg = Message(
@@ -667,17 +648,30 @@ class AIChatService:
         try:
             await self._ensure_title_agent_initialized()
             
-            prompt = f"User Message: {message}"
+            # Create mock Message objects for the title generation agent
+            from app.models.chat import Message
+            mock_message = Message(
+                content=message,
+                role="user",
+                thread_id=None,
+                created_at=datetime.now(timezone.utc)
+            )
+            
+            messages = [mock_message]
             if context:
-                prompt += f"\n\nContext: {context}"
-            prompt += "\n\nGenerate a concise, descriptive title for this customer support thread."
+                mock_context = Message(
+                    content=context,
+                    role="assistant", 
+                    thread_id=None,
+                    created_at=datetime.now(timezone.utc)
+                )
+                messages.append(mock_context)
             
-            usage_limits = UsageLimits(request_limit=3)
-            result = await self.title_agent.run(prompt, usage_limits=usage_limits)
+            result = await self.title_agent.generate_title(messages)
             
-            if result.output and result.output.title:
-                logger.info(f"✅ Generated title: '{result.output.title}' (confidence: {result.output.confidence:.2f})")
-                return result.output.title
+            if result and result.title:
+                logger.info(f"✅ Generated title: '{result.title}' (confidence: {result.confidence:.2f})")
+                return result.title
             else:
                 return self._generate_fallback_title(message)
                 
@@ -751,10 +745,7 @@ class AIChatService:
             yield "Processing your request with agent tools..."
             
             # Process message via task system (non-streaming for now)
-            if agent_model.mcp_enabled:
-                response = await self._process_message_via_task(context, message, agent_model, attachments)
-            else:
-                response = await self._process_message_direct(context, message, agent_model, attachments)
+            response = await self._process_message_via_task(context, message, agent_model, attachments)
             
             # Stream the final response
             yield response.content

@@ -101,7 +101,7 @@ class UserService:
             email=user_request.email,
             password_hash=hashed_password,
             full_name=user_request.full_name,
-            role=user_request.role or UserRole.USER,
+            role=user_request.role or UserRole.MEMBER,
             is_active=True,
             is_verified=False,  # Email verification required
             phone=user_request.phone,
@@ -277,7 +277,7 @@ class UserService:
         # Check permissions (self or admin)
         if user_id != requesting_user_id:
             requesting_user = await self.get_user(db, requesting_user_id)
-            if not requesting_user or requesting_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+            if not requesting_user or requesting_user.role != UserRole.ADMIN:
                 raise PermissionError("Insufficient permissions to update user")
         
         # Update fields
@@ -323,7 +323,7 @@ class UserService:
         else:
             # Admin changing user password
             requesting_user = await self.get_user(db, requesting_user_id)
-            if not requesting_user or requesting_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+            if not requesting_user or requesting_user.role != UserRole.ADMIN:
                 raise PermissionError("Insufficient permissions to change password")
         
         # Update password
@@ -425,7 +425,7 @@ class UserService:
         
         # Check permissions
         requesting_user = await self.get_user(db, requesting_user_id)
-        if not requesting_user or requesting_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        if not requesting_user or requesting_user.role != UserRole.ADMIN:
             raise PermissionError("Insufficient permissions to deactivate user")
         
         db_user.is_active = False
@@ -459,7 +459,7 @@ class UserService:
         
         # Check permissions
         requesting_user = await self.get_user(db, requesting_user_id)
-        if not requesting_user or requesting_user.role != UserRole.SUPER_ADMIN:
+        if not requesting_user or requesting_user.role != UserRole.ADMIN:
             raise PermissionError("Only super admins can delete users")
         
         if hard_delete:
@@ -496,7 +496,7 @@ class UserService:
         # Check permissions
         if user_id != requesting_user_id:
             requesting_user = await self.get_user(db, requesting_user_id)
-            if not requesting_user or requesting_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+            if not requesting_user or requesting_user.role != UserRole.ADMIN:
                 raise PermissionError("Insufficient permissions to generate API key")
         
         # Generate API key

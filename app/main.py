@@ -755,46 +755,9 @@ async def health_check():
                 logger.warning(f"Schema check failed: {schema_error}")
                 schema_ready = False
         
-        # Check system agents status
-        system_agent_status = {}
-        system_agents_healthy = False
-        
-        if db_healthy:
-            try:
-                from app.services.agent_service import agent_service
-                from app.database import get_async_db_session
-                
-                async with get_async_db_session() as db:
-                    title_agent = await agent_service.get_system_title_agent(db=db)
-                    if title_agent:
-                        system_agent_status = {
-                            "exists": True,
-                            "active": title_agent.is_active,
-                            "organization_id": None,  # System agents have no organization
-                            "last_used": title_agent.last_used_at.isoformat() if title_agent.last_used_at else None
-                        }
-                        system_agents_healthy = title_agent.is_active
-                    else:
-                        system_agent_status = {
-                            "exists": False,
-                            "active": False,
-                            "organization_id": None,
-                            "last_used": None
-                        }
-                        system_agents_healthy = False
-            except Exception as agent_error:
-                logger.warning(f"System agent check failed: {agent_error}")
-                system_agent_status = {
-                    "exists": False,
-                    "active": False,
-                    "organization_id": None,
-                    "last_used": None,
-                    "error": str(agent_error)
-                }
-                system_agents_healthy = False
-        
+
         # Check if all services are healthy
-        all_healthy = db_healthy and schema_ready and system_agents_healthy
+        all_healthy = db_healthy and schema_ready
         
         status = "healthy" if all_healthy else "unhealthy"
         status_code = 200 if all_healthy else 503
@@ -803,13 +766,8 @@ async def health_check():
             "status": status,
             "timestamp": time.time(),
             "services": {
-                "database": "healthy" if db_healthy else "unhealthy",
-                "schema": "ready" if schema_ready else "not_ready",
-                "ai_service": "healthy",  # Will be updated when AI service is implemented
-                "mcp_server": "healthy",   # Will be updated when MCP server is implemented
-                "system_agents": "healthy" if system_agents_healthy else "unhealthy"
+                "database": "healthy" if db_healthy else "unhealthy"
             },
-            "system_title_agent": system_agent_status,
             "environment": settings.environment,
             "version": "1.0.0"
         }

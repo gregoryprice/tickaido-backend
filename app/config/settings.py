@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Application Settings
     app_name: str = Field(default="TickAido", description="Application name")
-    environment: str = Field(default="development", description="Environment (development, staging, production)")
+    environment: str = Field(default="development", description="Environment (production, sandbox, development)")
     debug: bool = Field(default=False, description="Debug mode")
     
     # Database Settings
@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # AI Configuration
     openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
     gemini_api_key: Optional[str] = Field(default=None, description="Google Gemini API key")
+    
+    # AI Usage Limits (for Pydantic AI agents)
+    ai_request_limit: int = Field(default=5, description="Default AI request limit per conversation")
+    ai_total_tokens_limit: int = Field(default=5000, description="Default AI total tokens limit per conversation")
+    ai_max_iterations: int = Field(default=5, description="Default maximum AI agent iterations")
     
     # JWT Authentication
     secret_key: str = Field(default="your-secret-key-change-in-production", description="JWT secret key")

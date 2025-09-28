@@ -58,7 +58,8 @@ class TicketCreationResult(BaseModel):
 class AgentContext(BaseModel):
     """Generic context for AI agent operations"""
     user_input: str = Field(description="User's input/request")
-    uploaded_files: List[str] = Field(default=[], description="List of uploaded file paths")
+    attachments: List[str] = Field(default=[], description="List of attachment content or file paths")
+    file_ids: List[str] = Field(default=[], description="List of file IDs for tool calls")
     conversation_history: List[Dict[str, Any]] = Field(default=[], description="Previous conversation")
     user_metadata: Dict[str, Any] = Field(default={}, description="User information and context")
     organization_id: Optional[str] = Field(None, description="Organization ID for scoped operations")
