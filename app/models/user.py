@@ -19,11 +19,8 @@ from app.models.organization_invitation import OrganizationRole
 
 class UserRole(enum.Enum):
     """User roles for access control"""
-    ADMIN = "admin"
-    MANAGER = "manager"
-    AGENT = "agent"
-    USER = "user"
-    API_USER = "api_user"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
 
 
 class User(BaseModel):
@@ -84,7 +81,7 @@ class User(BaseModel):
     # Role and permissions
     role = Column(
         SQLEnum(UserRole),
-        default=UserRole.USER,
+        default=UserRole.MEMBER,
         nullable=False,
         index=True,
         comment="User role"
@@ -342,24 +339,10 @@ class User(BaseModel):
         """Get permissions for user's role"""
         role_permissions = {
             UserRole.ADMIN: ["*"],  # All permissions
-            UserRole.MANAGER: [
-                "tickets:create", "tickets:read", "tickets:update", "tickets:delete",
-                "files:upload", "files:download", "files:delete",
-                "users:read", "analytics:read", "integrations:read"
-            ],
-            UserRole.AGENT: [
+            UserRole.MEMBER: [
                 "tickets:create", "tickets:read", "tickets:update",
                 "files:upload", "files:download", "files:read",
-                "chat:access", "websocket:connect"
-            ],
-            UserRole.USER: [
-                "tickets:create", "tickets:read",
-                "files:upload", "files:download", "files:read",
-                "chat:access", "websocket:connect"
-            ],
-            UserRole.API_USER: [
-                "tickets:create", "tickets:read", "tickets:update",
-                "files:upload", "files:read", "api:access"
+                "chat:access", "websocket:connect", "api:access"
             ]
         }
         

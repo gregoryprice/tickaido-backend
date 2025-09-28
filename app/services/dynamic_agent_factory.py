@@ -5,17 +5,18 @@ Dynamic Agent Factory for creating Pydantic AI agents from Agent models
 This factory replaces the hardcoded CustomerSupportAgent by creating Pydantic AI
 agents dynamically based on Agent model configuration, with direct MCP integration.
 """
-
 import logging
 from typing import Optional, Dict, Any, List
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.usage import UsageLimits
 from pydantic_ai.messages import ModelMessage
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.ai_agent import Agent as AgentModel
 from app.schemas.ai_response import ChatResponse, AgentContext
 from mcp_client.client import mcp_client
+from app.schemas.principal import Principal
+from app.services.agent_service import agent_service
+from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,23 +33,25 @@ class DynamicAgentFactory:
         """Initialize the dynamic agent factory."""
         self._agent_cache = {}  # Cache created agents
     
-    async def create_agent_from_model(self, agent_model: AgentModel, auth_token: Optional[str] = None) -> Optional[PydanticAgent]:
+    async def create_agent(self, agent_model: AgentModel, principal: Optional['Principal'] = None) -> Optional[PydanticAgent]:
         """
-        Create a Pydantic AI agent from Agent model configuration with optional authentication.
+        Create a Pydantic AI agent from Agent model configuration with Principal-based authorization.
         
         Args:
             agent_model: Agent database model with configuration
-            auth_token: JWT token for MCP authentication (optional)
+            principal: Principal object for authorization (from AuthMiddleware)
             
         Returns:
-            PydanticAgent: Configured agent with MCP tools if enabled
+            PydanticAgent: Configured agent with MCP tools and Principal context
         """
         try:
-            # Check cache first - include auth status in cache key
-            auth_hash = hash(auth_token) if auth_token else "no_auth"
-            cache_key = f"{agent_model.id}_{agent_model.updated_at}_{auth_hash}"
+            # Check cache first - include principal status in cache key
+            cache_key = None
+            if principal:
+                cache_key = principal.get_cache_hash()
+
             if cache_key in self._agent_cache:
-                auth_status = "authenticated" if auth_token else "non-authenticated"
+                auth_status = "authenticated" if principal else "non-authenticated"
                 logger.debug(f"Using cached {auth_status} agent for {agent_model.id}")
                 return self._agent_cache[cache_key]
             
@@ -58,53 +61,77 @@ class DynamicAgentFactory:
             
             # Get agent configuration
             config = agent_model.get_configuration()
-            tools_enabled = config.get("tools_enabled", [])
+            tools = config.get("tools", [])
             
-            logger.info(f"Creating Pydantic AI agent for {agent_model.id} with {len(tools_enabled)} tools")
+            logger.info(f"Creating Pydantic AI agent for {agent_model.id} with {len(tools)} tools")
             
             # Get model string
             model_string = self._get_model_string(agent_model, config)
             
-            # Get system prompt
-            system_prompt = agent_model.prompt or "You are a helpful AI assistant."
+            # Get prompt
+            agent_prompt = agent_model.prompt or "You are a helpful AI assistant."
             
-            # Create MCP client if agent has tools enabled
+            # Create authenticated MCP client with Principal integration
             toolsets = []
-            if agent_model.mcp_enabled and tools_enabled:
-                # Create authenticated MCP client if token provided
-                agent_client = mcp_client.get_agent_client(
-                    agent_id=str(agent_model.id),
-                    tools_enabled=tools_enabled,
-                    organization_id=str(agent_model.organization_id),
-                    auth_token=auth_token
-                )
+            if tools:
+                logger.info(f"🔍 [TRACE] Tools enabled: {tools}")
                 
-                if agent_client:
-                    toolsets = [agent_client]
-                    auth_status = "authenticated" if auth_token else "non-authenticated"
-                    logger.info(f"Agent {agent_model.id} configured with {auth_status} MCP tools: {tools_enabled}")
+                if principal:
+                    try:
+                        # Get agent-specific authenticated MCP client from global mcp_client
+                        agent_mcp_client = mcp_client.create_agent_client(
+                            agent_id=str(agent_model.id),
+                            tools=tools,
+                            principal=principal
+                        )
+                        
+                        if agent_mcp_client:
+                            toolsets = [agent_mcp_client]
+                            logger.info(f"✅ Created authenticated MCP toolset for {agent_model.id} with {len(tools)} tools")
+                        else:
+                            logger.error(f"❌ Failed to create authenticated MCP toolset for {agent_model.id}")
+                            toolsets = []
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Failed to create authenticated FastMCP client for agent {agent_model.id}: {e}")
+                        toolsets = []
                 else:
-                    auth_status = "authenticated" if auth_token else "non-authenticated"
-                    logger.warning(f"Failed to create {auth_status} MCP client for agent {agent_model.id}")
+                    # No principal provided - cannot create authenticated MCP client
+                    logger.warning(f"⚠️ No principal provided for agent {agent_model.id} - cannot create authenticated MCP toolset")
+                    # Fallback to unauthenticated mode for backward compatibility
+                    try:
+                        # Use the global mcp_client's server URL but without authentication
+                        unauthenticated_client = mcp_client.create_mcp_client(principal=None)
+                        if unauthenticated_client:
+                            toolsets = [unauthenticated_client]
+                            logger.info(f"⚠️ Created unauthenticated MCP toolset for {agent_model.id} as fallback")
+                        else:
+                            toolsets = []
+                    except Exception as e:
+                        logger.error(f"❌ Failed to create fallback unauthenticated MCP client: {e}")
+                        toolsets = []
             else:
-                logger.info(f"🚨 MCP tools temporarily disabled for debugging - agent {agent_model.id} will run without tools")
+                logger.info(f"ℹ️ No tools configured for agent {agent_model.id}")
             
-            # Create Pydantic AI agent
+            # Create Pydantic AI agent with Principal dependencies support
+            # Follow official PydanticAI dependencies pattern: https://ai.pydantic.dev/dependencies/
             if toolsets:
                 pydantic_agent = PydanticAgent(
                     model=model_string,
+                    deps_type=Principal,  # Define dependencies type
                     output_type=ChatResponse,
-                    system_prompt=system_prompt,
+                    system_prompt=agent_prompt,
                     toolsets=toolsets
                 )
-                logger.info(f"✅ Created Pydantic AI agent with MCP tools for {agent_model.id}")
+                logger.info(f"✅ Created Pydantic AI agent with FastMCP tools and Principal dependencies for {agent_model.id}")
             else:
                 pydantic_agent = PydanticAgent(
                     model=model_string,
+                    deps_type=Principal,  # Define dependencies type
                     output_type=ChatResponse,
-                    system_prompt=system_prompt
+                    system_prompt=agent_prompt
                 )
-                logger.info(f"✅ Created Pydantic AI agent without tools for {agent_model.id}")
+                logger.info(f"✅ Created Pydantic AI agent with Principal dependencies (no FastMCP tools) for {agent_model.id}")
             
             # Cache the agent
             self._agent_cache[cache_key] = pydantic_agent
@@ -148,7 +175,8 @@ class DynamicAgentFactory:
         file_context: str,
         user_metadata: Dict[str, Any],
         session_id: Optional[str] = None,
-        organization_id: Optional[str] = None
+        organization_id: Optional[str] = None,
+        file_ids: Optional[List[str]] = None
     ) -> Any:
         """
         Build appropriate context based on agent type.
@@ -164,6 +192,7 @@ class DynamicAgentFactory:
             user_metadata: User information and session data
             session_id: Optional session/thread ID
             organization_id: Optional organization ID
+            file_ids: Optional list of file IDs for tool calls
             
         Returns:
             Context object appropriate for the agent type
@@ -178,12 +207,14 @@ class DynamicAgentFactory:
                 "organization_id": organization_id or user_metadata.get("organization_id")
             }
             
-            # Add file context if available
-            if file_context:
-                base_context["uploaded_files"] = [file_context]
+            # Add file context and IDs if available
+            if file_context or file_ids:
+                base_context["attachments"] = [file_context] if file_context else []
+                base_context["file_ids"] = file_ids or []
                 base_context["has_attachments"] = True
             else:
-                base_context["uploaded_files"] = []
+                base_context["attachments"] = []
+                base_context["file_ids"] = []
                 base_context["has_attachments"] = False
             
             # Apply agent-specific customizations to base context
@@ -197,7 +228,8 @@ class DynamicAgentFactory:
             # Return minimal fallback context
             return AgentContext(
                 user_input=message,
-                uploaded_files=[],
+                attachments=[],
+                file_ids=file_ids or [],
                 conversation_history=[],
                 user_metadata=user_metadata,
                 session_id=session_id,
@@ -257,7 +289,8 @@ class DynamicAgentFactory:
         # Create and return AgentContext
         return AgentContext(
             user_input=final_context["user_input"],
-            uploaded_files=final_context["uploaded_files"],
+            attachments=final_context["attachments"],
+            file_ids=final_context["file_ids"],
             conversation_history=final_context["conversation_history"],
             user_metadata=final_context["user_metadata"],
             session_id=final_context["session_id"],
@@ -269,18 +302,18 @@ class DynamicAgentFactory:
         agent_model: AgentModel,
         message: str,
         context: AgentContext,
-        auth_token: Optional[str] = None,
+        principal: Optional['Principal'] = None,
         thread_id: Optional[str] = None,
         db: Optional[AsyncSession] = None
     ) -> ChatResponse:
         """
-        Process message with conversation history support.
+        Process message with conversation history support and Principal-based authorization.
         
         Args:
             agent_model: Agent configuration
             message: User message
             context: Chat context
-            auth_token: JWT token for MCP authentication (optional)
+            principal: Principal object for authorization (from AuthMiddleware)
             thread_id: Thread ID for message history (optional)
             db: Database session for history retrieval (optional)
             
@@ -288,8 +321,8 @@ class DynamicAgentFactory:
             ChatResponse: Agent response with tool usage
         """
         try:
-            # Create agent from model with authentication support
-            pydantic_agent = await self.create_agent_from_model(agent_model, auth_token=auth_token)
+            # Create agent from model with Principal support
+            pydantic_agent = await self.create_agent(agent_model, principal=principal)
             
             if not pydantic_agent:
                 logger.error(f"Failed to create agent from model {agent_model.id}")
@@ -300,9 +333,10 @@ class DynamicAgentFactory:
                     tools_used=[]
                 )
             
-            # Retrieve message history in proper ModelMessage format
+            # Retrieve message history in proper ModelMessage format  
             message_history: List[ModelMessage] = []
-            if thread_id and agent_model.use_memory_context:
+            # Temporarily disable memory context to test FastMCP integration
+            if False and thread_id and agent_model.use_memory_context:
                 try:
                     from app.services.ai_chat_service import ai_chat_service, MessageFormat
                     
@@ -328,22 +362,40 @@ class DynamicAgentFactory:
                     # Continue without history rather than failing completely
                     message_history = []
             
-            # Configure usage limits
-            usage_limits = UsageLimits(request_limit=agent_model.max_iterations)
+            # Configure usage limits based on agent configuration with settings defaults
             
-            # CORRECT PYDANTIC AI USAGE - Use message_history parameter
+            settings = get_settings()
+            
+            # TODO: token limits in agents instead of hardcoded settings
+            usage_limits = UsageLimits(
+                request_limit=max(settings.ai_request_limit, agent_model.max_iterations),  # Ensure minimum requests for FastMCP
+                total_tokens_limit=max(settings.ai_total_tokens_limit, 250000)  # Ensure minimum for FastMCP tool calls
+            )
+            logger.info(f"🔍 [TRACE] Usage limits: request_limit={usage_limits.request_limit}, total_tokens_limit={usage_limits.total_tokens_limit}")
+            
+            # Enhance message with file ID information if attachments are present
+            enhanced_message = message
+            file_ids = context.file_ids or []
+            if file_ids:
+                file_ids_str = ','.join(file_ids)
+                enhanced_message = f"{message}\n\n[CONTEXT: User has uploaded {len(file_ids)} file(s) with IDs: {file_ids_str}. When creating tickets or using tools that support file attachments, use these file IDs with the file_ids parameter.]"
+                logger.info(f"🔍 [TRACE] Enhanced message with file_ids: {file_ids}")
+            
+            # CORRECT PYDANTIC AI USAGE - Use message_history and deps for Principal context
             if message_history:
-                # Run agent with conversation history
+                # Run agent with conversation history and Principal context
                 result = await pydantic_agent.run(
-                    message,
-                    message_history=message_history,  # Correct parameter usage
-                    usage_limits=usage_limits
+                    enhanced_message,
+                    message_history=message_history,  # Conversation history
+                    usage_limits=usage_limits,
+                    deps=principal  # Principal context for tools
                 )
             else:
-                # Run agent without history
+                # Run agent without history but with Principal context
                 result = await pydantic_agent.run(
-                    message,
-                    usage_limits=usage_limits
+                    enhanced_message,
+                    usage_limits=usage_limits,
+                    deps=principal  # Principal context for tools
                 )
             
             # Extract response and tools used
@@ -352,33 +404,109 @@ class DynamicAgentFactory:
             else:
                 response = result
             
-            tools_used = getattr(result, 'tools_used', []) or []
+            # Extract actual tool calls from messages
+            tool_calls = []
+            tools_used = []
+            
+            try:
+                messages = result.all_messages()
+                for msg in messages:
+                    if hasattr(msg, 'parts'):
+                        for part in msg.parts:
+                            part_type = type(part).__name__
+                            
+                            if 'ToolCall' in part_type:
+                                tool_info = {
+                                    'tool_name': getattr(part, 'tool_name', None),
+                                    'args': getattr(part, 'args', None),
+                                    'tool_call_id': getattr(part, 'tool_call_id', None),
+                                    'called_at': str(msg.timestamp) if hasattr(msg, 'timestamp') else None,
+                                    'status': 'pending'
+                                }
+                                tool_calls.append(tool_info)
+                                tools_used.append(tool_info['tool_name'])
+                                
+                            elif 'ToolReturn' in part_type:
+                                # Update status of matching tool call
+                                tool_call_id = getattr(part, 'tool_call_id', None)
+                                for tool_call in tool_calls:
+                                    if tool_call['tool_call_id'] == tool_call_id:
+                                        tool_call['status'] = 'completed'
+                                        tool_call['result'] = getattr(part, 'content', None)
+                                        
+            except Exception as e:
+                logger.warning(f"Failed to extract tool calls from result: {e}")
+            
+            # Add tool information to response
+            if hasattr(response, 'tools_used'):
+                response.tools_used = tools_used
+            else:
+                # If response is a string, create a ChatResponse object
+                if isinstance(response, str):
+                    response = ChatResponse(
+                        content=response,
+                        confidence=1.0,
+                        requires_escalation=False,
+                        tools_used=tools_used
+                    )
+            
+            # Store tool calls for later use in service layer
+            if hasattr(result, '_tool_calls_data'):
+                result._tool_calls_data = tool_calls
+            else:
+                # Add as a new attribute
+                result._tool_calls_data = tool_calls
+            
             if tools_used:
-                logger.info(f"🔧 MCP Tools used: {tools_used}")
+                logger.info(f"🔧 FastMCP Tools used: {tools_used}")
+            if tool_calls:
+                logger.debug(f"🔧 Tool calls data: {tool_calls}")
             
             
             # Record usage statistics
-            from app.services.ai_agent_service import ai_agent_service
-            await ai_agent_service.record_agent_usage(
-                agent_id=agent_model.id,
-                success=True,
-                tools_called=len(tools_used)
-            )
+            try:
+                await agent_service.record_agent_usage(
+                    agent_id=agent_model.id,
+                    success=True,
+                    tools_called=len(tools_used)
+                )
+            except Exception as usage_error:
+                logger.warning(f"Failed to record agent usage: {usage_error}")
+            
+            # Add tool calls data to response for service layer access
+            if hasattr(response, '_tool_calls_data'):
+                response._tool_calls_data = tool_calls
+            else:
+                # Add as a new attribute to response
+                try:
+                    response._tool_calls_data = tool_calls
+                except AttributeError:
+                    # If response is immutable, that's fine - service layer will use tools_used fallback
+                    pass
             
             return response
             
         except Exception as e:
+            # Enhanced error logging for TaskGroup and other async issues
+            import traceback
             logger.error(f"❌ Error processing message with dynamic agent: {e}")
+            logger.error(f"❌ Exception type: {type(e).__name__}")
+            logger.error(f"❌ Full traceback:\n{traceback.format_exc()}")
             
+            # Check for specific TaskGroup exception details
+            if hasattr(e, '__cause__') and e.__cause__:
+                logger.error(f"❌ Root cause: {e.__cause__}")
+            if hasattr(e, 'exceptions'):
+                logger.error(f"❌ Sub-exceptions: {e.exceptions}")
+                
             # Record failed usage
             try:
-                from app.services.ai_agent_service import ai_agent_service
-                await ai_agent_service.record_agent_usage(
+                await agent_service.record_agent_usage(
                     agent_id=agent_model.id,
                     success=False
                 )
-            except:
-                pass
+            except Exception as usage_error:
+                logger.warning(f"Failed to record failed agent usage: {usage_error}")
             
             return ChatResponse(
                 content="I encountered an error processing your request. Please try again or contact support if the issue persists.",

@@ -64,7 +64,7 @@ class AuthenticatedHTTPClient:
     """HTTP client with connection pooling and circuit breaker for MCP tools"""
     
     _instances: ClassVar[Dict[str, 'AuthenticatedHTTPClient']] = {}
-    _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
+    _lock: ClassVar[Optional[asyncio.Lock]] = None
     
     def __init__(self, backend_url: str, max_connections: int = 100):
         self.backend_url = backend_url
@@ -174,6 +174,9 @@ class AuthenticatedHTTPClient:
     @classmethod
     async def cleanup_all(cls):
         """Close all client instances"""
+        if cls._lock is None:
+            cls._lock = asyncio.Lock()
+            
         async with cls._lock:
             for instance in cls._instances.values():
                 await instance.close()

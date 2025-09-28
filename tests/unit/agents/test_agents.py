@@ -65,7 +65,7 @@ class TestAgentModel:
         
         assert config["role"] == "Customer support specialist"
         assert config["prompt"] == "You are helpful"
-        assert config["tools_enabled"] == ["create_ticket", "search_tickets"]
+        assert config["tools"] == ["create_ticket", "search_tickets"]
         assert config["use_streaming"] is True
         assert config["max_context_size"] == 150000
     
@@ -78,7 +78,7 @@ class TestAgentModel:
         
         updates = {
             "role": "Technical support",
-            "tools_enabled": ["tool1", "tool2"],
+            "tools": ["tool1", "tool2"],
             "communication_style": "casual",
             "memory_retention": 10
         }
@@ -310,13 +310,13 @@ class TestAgentSchemas:
             agent_type="customer_support",
             role="Support specialist",
             communication_style="professional",
-            tools_enabled=["create_ticket"]
+            tools=["create_ticket"]
         )
         
         assert valid_request.name == "Test Agent"
         assert valid_request.agent_type == "customer_support"
         assert valid_request.communication_style == "professional"
-        assert "create_ticket" in valid_request.tools_enabled
+        assert "create_ticket" in valid_request.tools
     
     def test_agent_update_request_validation(self):
         """Test AgentUpdateRequest schema validation"""
@@ -451,7 +451,6 @@ class TestMultiAgentCapabilities:
         # Test personalization
         assert agent.name == "Friendly Support Bot"
         assert agent.avatar_url == "https://example.com/avatar.png"
-        assert agent.effective_name == "Friendly Support Bot"
         
         # Test configuration includes personalization
         config = agent.get_configuration()

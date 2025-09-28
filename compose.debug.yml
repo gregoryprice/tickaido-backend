@@ -6,10 +6,10 @@ services:
       - sh
       - -c
       - "alembic upgrade head && exec python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"
-  celery-worker:
-    ports:
-      - "5679:5679"
-    command:
-      - sh
-      - -c
-      - "exec python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5679 --wait-for-client -m celery -A app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-4} --queues=file_processing"
+  #celery-worker:
+  #  ports:
+  #    - "5679:5679"
+  #  command:
+  #    - sh
+  #    - -c
+  #    - "exec python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5679 --wait-for-client -m celery -A app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-4} --queues=file_processing"

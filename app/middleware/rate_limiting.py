@@ -256,9 +256,6 @@ class RateLimitMiddleware:
                     }
                 )
             
-            logger.debug(f"✅ Rate limit check passed for {identifier} on {rule_name}: "
-                        f"{info['remaining']}/{info['limit']} remaining")
-            
             return None  # Allow request to proceed
             
         except Exception as e:

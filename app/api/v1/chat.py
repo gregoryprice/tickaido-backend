@@ -175,18 +175,24 @@ async def send_message(
     logger.info(f"[CHAT_API] Sending message to thread {thread_id}, agent {agent_id}, user: {current_user.id}")
     logger.debug(f"[CHAT_API] Message content: {request.content[:100]}{'...' if len(request.content) > 100 else ''}")
     
-    # Extract JWT token for MCP authentication
-    auth_header = http_request.headers.get("authorization", "")
-    jwt_token = None
-    
-    if auth_header.startswith("Bearer "):
-        jwt_token = auth_header[7:]
-        try:
-            payload = decode_jwt_token(jwt_token)
-            logger.debug("[CHAT_API] Extracted JWT token for MCP authentication")
-        except Exception as e:
-            logger.warning(f"[CHAT_API] Failed to decode JWT token: {e}")
-            jwt_token = None
+    # Convert authenticated user to Principal for proper authorization flow
+    # Principal service will extract auth token from request (handles both API keys and JWT)
+    principal = None
+    try:
+        from app.services.principal_service import principal_service
+        
+        # Extract Principal from request (handles both API key and JWT authentication)
+        principal = await principal_service.get_principal_from_request(
+            request=http_request,
+            current_user=current_user,
+            db=db
+        )
+        if principal:
+            logger.debug(f"[CHAT_API] Principal created for user {current_user.email} (org: {principal.organization_id}) with auth context")
+        else:
+            logger.warning(f"[CHAT_API] Failed to create Principal for user {current_user.id}")
+    except Exception as e:
+        logger.error(f"[CHAT_API] Error creating Principal: {e}")
     
     try:
         # Validate attachments format if provided
@@ -219,14 +225,14 @@ async def send_message(
         if request.attachments:
             attachments_dict = [{"file_id": str(att.file_id)} for att in request.attachments]
         
-        # Use AI chat service with agent-centric processing
+        # Use AI chat service with agent-centric processing and Principal context
         ai_response = await ai_chat_service.send_message_to_thread(
             agent_id=str(agent_id),
             thread_id=str(thread_id),
             user_id=user_id,
             message=request.content,
             attachments=attachments_dict,
-            auth_token=jwt_token
+            principal=principal
         )
         
         logger.info(f"[CHAT_API] AI response generated with confidence: {getattr(ai_response, 'confidence', 0.0)}")

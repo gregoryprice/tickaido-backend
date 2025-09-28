@@ -254,15 +254,6 @@ class Agent(BaseModel):
     def __repr__(self):
         return f"<Agent(id={self.id}, organization_id={self.organization_id}, agent_type={self.agent_type}, name={self.name})>"
     
-    @property
-    def effective_name(self) -> str:
-        """Get effective display name for the agent"""
-        return str(self.name or f"{self.agent_type.replace('_', ' ').title()} Agent")
-    
-    @property
-    def is_customer_support(self) -> bool:
-        """Check if this is a customer support agent"""
-        return str(self.agent_type) == "customer_support"
     
     @property
     def is_ready(self) -> bool:
@@ -274,11 +265,6 @@ class Agent(BaseModel):
         """Get count of enabled tools"""
         return len(self.tools or [])
     
-    @property
-    def mcp_enabled(self) -> bool:
-        """Check if MCP integration is enabled"""
-        # MCP is enabled by default for all agents in new architecture
-        return True
     
     def get_configuration(self) -> Dict[str, Any]:
         """
@@ -303,7 +289,7 @@ class Agent(BaseModel):
             "use_memory_context": self.use_memory_context,
             "max_iterations": self.max_iterations,
             "timeout_seconds": self.timeout_seconds,
-            "tools_enabled": self.tools or []
+            "tools": self.tools or []
         }
     
     def update_configuration(self, updates: Dict[str, Any]) -> None:
@@ -329,7 +315,7 @@ class Agent(BaseModel):
             "use_memory_context": "use_memory_context",
             "max_iterations": "max_iterations",
             "timeout_seconds": "timeout_seconds",
-            "tools_enabled": "tools"
+            "tools": "tools"
         }
         
         for config_key, value in updates.items():
@@ -426,11 +412,8 @@ class Agent(BaseModel):
             data.pop('configuration', None)
         
         # Add computed properties
-        data['effective_name'] = self.effective_name
-        data['is_customer_support'] = self.is_customer_support
         data['is_ready'] = self.is_ready
         data['tools_count'] = self.tools_count
-        data['mcp_enabled'] = self.mcp_enabled
         data['avatar_url'] = self.avatar_url
         
         return data

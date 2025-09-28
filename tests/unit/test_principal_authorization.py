@@ -78,7 +78,7 @@ class MockAgentModel:
         self,
         id: str = "test-agent-123",
         organization_id: str = "org-456",
-        tools_enabled: list = None,
+        tools: list = None,
         requires_approval: bool = False,
         max_iterations: int = 5,
         prompt: str = "You are a helpful assistant",
@@ -92,14 +92,14 @@ class MockAgentModel:
         self.max_iterations = max_iterations
         self.model_provider = model_provider
         self.model_name = model_name
-        self._tools_enabled = tools_enabled or [
+        self._tools = tools or [
             "create_ticket", "get_ticket", "list_tickets", "search_tickets"
         ]
     
     def get_configuration(self) -> Dict[str, Any]:
         """Get agent configuration"""
         return {
-            "tools_enabled": self._tools_enabled,
+            "tools": self._tools,
             "model_provider": self.model_provider,
             "model_name": self.model_name
         }
@@ -295,7 +295,7 @@ class TestDynamicAgentFactory:
     def mock_agent_model(self):
         """Create mock agent model for testing"""
         return MockAgentModel(
-            tools_enabled=["create_ticket", "get_ticket", "list_tickets"]
+            tools=["create_ticket", "get_ticket", "list_tickets"]
         )
     
     @pytest.fixture
@@ -325,7 +325,7 @@ class TestDynamicAgentFactory:
     def test_agent_tool_filtering_with_principal(self, mock_agent_model, admin_principal, user_principal):
         """Test that agent tools are properly filtered based on principal"""
         # Agent model has limited tools
-        agent_tools = mock_agent_model.get_configuration()["tools_enabled"]
+        agent_tools = mock_agent_model.get_configuration()["tools"]
         assert "create_ticket" in agent_tools
         assert "get_ticket" in agent_tools
         assert "delete_ticket" not in agent_tools  # Not in agent's allowed tools
@@ -344,12 +344,12 @@ class TestDynamicAgentFactory:
         # This test is for future implementation when app.tools module exists
         # For now, just test the mock agent model structure
         agent_config = mock_agent_model.get_configuration()
-        assert "tools_enabled" in agent_config
-        assert isinstance(agent_config["tools_enabled"], list)
-        assert len(agent_config["tools_enabled"]) > 0
+        assert "tools" in agent_config
+        assert isinstance(agent_config["tools"], list)
+        assert len(agent_config["tools"]) > 0
         
         # Verify admin can access agent tools
-        for tool in agent_config["tools_enabled"]:
+        for tool in agent_config["tools"]:
             assert admin_principal.can_access_tool(tool)
     
     def test_approval_workflow_integration(self, mock_agent_model, admin_principal, user_principal):

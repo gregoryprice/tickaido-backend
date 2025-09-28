@@ -413,6 +413,88 @@ class AuthMiddleware:
         except Exception as e:
             logger.error(f"Failed to sync organization: {e}")
             return None
+    
+    def validate_token_for_mcp(self, token: str) -> Optional[str]:
+        """
+        Centralized token validation for MCP services supporting all environments.
+        
+        Handles:
+        - API keys: ai_dev_xxx, ai_san_xxx, ai_pro_xxx  
+        - JWT tokens: Standard JWT format validation
+        - Environment validation: Ensures token matches current environment
+        
+        Args:
+            token: Raw token string
+            
+        Returns:
+            str: Validated token if valid, None if invalid
+        """
+        try:
+            if not token:
+                return None
+            
+            # Check if it's an API token (ai_env_xxx format)
+            if token.startswith('ai_'):
+                return self._validate_api_token_for_mcp(token)
+            else:
+                # Assume JWT token - validate using existing logic
+                return self._validate_jwt_token_for_mcp(token)
+                
+        except Exception as e:
+            logger.debug(f"MCP token validation failed: {e}")
+            return None
+    
+    def _validate_api_token_for_mcp(self, token: str) -> Optional[str]:
+        """Validate API token format and environment for MCP usage"""
+        try:
+            # Parse token format: ai_env_token
+            parts = token.split('_', 2)
+            if len(parts) != 3 or parts[0] != 'ai':
+                logger.debug(f"Invalid API token format: {token[:20]}...")
+                return None
+            
+            env_prefix, raw_token = parts[1], parts[2]
+            
+            # Support all 3 environments
+            valid_environments = {
+                'dev': 'development',
+                'san': 'sandbox', 
+                'pro': 'production'
+            }
+            
+            if env_prefix not in valid_environments:
+                logger.debug(f"Unknown environment in API token: {env_prefix}")
+                return None
+            
+            # Validate environment matches current environment
+            settings = get_settings()
+            current_env = settings.environment
+            expected_env = valid_environments[env_prefix]
+            
+            if current_env != expected_env:
+                logger.warning(f"API token environment mismatch: expected {expected_env}, got {current_env}")
+                return None
+            
+            # Token format is valid and environment matches
+            logger.debug(f"Valid API token for environment: {env_prefix}")
+            return token
+            
+        except Exception as e:
+            logger.debug(f"API token validation failed: {e}")
+            return None
+    
+    def _validate_jwt_token_for_mcp(self, token: str) -> Optional[str]:
+        """Validate JWT token for MCP usage"""
+        try:
+            # Use existing JWT validation logic
+            payload = self.verify_token(token)
+            if payload:
+                logger.debug(f"Valid JWT token for MCP usage")
+                return token
+            return None
+        except Exception as e:
+            logger.debug(f"JWT token validation failed: {e}")
+            return None
 
 
 # Global middleware instance

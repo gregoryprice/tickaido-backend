@@ -28,6 +28,14 @@ def create_filtered_mcp_client(base_client: MCPServerStreamableHTTP, allowed_too
     
     # Use PydanticAI's official filtering mechanism
     filtered_toolset = base_client.filtered(tool_filter_func)
+    
+    # Preserve authentication information from the base client
+    if hasattr(base_client, 'get_principal'):
+        # Store principal getter on filtered toolset for reference
+        filtered_toolset.get_principal = base_client.get_principal
+        filtered_toolset.is_authenticated = base_client.is_authenticated
+        logger.debug(f"[TOOL_FILTER] ✅ Preserved authentication methods on filtered toolset")
+    
     logger.info(f"[TOOL_FILTER] ✅ Created official PydanticAI filtered toolset for agent {agent_id} with {len(allowed_tools)} allowed tools")
     
     return filtered_toolset

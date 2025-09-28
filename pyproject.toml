@@ -83,3 +83,12 @@ debugpy = "^1.8.16"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E","F","I","UP"]
+
+[tool.ruff.format]
+quote-style = "double"

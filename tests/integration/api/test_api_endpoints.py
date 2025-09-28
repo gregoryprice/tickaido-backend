@@ -172,7 +172,7 @@ def test_database_models():
     # Test enums
     assert TicketStatus.OPEN.value == "open"
     assert TicketPriority.HIGH.value == "high"
-    assert UserRole.USER.value == "user" 
+    assert UserRole.MEMBER.value == "MEMBER" 
     assert FileStatus.UPLOADED.value == "uploaded"
     print("✅ Database model enums working")
     

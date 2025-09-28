@@ -42,7 +42,7 @@ class AgentCreateRequest(BaseModel):
     use_memory_context: bool = Field(default=True, description="Whether to use conversation memory in context")
     max_iterations: int = Field(default=5, ge=1, le=10, description="Maximum number of tool call iterations")
     timeout_seconds: Optional[int] = Field(None, ge=1, le=300, description="Timeout for agent responses")
-    tools_enabled: List[str] = Field(default_factory=list, description="List of enabled tool names")
+    tools: List[str] = Field(default_factory=list, description="List of enabled tool names")
 
 
 class AgentUpdateRequest(BaseModel):
@@ -77,7 +77,7 @@ class AgentUpdateRequest(BaseModel):
     use_memory_context: Optional[bool] = Field(None, description="Whether to use conversation memory in context")
     max_iterations: Optional[int] = Field(None, ge=1, le=10, description="Maximum number of tool call iterations")
     timeout_seconds: Optional[int] = Field(None, ge=1, le=300, description="Timeout for agent responses")
-    tools_enabled: Optional[List[str]] = Field(None, description="List of enabled tool names")
+    tools: Optional[List[str]] = Field(None, description="List of enabled tool names")
 
 
 class AgentResponse(BaseModel):
@@ -116,7 +116,7 @@ class AgentResponse(BaseModel):
     use_memory_context: bool
     max_iterations: int
     timeout_seconds: Optional[int] = None
-    tools_enabled: List[str] = Field(alias="tools", default_factory=list)
+    tools: List[str] = Field(default_factory=list)
     
     # Metadata
     last_used_at: Optional[datetime] = None
@@ -124,11 +124,8 @@ class AgentResponse(BaseModel):
     updated_at: datetime
     
     # Computed properties
-    effective_name: str
-    is_customer_support: bool
     is_ready: bool
     tools_count: int
-    mcp_enabled: bool
 
 
 class AgentListResponse(BaseModel):

@@ -94,8 +94,8 @@ def test_enum_values():
         from app.models.ticket import TicketStatus, TicketPriority
         
         # Test UserRole values
-        assert UserRole.ADMIN.value == "admin"
-        assert UserRole.USER.value == "user"
+        assert UserRole.ADMIN.value == "ADMIN"
+        assert UserRole.MEMBER.value == "MEMBER"
         
         # Test TicketStatus values
         assert TicketStatus.NEW.value == "new"

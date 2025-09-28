@@ -692,26 +692,16 @@ class SecureTicketAgent(Agent):
 # Default role permissions (configured in PrincipalService)
 ROLE_PERMISSIONS = {
     'admin': {
-        'tickets.*': True,  # All ticket permissions
-        'users.*': True     # All user permissions
+        '*': True,  # ticket permissions
     },
-    'org_admin': {
+    'member': {
         'tickets.*': True,
         'users.read': True,
-        'users.update': True
-    },
-    'support_user': {
-        'tickets.create': True,
-        'tickets.read': True,
-        'tickets.update': True
     },
     'agent': {
         'tickets.read': True,
         'tickets.create': True,
         'tickets.update': True
-    },
-    'viewer': {
-        'tickets.read': True
     }
 }
 ```
@@ -725,9 +715,7 @@ api_token = APIToken(
     user_id=user.id,
     organization_id=org.id,
     permissions=[
-        "tickets.create",
-        "tickets.read",
-        "tickets.update"
+        "*"
     ]
 )
 ```
@@ -2661,10 +2649,13 @@ asyncio.run(test())
 - **Audit logging** validation for all tool calls
 
 #### Step 4.3: Performance and Load Testing (NEW)
-- **Principal caching** performance with Redis
-- **Concurrent tool calls** with different users
-- **Database connection** management under load
-- **Memory usage** with Principal objects
+- **Principal caching** performance with Redis (15-minute TTL optimization)
+- **Concurrent tool calls** with different users (connection pooling)
+- **Database connection** management under load (SQLAlchemy async pool)
+- **Memory usage** with Principal objects (object pooling and cleanup)
+- **AI agent response times** under concurrent requests
+- **WebSocket connection scaling** for real-time updates
+- **File processing throughput** with Celery worker optimization
 
 #### Final Validation Criteria (COMPREHENSIVE)
 - [ ] Complete removal of old MCP implementation verified
@@ -2673,8 +2664,13 @@ asyncio.run(test())
 - [ ] Organization isolation perfect (0 cross-org data leaks)
 - [ ] Permission system blocks unauthorized operations
 - [ ] Audit logs capture all tool executions with Principal context
-- [ ] Performance meets requirements (<100ms tool filtering overhead)
-- [ ] Load testing passes with 100 concurrent requests
+- [ ] Performance meets enhanced requirements (<50ms tool filtering overhead)
+- [ ] Load testing passes with 500 concurrent requests
+- [ ] AI agent response times under 2 seconds for ticket creation
+- [ ] WebSocket connections scale to 1000+ concurrent users
+- [ ] Database query performance optimized with proper indexing
+- [ ] Redis caching hit ratio above 90%
+- [ ] Celery task processing under 5 seconds for file operations
 - [ ] Security audit confirms no authentication bypass vectors
 
 #### Final End-to-End Test (NEW)
@@ -3154,10 +3150,14 @@ asyncio.run(test())
 
 #### Step 5.2: Performance Testing
 - **Tasks**:
-  1. Load test with concurrent requests
-  2. Measure toolset overhead
-  3. Optimize permission checking
-  4. Profile memory usage
+  1. Load test with 500+ concurrent requests (enhanced from basic testing)
+  2. Measure toolset overhead (<25ms target)
+  3. Optimize permission checking with Redis caching
+  4. Profile memory usage with Principal object pooling
+  5. Stress test WebSocket connections (1000+ concurrent)
+  6. Benchmark AI agent response times (2s target for 95th percentile)
+  7. Test Celery worker scaling under high file processing load
+  8. Validate database connection pool efficiency
 
 #### Step 5.3: Security Validation
 - **Tasks**:
@@ -3171,7 +3171,11 @@ asyncio.run(test())
 - [ ] Users can only access their organization's data
 - [ ] Tool filtering prevents unauthorized operations
 - [ ] Approval workflow functions correctly
-- [ ] Performance meets acceptable thresholds (<100ms for tool filtering)
+- [ ] Performance meets enhanced thresholds (<25ms for tool filtering)
+- [ ] Load testing with 500 concurrent users passes
+- [ ] AI agent response times under 2 seconds (95th percentile)
+- [ ] WebSocket scaling to 1000+ concurrent connections
+- [ ] Redis cache hit ratio above 90%
 - [ ] Security audit passes all checks
 
 #### End-to-End Tests
@@ -3179,8 +3183,18 @@ asyncio.run(test())
 # Full integration test
 poetry run pytest tests/e2e/test_secure_ticket_management.py -v
 
-# Performance test
+# Performance test suite
 docker compose exec app python scripts/test_toolset_performance.py
+
+# Enhanced performance tests
+docker compose exec app python scripts/test_concurrent_load.py --users 500
+docker compose exec app python scripts/test_websocket_scaling.py --connections 1000
+docker compose exec app python scripts/test_ai_agent_performance.py --iterations 100
+docker compose exec app python scripts/test_redis_cache_performance.py
+docker compose exec app python scripts/test_database_pool_efficiency.py
+
+# Stress test with monitoring
+docker compose exec app python scripts/stress_test_with_metrics.py --duration 300
 
 # Security test
 docker compose exec app python scripts/security_audit.py
@@ -3229,15 +3243,46 @@ curl -H "Authorization: Bearer $TOKEN" \
 - [ ] Approval workflow processes sensitive operations
 
 ### Performance Requirements  
-- [ ] Tool filtering adds <50ms latency
-- [ ] Principal extraction adds <10ms per request
-- [ ] System handles 100 concurrent authenticated requests
+- [ ] Tool filtering adds <25ms latency (enhanced from <50ms)
+- [ ] Principal extraction adds <5ms per request (enhanced from <10ms)
+- [ ] System handles 500 concurrent authenticated requests (enhanced from 100)
+- [ ] Database connection pool maintains 95% availability under load
+- [ ] Redis caching reduces principal lookup time by 80%
+- [ ] AI agent processing time under 2 seconds for 95th percentile
+- [ ] WebSocket message latency under 100ms for real-time updates
+- [ ] File processing queue maintains throughput of 100 files/minute
 
 ### Security Requirements
 - [ ] Zero raw JWT tokens in tool layer
 - [ ] All operations auditable through Principal context
 - [ ] Permission changes take effect immediately
 - [ ] Token expiration properly handled
+
+## Performance and Scalability Architecture
+
+### Caching Strategy
+- **Redis Principal Cache**: 15-minute TTL with smart invalidation on permission changes
+- **Database Query Cache**: Optimized with proper indexing on user_id, organization_id
+- **Tool Authorization Cache**: Permission sets cached per user/organization combination
+- **AI Model Response Cache**: Cache frequently requested categorizations and responses
+
+### Connection Management
+- **Database Pool**: SQLAlchemy async connection pool (min: 5, max: 20 connections)
+- **Redis Pool**: Connection pool with automatic failover and circuit breaker
+- **WebSocket Management**: Connection pooling with heartbeat monitoring
+- **HTTP Client Pool**: Reusable connections for external API calls
+
+### Horizontal Scaling Support
+- **Stateless Design**: All components designed for horizontal scaling
+- **Load Balancer Ready**: Health checks and graceful shutdown support
+- **Database Sharding Ready**: Organization-based data partitioning capability
+- **Celery Auto-scaling**: Dynamic worker scaling based on queue depth
+
+### Performance Monitoring
+- **Metrics Collection**: Prometheus-compatible metrics for all operations
+- **Response Time Tracking**: P50, P95, P99 percentiles for all endpoints
+- **Resource Usage Monitoring**: Memory, CPU, and database connection tracking
+- **Alert Thresholds**: Automated alerts for performance degradation
 
 ## Rollout Plan
 
@@ -3248,19 +3293,25 @@ curl -H "Authorization: Bearer $TOKEN" \
 4. Merge to main branch
 
 ### Staging Environment
-1. Deploy with feature flags
-2. Run load and security tests
-3. Validate with test users
-4. Performance optimization
+1. Deploy with feature flags and performance monitoring
+2. Run enhanced load tests (500+ concurrent users)
+3. Validate with test users and performance benchmarks
+4. Performance optimization and Redis cache tuning
+5. WebSocket scaling validation
+6. AI agent response time optimization
 
 ### Production Environment
-1. Gradual rollout with monitoring
-2. Fallback plan to previous implementation
-3. Monitor error rates and performance
-4. Full rollout after validation
+1. Gradual rollout with comprehensive monitoring and alerting
+2. Fallback plan to previous implementation with performance baselines
+3. Monitor error rates, response times, and resource utilization
+4. Auto-scaling configuration for Celery workers
+5. Performance dashboard with real-time metrics
+6. Full rollout after validation of all performance requirements
 
 ## Conclusion
 
-This implementation will provide a secure, scalable foundation for AI-powered ticket management using Pydantic AI toolsets. The Principal-based authentication system ensures proper authorization while maintaining clean separation of concerns between authentication and business logic.
+This implementation will provide a secure, high-performance, scalable foundation for AI-powered ticket management using Pydantic AI toolsets. The Principal-based authentication system ensures proper authorization while maintaining clean separation of concerns between authentication and business logic.
 
-The phased approach allows for incremental validation and reduces risk, while the comprehensive testing strategy ensures reliability and security.
+The enhanced performance architecture supports horizontal scaling with optimized caching strategies, connection pooling, and comprehensive monitoring. The system is designed to handle 500+ concurrent users with sub-2-second AI response times and 90%+ cache hit ratios.
+
+The phased approach allows for incremental validation and reduces risk, while the comprehensive testing strategy ensures reliability, security, and performance at scale.

@@ -529,7 +529,7 @@ class MemberManagementService:
                 joined_organization_at=datetime.now(timezone.utc),
                 is_active=True,
                 is_verified=True,  # Auto-verify invited users
-                role=UserRole.USER
+                role=UserRole.MEMBER
             )
             
             db.add(user)
@@ -746,3 +746,65 @@ class MemberManagementService:
             "pending_invitations": pending_invitations,
             "has_admin": admin_count > 0
         }
+    
+    async def ensure_organization_has_admin(
+        self,
+        db: AsyncSession,
+        organization_id: UUID
+    ) -> Optional[User]:
+        """
+        Ensure that an organization has at least one admin.
+        If there's only one user in the organization, make them an admin.
+        
+        Args:
+            db: Database session
+            organization_id: Organization ID to check
+            
+        Returns:
+            User: The user that was promoted to admin, or None if no action needed
+            
+        Raises:
+            ValueError: If organization not found or has no users
+        """
+        # Get all active users in the organization
+        users_query = select(User).where(
+            and_(
+                User.organization_id == organization_id,
+                User.is_active == True,
+                User.is_deleted == False
+            )
+        )
+        
+        result = await db.execute(users_query)
+        users = result.scalars().all()
+        
+        if not users:
+            raise ValueError("Organization has no active users")
+        
+        # Count admins
+        admin_users = [user for user in users if user.role == UserRole.ADMIN]
+        
+        # If there's already an admin, no action needed
+        if admin_users:
+            return None
+        
+        # If there's only one user and no admin, make them admin
+        if len(users) == 1:
+            single_user = users[0]
+            single_user.role = UserRole.ADMIN
+            await db.commit()
+            await db.refresh(single_user)
+            return single_user
+        
+        # If multiple users but no admin, this is an edge case
+        # We could implement logic to promote the first user or oldest user
+        # For now, let's promote the first user found
+        first_user = users[0]
+        first_user.role = UserRole.ADMIN
+        await db.commit()
+        await db.refresh(first_user)
+        return first_user
+
+
+# Global service instance
+member_management_service = MemberManagementService()

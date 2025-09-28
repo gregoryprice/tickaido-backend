@@ -134,12 +134,39 @@ def register_health_endpoint():
 # =============================================================================
 
 def register_all_system_tools(mcp_instance: FastMCP):
-    """Register all system tools"""
+    """Register all system tools (includes health checks)"""
     global mcp
     mcp = mcp_instance
     
-    # Register tools using original registration pattern
+    # Register system-specific tools
     register_get_system_health()
     register_health_endpoint()
     
     logger.info("System tools registered")
+
+
+def register_all_tools(mcp_instance: FastMCP):
+    """Register ALL MCP tools from all modules"""
+    logger.info("🔧 Registering all MCP tool modules")
+    
+    # Register ticket tools (Principal-based, NO HTTP calls)
+    try:
+        from .ticket_tools import register_all_ticket_tools
+        register_all_ticket_tools(mcp_instance)
+        logger.info("✅ Ticket tools registered (Principal-based)")
+    except ImportError as e:
+        logger.error(f"❌ Failed to import ticket tools: {e}")
+    
+    # Register integration tools (Principal-based)
+    try:
+        from .integration_tools import register_all_integration_tools
+        register_all_integration_tools(mcp_instance)
+        logger.info("✅ Integration tools registered (Principal-based)")
+    except ImportError as e:
+        logger.error(f"❌ Failed to import integration tools: {e}")
+    
+    # Register system tools
+    register_all_system_tools(mcp_instance)
+    logger.info("✅ System tools registered")
+    
+    logger.info("🎉 All MCP tool modules registered successfully")

@@ -14,11 +14,8 @@ from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse, E
 
 class UserRoleSchema(str, Enum):
     """User roles enum schema"""
-    ADMIN = "admin"
-    MANAGER = "manager"
-    AGENT = "agent"
-    USER = "user"
-    API_USER = "api_user"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
 
 
 # Request schemas
@@ -27,7 +24,7 @@ class UserCreateRequest(BaseCreate):
     email: EmailStr = Field(description="User email address")
     full_name: Optional[str] = Field(None, max_length=255, description="User's full name")
     password: Optional[str] = Field(None, min_length=8, description="User password (for local auth)")
-    role: UserRoleSchema = Field(UserRoleSchema.USER, description="User role")
+    role: UserRoleSchema = Field(UserRoleSchema.MEMBER, description="User role")
     department: Optional[str] = Field(None, max_length=100, description="User's department")
     timezone: str = Field("UTC", max_length=50, description="User's timezone")
     language: str = Field("en", max_length=10, description="Preferred language")
@@ -201,7 +198,7 @@ class UserBulkCreateRequest(BaseSchema):
     """Schema for bulk user creation"""
     users: List[UserCreateRequest] = Field(description="List of users to create")
     send_invitations: bool = Field(True, description="Whether to send invitation emails")
-    default_role: UserRoleSchema = Field(UserRoleSchema.USER, description="Default role for users")
+    default_role: UserRoleSchema = Field(UserRoleSchema.MEMBER, description="Default role for users")
 
 
 class UserBulkUpdateRequest(BaseSchema):
