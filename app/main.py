@@ -74,6 +74,7 @@ from app.api.v1.agent_avatars import router as agent_avatars_router
 from app.api.v1.members import router as members_router
 from app.api.v1.organization_discovery import router as org_discovery_router
 from app.api.v1.invitations import router as invitations_router
+from app.api.v1.tools import router as tools_router
 from app.routers.auth import router as auth_router
 from app.routers.integration import router as integration_router
 from app.websocket.chat import router as chat_websocket_router
@@ -350,6 +351,7 @@ app.include_router(agent_avatars_router, prefix="/api/v1", tags=["Agent Avatars"
 app.include_router(members_router, prefix="/api/v1", tags=["Member Management"])
 app.include_router(org_discovery_router, prefix="/api/v1", tags=["Organization Discovery"])
 app.include_router(invitations_router, prefix="/api/v1", tags=["Invitation Management"])
+app.include_router(tools_router, prefix="/api/v1", tags=["Tools"])
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(integration_router, prefix="/api/v1")
 
