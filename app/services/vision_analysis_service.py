@@ -9,6 +9,7 @@ import re
 from typing import Dict, Any, List
 from PIL import Image
 from io import BytesIO
+import xml.etree.ElementTree as ET
 
 from app.config.settings import get_settings
 from app.services.ai_config_service import AIConfigService
@@ -77,18 +78,38 @@ class VisionAnalysisService:
             Dictionary with analysis results based on requested features
         """
         
+        # Handle SVG files specially as they cannot be opened by PIL directly
+        is_svg = self._is_svg_content(image_content)
+        
+        if is_svg:
+            # For SVG files, convert to PNG first
+            image_content = self._convert_svg_to_png(image_content)
+        
         # Encode image for API
         image_b64 = base64.b64encode(image_content).decode('utf-8')
         
         # Get image metadata
-        image = Image.open(BytesIO(image_content))
-        metadata = {
-            "width": image.width,
-            "height": image.height,
-            "format": image.format,
-            "mode": image.mode,
-            "size_bytes": len(image_content)
-        }
+        try:
+            image = Image.open(BytesIO(image_content))
+            metadata = {
+                "width": image.width,
+                "height": image.height,
+                "format": image.format if not is_svg else "SVG",
+                "mode": image.mode,
+                "size_bytes": len(image_content),
+                "original_format": "SVG" if is_svg else image.format
+            }
+        except Exception as e:
+            logger.error(f"Failed to open image with PIL: {e}")
+            # Fallback metadata for problematic images
+            metadata = {
+                "width": 0,
+                "height": 0,
+                "format": "SVG" if is_svg else "Unknown",
+                "mode": "Unknown",
+                "size_bytes": len(image_content),
+                "error": str(e)
+            }
         
         analysis_result = {
             "metadata": metadata,
@@ -249,3 +270,101 @@ class VisionAnalysisService:
         """Detect objects in image"""
         result = await self.analyze_image(image_content, ["OBJECTS"])
         return result.get("objects", [])
+    
+    def _is_svg_content(self, content: bytes) -> bool:
+        """Check if content is SVG by looking for SVG elements"""
+        try:
+            # Decode bytes to string for XML parsing
+            content_str = content.decode('utf-8', errors='ignore')
+            
+            # Check for SVG root element
+            if '<svg' in content_str.lower() or content_str.strip().startswith('<?xml'):
+                try:
+                    # Try to parse as XML to confirm it's valid SVG
+                    root = ET.fromstring(content_str)
+                    return root.tag.lower().endswith('svg') or 'svg' in root.tag.lower()
+                except ET.ParseError:
+                    # If XML parsing fails, check for SVG string presence
+                    return '<svg' in content_str.lower()
+            return False
+        except Exception:
+            return False
+    
+    def _convert_svg_to_png(self, svg_content: bytes) -> bytes:
+        """Convert SVG content to PNG bytes using cairosvg"""
+        try:
+            # Try to import cairosvg for SVG conversion
+            try:
+                import cairosvg
+                png_bytes = cairosvg.svg2png(bytestring=svg_content)
+                logger.info("Successfully converted SVG to PNG using cairosvg")
+                return png_bytes
+            except ImportError:
+                logger.warning("cairosvg not available, falling back to PIL conversion attempt")
+                # Fallback: Create a simple text-based representation
+                return self._create_svg_fallback_image(svg_content)
+                
+        except Exception as e:
+            logger.error(f"Failed to convert SVG to PNG: {e}")
+            # Create a fallback image that indicates SVG content
+            return self._create_svg_fallback_image(svg_content)
+    
+    def _create_svg_fallback_image(self, svg_content: bytes) -> bytes:
+        """Create a fallback PNG image for SVG files that can't be converted"""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            # Create a simple image indicating SVG content
+            width, height = 400, 300
+            img = Image.new('RGB', (width, height), color='white')
+            draw = ImageDraw.Draw(img)
+            
+            # Draw text indicating this is an SVG file
+            try:
+                # Try to use a default font
+                font = ImageFont.load_default()
+            except:
+                font = None
+            
+            text_lines = [
+                "SVG File",
+                "Vector Graphics Content",
+                f"Size: {len(svg_content)} bytes"
+            ]
+            
+            y_offset = height // 2 - 30
+            for line in text_lines:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                text_width = bbox[2] - bbox[0]
+                x_offset = (width - text_width) // 2
+                draw.text((x_offset, y_offset), line, fill='black', font=font)
+                y_offset += 25
+            
+            # Save to bytes
+            output = BytesIO()
+            img.save(output, format='PNG')
+            output.seek(0)
+            
+            logger.info("Created fallback PNG image for SVG content")
+            return output.getvalue()
+            
+        except Exception as e:
+            logger.error(f"Failed to create SVG fallback image: {e}")
+            # Final fallback: create a minimal 1x1 PNG
+            return self._create_minimal_png()
+    
+    def _create_minimal_png(self) -> bytes:
+        """Create a minimal 1x1 white PNG as ultimate fallback"""
+        try:
+            from PIL import Image
+            img = Image.new('RGB', (1, 1), color='white')
+            output = BytesIO()
+            img.save(output, format='PNG')
+            output.seek(0)
+            logger.info("Created minimal 1x1 PNG as final fallback")
+            return output.getvalue()
+        except Exception as e:
+            logger.error(f"Failed to create minimal PNG: {e}")
+            # Return a hardcoded minimal PNG if all else fails
+            # This is a 1x1 white PNG encoded in bytes
+            return b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82'

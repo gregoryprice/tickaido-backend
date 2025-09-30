@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.usage import UsageLimits
 from pydantic_ai.messages import ModelMessage
+from pydantic_ai.exceptions import UsageLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.ai_agent import Agent as AgentModel
 from app.schemas.ai_response import ChatResponse, AgentContext
@@ -46,14 +47,14 @@ class DynamicAgentFactory:
         """
         try:
             # Check cache first - include principal status in cache key
-            cache_key = None
-            if principal:
-                cache_key = principal.get_cache_hash()
+            # cache_key = None
+            # if principal:
+            #     cache_key = principal.get_cache_hash()
 
-            if cache_key in self._agent_cache:
-                auth_status = "authenticated" if principal else "non-authenticated"
-                logger.debug(f"Using cached {auth_status} agent for {agent_model.id}")
-                return self._agent_cache[cache_key]
+            # if cache_key in self._agent_cache:
+            #     auth_status = "authenticated" if principal else "non-authenticated"
+            #     logger.debug(f"Using cached {auth_status} agent for {agent_model.id}")
+            #     return self._agent_cache[cache_key]
             
             if not agent_model.is_ready:
                 logger.error(f"Agent {agent_model.id} is not ready")
@@ -115,13 +116,15 @@ class DynamicAgentFactory:
             
             # Create Pydantic AI agent with Principal dependencies support
             # Follow official PydanticAI dependencies pattern: https://ai.pydantic.dev/dependencies/
+            # Use instructions instead of system_prompt as recommended: https://ai.pydantic.dev/agents/#instructions
             if toolsets:
                 pydantic_agent = PydanticAgent(
                     model=model_string,
                     deps_type=Principal,  # Define dependencies type
                     output_type=ChatResponse,
-                    system_prompt=agent_prompt,
-                    toolsets=toolsets
+                    instructions=agent_prompt,
+                    toolsets=toolsets,
+                    end_strategy="exhaustive"
                 )
                 logger.info(f"✅ Created Pydantic AI agent with FastMCP tools and Principal dependencies for {agent_model.id}")
             else:
@@ -129,12 +132,13 @@ class DynamicAgentFactory:
                     model=model_string,
                     deps_type=Principal,  # Define dependencies type
                     output_type=ChatResponse,
-                    system_prompt=agent_prompt
+                    instructions=agent_prompt,
+                    end_strategy="exhaustive"
                 )
                 logger.info(f"✅ Created Pydantic AI agent with Principal dependencies (no FastMCP tools) for {agent_model.id}")
             
             # Cache the agent
-            self._agent_cache[cache_key] = pydantic_agent
+            # self._agent_cache[cache_key] = pydantic_agent
             
             return pydantic_agent
             
@@ -486,6 +490,25 @@ class DynamicAgentFactory:
             
             return response
             
+        except UsageLimitExceeded as e:
+            # Handle tool count limit specifically
+            logger.error(f"❌ Tool usage limit exceeded: {e}")
+            
+            # Record failed usage
+            try:
+                await agent_service.record_agent_usage(
+                    agent_id=agent_model.id,
+                    success=False
+                )
+            except Exception as usage_error:
+                logger.warning(f"Failed to record failed agent usage: {usage_error}")
+            
+            return ChatResponse(
+                content="This request exceeded the tool usage limit. Please try with a more specific request or increase the limits of this agent.",
+                confidence=0.0,
+                requires_escalation=True,
+                tools_used=[]
+            )
         except Exception as e:
             # Enhanced error logging for TaskGroup and other async issues
             import traceback

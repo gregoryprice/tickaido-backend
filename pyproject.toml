@@ -66,6 +66,7 @@ openpyxl = "^3.1.2"  # Excel document parsing
 anthropic = "^0.52.0"  # Claude API client
 pytesseract = "^0.3.13"  # OCR text extraction from images
 pymupdf = "^1.26.4"
+cairosvg = "^2.8.2"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.0.0"

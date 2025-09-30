@@ -243,7 +243,7 @@ async def create_ticket(
     file_ids: str = ""
 ) -> str:
     """
-    Create a new support ticket.
+    Create a new bug or feature request ticket.
     
     Calls POST /api/v1/tickets with fields matching TicketCreateRequest, including
     attachments in the initial request payload.
@@ -336,7 +336,6 @@ async def create_ticket(
             # Log the actual request payload being sent
             logger.info(f"🔍 [TRACE] create_ticket request payload: {json.dumps(payload, indent=2)}")
             logger.info(f"🔍 [TRACE] create_ticket request URL: {API_BASE_URL}/api/v1/tickets/")
-            logger.info(f"🔍 [TRACE] create_ticket request headers: {api_headers}")
             
             # Create the ticket
             create_resp = await client.post(
@@ -556,40 +555,6 @@ async def get_ticket(
 
 
 @mcp.tool
-async def get_available_tools(ctx: Context) -> str:
-    """ List all available tools and their capabilities. 
-        Use when user asks 'what tools can you call?' 
-        or wants to know available functions. """
-    
-    logger.info(f"🔍 [TRACE] in get_available_tools: ")
-
-    try:
-        available_tools = {
-            "list_tickets": "List and retrieve your tickets with pagination",
-            "create_ticket": "Create a new support ticket",
-            "search_tickets": "Search for specific tickets by keywords or content",
-            "get_ticket": "Get details of a specific ticket by ID",
-            "get_system_health": "Check system and API health status"
-        }
-        
-        result = {
-            "available_tools": available_tools,
-            "total_tools": len(available_tools),
-            "message": "I can help you with ticket management using these tools"
-        }
-        
-        return json.dumps(result, indent=2)
-        
-    except Exception as e:
-        error_msg = f"Failed to list tools: {str(e)}"
-        logger.error(error_msg)
-        return json.dumps({
-            "error": "Failed to list available tools",
-            "message": str(e)
-        })
-
-
-@mcp.tool
 async def get_system_health(ctx: Context) -> str:
     """Get system health status with API call."""
     logger.info("Checking system health")
@@ -780,29 +745,9 @@ async def update_ticket(
         })
 
 
-@mcp.tool
-async def add(ctx: Context, a: int, b: int) -> int:
-    # Get the HTTP request
-    request = get_http_request()
-    headers = get_http_headers()
-
-    ctx: Context | None = get_context()
-    await ctx.debug("Starting analysis")
-    await ctx.info(f"Processing {a} + {b}") 
-    await ctx.warning("Deprecated parameter used")
-    await ctx.error("Processing failed")
-
-    token: AccessToken | None = get_access_token()
-    logger.info(f"🔍 [TRACE] request: {request}, headers: {headers}")
-    logger.info(f"🔍 [TRACE] token: {token}")
-    logger.info(f"🔍 [TRACE] ctx: {ctx}")
-    logger.info(f"🔍 [TRACE] in add: {a} + {b}")
-    return a + b
-
-
 # Log successful tool registration
-tool_count = len([f for f in globals().values() if callable(f) and hasattr(f, '__name__') and (f.__name__.startswith('get_') or f.__name__.endswith('_ticket') or f.__name__ in ['list_tickets', 'create_ticket', 'search_tickets', 'get_ticket'])])
-logger.info(f"✅ Registered {tool_count} FastMCP tools")
+# Available tools: list_tickets, create_ticket, search_tickets, get_ticket, update_ticket, get_system_health
+logger.info(f"✅ Registered 6 FastMCP tools")
 logger.info("✅ All tools use API-based calls (no direct database access)")
 logger.info("✅ Authentication context available to all tools")
 
