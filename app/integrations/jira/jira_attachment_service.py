@@ -5,11 +5,13 @@ Handles uploading ticket attachments to JIRA issues
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.file_service import FileService
+
 from .jira_integration import JiraIntegration
 
 logger = logging.getLogger(__name__)

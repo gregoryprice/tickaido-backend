@@ -4,14 +4,15 @@ Storage service for generic file management operations
 """
 
 import uuid
-from typing import Optional, Dict, Any
-from uuid import UUID
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, Optional
+from uuid import UUID
 
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile
 
 from app.config.settings import get_settings
+
 from .backend import StorageBackend
 
 

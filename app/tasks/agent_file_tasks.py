@@ -3,11 +3,11 @@
 Agent File Processing Tasks for asynchronous file content extraction
 """
 
-import logging
 import asyncio
-from typing import Dict, Any
-from uuid import UUID
+import logging
 from datetime import datetime, timezone
+from typing import Any, Dict
+from uuid import UUID
 
 from app.celery_app import celery_app
 from app.services.agent_file_service import agent_file_service

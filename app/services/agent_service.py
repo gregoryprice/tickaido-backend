@@ -4,16 +4,17 @@ Agent Service for managing organization-scoped multi-agent system
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
-from app.models.ai_agent import Agent
-from app.services.ai_config_service import ai_config_service
-from app.services.agent_history_service import agent_history_service
 from app.database import get_async_db_session
+from app.models.ai_agent import Agent
+from app.services.agent_history_service import agent_history_service
+from app.services.ai_config_service import ai_config_service
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class AgentService:
                 stmt = select(Agent).where(
                     and_(
                         Agent.id == agent_id,
-                        Agent.is_deleted == False
+                        Agent.deleted_at.is_(None)
                     )
                 ).options(selectinload(Agent.organization))
                 
@@ -96,7 +97,7 @@ class AgentService:
                 conditions = [
                     Agent.organization_id == organization_id,
                     Agent.organization_id.is_not(None),  # Explicitly exclude system agents
-                    Agent.is_deleted == False
+                    Agent.deleted_at.is_(None)
                 ]
                 
                 if agent_type:
@@ -620,7 +621,7 @@ class AgentService:
                     Agent.agent_type == "title_generation",
                     Agent.is_active.is_(True),
                     Agent.organization_id.is_(None),  # System agent has no organization
-                    Agent.is_deleted == False
+                    Agent.deleted_at.is_(None)
                 )
                 
                 result = await session.execute(stmt)

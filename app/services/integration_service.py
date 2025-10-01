@@ -3,33 +3,33 @@
 Integration Service - Business logic for third-party integrations
 """
 
-import httpx
 import time
-from typing import List, Optional, Dict, Any, Tuple
-from uuid import UUID
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
 
+import httpx
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
+from app.config.settings import get_settings
+from app.integrations.base.integration_interface import IntegrationInterface
+from app.integrations.jira import JiraIntegration
 from app.models.integration import Integration, IntegrationStatus
 from app.models.user import User
 from app.schemas.integration import (
     IntegrationCreateRequest,
-    IntegrationUpdateRequest,
-    IntegrationTestRequest,
-    IntegrationSyncRequest,
-    IntegrationTestResponse,
-    IntegrationSyncResponse,
-    IntegrationStatusUpdateRequest,
     IntegrationSearchParams,
-    IntegrationSortParams
+    IntegrationSortParams,
+    IntegrationStatusUpdateRequest,
+    IntegrationSyncRequest,
+    IntegrationSyncResponse,
+    IntegrationTestRequest,
+    IntegrationTestResponse,
+    IntegrationUpdateRequest,
 )
-from app.config.settings import get_settings
 from app.utils.http_debug_logger import log_http_request_response_pair
-from app.integrations.base.integration_interface import IntegrationInterface
-from app.integrations.jira import JiraIntegration
 
 
 class IntegrationService:
@@ -142,7 +142,7 @@ class IntegrationService:
         query = select(Integration).where(
             and_(
                 Integration.id == integration_id,
-                Integration.is_deleted == False,
+                Integration.deleted_at.is_(None),
                 Integration.organization_id == user.organization_id
             )
         )
@@ -190,7 +190,7 @@ class IntegrationService:
         
         # Base query with organization filtering
         base_filter = and_(
-            Integration.is_deleted == False,
+            Integration.deleted_at.is_(None),
             Integration.organization_id == user.organization_id
         )
         
@@ -623,8 +623,8 @@ class IntegrationService:
         """Get required configuration fields for platform"""
         field_map = {
             "salesforce": ["client_id", "client_secret", "instance_url"],
-            # JIRA relies on top-level base_url and credentials containing email/api_token
-            "jira": ["email", "api_token"],
+            # JIRA uses credentials section for email/api_token, configuration for settings
+            "jira": [],  # Email and api_token are in credentials, not configuration
             "servicenow": ["instance_url", "username", "password"],
             "zendesk": ["subdomain", "email", "api_token"],
             "github": ["token", "organization"],

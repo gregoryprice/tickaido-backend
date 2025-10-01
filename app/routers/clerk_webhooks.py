@@ -3,20 +3,21 @@
 Clerk webhook handlers for real-time user and organization synchronization
 """
 
-import logging
-import hmac
 import hashlib
+import hmac
+import logging
 from datetime import datetime, timezone
-from typing import Dict, Any
-from fastapi import APIRouter, Request, HTTPException, status, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from typing import Any, Dict
 
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config.settings import get_settings
 from app.database import get_db_session
-from app.models.user import User
 from app.models.organization import Organization
 from app.models.organization_invitation import OrganizationRole
-from app.config.settings import get_settings
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks/clerk", tags=["Clerk Webhooks"])

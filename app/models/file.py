@@ -6,7 +6,19 @@ File model for attachment management and AI processing
 import enum
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, ForeignKey, Integer, BigInteger
+
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 

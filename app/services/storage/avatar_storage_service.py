@@ -3,17 +3,17 @@
 Avatar Storage Service - Handles avatar-specific storage operations with thumbnail generation
 """
 
-import uuid
-from typing import Optional, Dict, Any
-from uuid import UUID
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from datetime import datetime
+from typing import Dict, Optional
+from uuid import UUID
 
+from fastapi import HTTPException, UploadFile
 from PIL import Image, ImageOps
-from fastapi import UploadFile, HTTPException
 
 from app.config.settings import get_settings
+
 from .backend import StorageBackend
 
 

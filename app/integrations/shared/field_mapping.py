@@ -4,8 +4,8 @@ Common Field Mapping Utilities
 Shared utilities for mapping internal fields to external integration fields
 """
 
-from typing import Dict, Any, Optional, List
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class FieldMappingError(Exception):

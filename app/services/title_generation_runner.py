@@ -7,8 +7,8 @@ Integrates with the multi-agent system to provide system-wide title generation a
 """
 
 import logging
-from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 try:
     from pydantic_ai import Agent as PydanticAgent

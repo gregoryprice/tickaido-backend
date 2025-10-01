@@ -4,7 +4,8 @@ Clerk Organizations API integration service
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
 from app.services.clerk_service import clerk_service
 
 logger = logging.getLogger(__name__)

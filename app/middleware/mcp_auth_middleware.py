@@ -7,8 +7,9 @@ ensuring tokens are suitable for tool-based operations with enhanced security.
 """
 
 import logging
-from typing import Optional
 from datetime import datetime, timezone
+from typing import Optional
+
 from app.services.auth_provider import decode_jwt_token
 
 logger = logging.getLogger(__name__)

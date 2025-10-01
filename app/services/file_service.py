@@ -3,30 +3,29 @@
 File Service - Business logic for file management, processing, and analysis using unified storage
 """
 
-import os
-import uuid
 import logging
-from typing import List, Optional, Dict, Any, Tuple
-from uuid import UUID
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
 
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
+from app.config.settings import get_settings
 from app.models.file import File, FileStatus, FileType
 from app.schemas.file import (
-    FileUploadRequest,
-    FileUpdateRequest,
-    FileProcessingRequest,
     FileAnalysisRequest,
-    FileProcessingResponse,
     FileAnalysisResponse,
+    FileProcessingRequest,
+    FileProcessingResponse,
     FileSearchParams,
-    FileSortParams
+    FileSortParams,
+    FileUpdateRequest,
+    FileUploadRequest,
 )
-from app.config.settings import get_settings
 from app.services.storage.factory import get_storage_service
 
 logger = logging.getLogger(__name__)
@@ -145,7 +144,7 @@ class FileService:
             File record if found
         """
         query = select(File).where(
-            and_(File.id == file_id, File.is_deleted == False)
+            and_(File.id == file_id, File.deleted_at.is_(None))
         )
         
         if include_content:
@@ -183,8 +182,8 @@ class FileService:
             Tuple of (files list, total count)
         """
         # Base query
-        query = select(File).where(File.is_deleted == False)
-        count_query = select(func.count(File.id)).where(File.is_deleted == False)
+        query = select(File).where(File.deleted_at.is_(None))
+        count_query = select(func.count(File.id)).where(File.deleted_at.is_(None))
         
         # Apply filters
         filters = []
@@ -746,8 +745,7 @@ class FileService:
                     # File was never processed or failed, set to UPLOADED for processing
                     existing_file.status = FileStatus.UPLOADED
                 
-                existing_file.is_deleted = False
-                existing_file.deleted_at = None
+                existing_file.restore()
                 existing_file.updated_at = datetime.now(timezone.utc)
                 
                 await db.commit()
@@ -815,7 +813,7 @@ class FileService:
         query = select(File).where(
             and_(
                 File.organization_id == organization_id,
-                File.is_deleted == False,
+                File.deleted_at.is_(None),
                 File.uploaded_by_id == user_id  # Phase 1: Only user's own files
             )
         )

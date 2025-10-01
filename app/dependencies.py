@@ -4,15 +4,16 @@ FastAPI dependency injection functions
 """
 
 import logging
-from typing import Optional, Generator
-from fastapi import Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Generator, Optional
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
 
-from app.database import get_db_session, SessionLocal
 from app.config.settings import get_settings
+from app.database import SessionLocal, get_db_session
 from app.models import User  # Will be created later
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ async def get_current_user(
         from sqlalchemy import select
         stmt = select(User).where(
             User.id == user_id,
-            User.is_deleted == False
+            User.deleted_at.is_(None)
         )
         
         result = await db.execute(stmt)
@@ -325,7 +326,7 @@ async def get_current_user_from_token(
         from sqlalchemy import select
         stmt = select(User).where(
             User.id == user_id,
-            User.is_deleted == False
+            User.deleted_at.is_(None)
         )
         
         result = await db.execute(stmt)

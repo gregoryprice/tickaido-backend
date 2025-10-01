@@ -3,35 +3,36 @@
 User Service - Business logic for user management, authentication, and permissions
 """
 
-import secrets
 import hashlib
-from typing import List, Optional, Dict, Any, Tuple
-from uuid import UUID
-from datetime import datetime, timezone, timedelta
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
-from sqlalchemy.orm import selectinload
+import secrets
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*crypt.*")
-from passlib.context import CryptContext
-from jose import JWTError, jwt
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
 
-from app.models.user import User, UserRole
-from app.models.ticket import Ticket
-from app.schemas.user import (
-    UserCreateRequest,
-    UserUpdateRequest,
-    UserPasswordChangeRequest,
-    UserAPIKeyRequest,
-    UserLoginRequest,
-    UserPrivateResponse,
-    UserLoginResponse,
-    UserAPIKeyResponse,
-    UserSearchParams,
-    UserSortParams
-)
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*crypt.*")
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
 from app.config.settings import get_settings
+from app.models.ticket import Ticket
+from app.models.user import User, UserRole
+from app.schemas.user import (
+    UserAPIKeyRequest,
+    UserAPIKeyResponse,
+    UserCreateRequest,
+    UserLoginRequest,
+    UserLoginResponse,
+    UserPasswordChangeRequest,
+    UserPrivateResponse,
+    UserSearchParams,
+    UserSortParams,
+    UserUpdateRequest,
+)
 
 
 class UserService:
@@ -137,7 +138,7 @@ class UserService:
             User record if found
         """
         query = select(User).where(
-            and_(User.id == user_id, User.is_deleted == False)
+            and_(User.id == user_id, User.deleted_at.is_(None))
         )
         
         if include_stats:
@@ -162,7 +163,7 @@ class UserService:
             User record if found
         """
         query = select(User).where(
-            and_(User.email == email, User.is_deleted == False)
+            and_(User.email == email, User.deleted_at.is_(None))
         )
         result = await db.execute(query)
         return result.scalar_one_or_none()
@@ -191,8 +192,8 @@ class UserService:
             Tuple of (users list, total count)
         """
         # Base query
-        query = select(User).where(User.is_deleted == False)
-        count_query = select(func.count(User.id)).where(User.is_deleted == False)
+        query = select(User).where(User.deleted_at.is_(None))
+        count_query = select(func.count(User.id)).where(User.deleted_at.is_(None))
         
         # Apply filters
         filters = []
@@ -554,7 +555,7 @@ class UserService:
         ticket_query = select(func.count(Ticket.id)).where(
             and_(
                 Ticket.created_by == user_id,
-                Ticket.is_deleted == False
+                Ticket.deleted_at.is_(None)
             )
         )
         total_tickets = await db.execute(ticket_query)

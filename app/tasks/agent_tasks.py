@@ -3,16 +3,16 @@
 Agent Processing Tasks for autonomous multi-channel agent operations
 """
 
-import logging
 import asyncio
-from typing import Dict, Any, List
-from uuid import UUID
+import logging
 from datetime import datetime, timezone
+from typing import Any, Dict, List
+from uuid import UUID
 
 from app.celery_app import celery_app
-from app.services.agent_task_service import agent_task_service
-from app.services.agent_service import agent_service
 from app.services.agent_file_service import agent_file_service
+from app.services.agent_service import agent_service
+from app.services.agent_task_service import agent_task_service
 
 logger = logging.getLogger(__name__)
 
@@ -423,8 +423,8 @@ async def record_agent_action(
     """
     try:
         # Import here to avoid circular imports
-        from app.models.agent_action import AgentAction
         from app.database import get_async_db_session
+        from app.models.agent_action import AgentAction
         
         async with get_async_db_session() as session:
             action = AgentAction(

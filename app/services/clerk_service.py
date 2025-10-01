@@ -3,9 +3,10 @@
 Clerk integration service for user authentication and management
 """
 
-import os
 import logging
-from typing import Optional, Dict, Any, List
+import os
+from typing import Any, Dict, List, Optional
+
 from clerk_backend_api import Clerk
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class ClerkService:
     
     async def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Verify Clerk session token and return user data"""
-        logger.debug(f"Attempting to verify Clerk token")
+        logger.debug("Attempting to verify Clerk token")
         
         if not self.client:
             logger.error("Clerk client not initialized - missing CLERK_SECRET_KEY")
@@ -97,7 +98,7 @@ class ClerkService:
             # Get user data from the user_id
             logger.debug(f"Getting user data for user_id: {user_id}")
             user = self.client.users.get(user_id=user_id)
-            logger.debug(f"Successfully retrieved user data from Clerk API")
+            logger.debug("Successfully retrieved user data from Clerk API")
             
             formatted_user = self._format_user_data(user, org_info)
             logger.debug(f"Formatted user data: {formatted_user}")
@@ -116,7 +117,7 @@ class ClerkService:
             return None
             
         try:
-            user = self.client.users.get(user_id)
+            user = self.client.users.get(user_id=user_id)
             return self._format_user_data(user)
         except Exception as e:
             logger.error(f"Failed to get user {user_id}: {e}")

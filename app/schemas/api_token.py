@@ -4,11 +4,12 @@ API Token schemas for request validation and response serialization
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
+
 from pydantic import Field, field_validator
 
-from app.schemas.base import BaseSchema, BaseResponse
+from app.schemas.base import BaseSchema
 
 
 class APITokenGenerationRequest(BaseSchema):

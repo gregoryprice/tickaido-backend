@@ -5,8 +5,8 @@ AIService - LLM-based content analysis using the existing ai_config.yaml configu
 
 import json
 import logging
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from app.config.settings import get_settings
 from app.services.ai_config_service import AIConfigService

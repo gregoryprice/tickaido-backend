@@ -4,8 +4,7 @@ Abstract storage backend interface
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, IO
-from pathlib import Path
+from typing import Any, Dict, Optional
 
 
 class StorageBackend(ABC):

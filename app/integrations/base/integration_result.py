@@ -4,7 +4,7 @@ Integration Result Classes
 Standardized result classes for integration operations
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 
 class IntegrationTestResult:

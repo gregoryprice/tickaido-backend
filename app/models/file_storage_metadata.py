@@ -3,10 +3,8 @@
 File Storage Metadata model for tracking files across storage backends
 """
 
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, BigInteger, JSON, Index, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import BigInteger, Column, ForeignKey, Index, String
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel

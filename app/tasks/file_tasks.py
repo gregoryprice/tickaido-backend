@@ -3,10 +3,11 @@
 Celery tasks for file processing, analysis, and management
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
+from celery.utils.log import get_task_logger
 
 from app.celery_app import celery_app
-from celery.utils.log import get_task_logger
 
 # Get logger
 logger = get_task_logger(__name__)
@@ -109,11 +110,13 @@ def _process_file_upload_sync(file_id: str, processing_options: Dict[str, Any] =
     """Process file upload using sync DB session but async FileProcessingService"""
     logger.info(f"_process_file_upload_sync starting for {file_id}")
     
-    from app.services.file_processing_service import FileProcessingService
+    from uuid import UUID
+
+    from sqlalchemy import and_, select
+
     from app.database import SessionLocal
     from app.models.file import File, FileStatus
-    from sqlalchemy import select, and_
-    from uuid import UUID
+    from app.services.file_processing_service import FileProcessingService
     
     # Use synchronous database session for Celery
     db = SessionLocal()
@@ -122,7 +125,7 @@ def _process_file_upload_sync(file_id: str, processing_options: Dict[str, Any] =
         # Get file record using sync query
         db_file = db.execute(
             select(File).where(
-                and_(File.id == UUID(file_id), File.is_deleted == False)
+                and_(File.id == UUID(file_id), File.deleted_at.is_(None))
             )
         ).scalar_one_or_none()
         
@@ -219,19 +222,19 @@ async def _process_file_using_service_methods(file_processing_service, db_file):
     logger.info(f"File processing - MIME: {db_file.mime_type}, is_text_file: {db_file.is_text_file}")
     
     if db_file.is_text_file or db_file.mime_type == "application/pdf":
-        logger.info(f"Using document processing path")
+        logger.info("Using document processing path")
         document_data = await file_processing_service._extract_document_content(db_file, file_content)
         extracted_context["document"] = document_data
         db_file.extraction_method = "document_parser"
     
     elif db_file.is_image_file:
-        logger.info(f"Using image processing path")
+        logger.info("Using image processing path")
         image_data = await file_processing_service._extract_image_content(db_file, file_content)
         extracted_context["image"] = image_data
         db_file.extraction_method = "vision_ocr"
     
     elif db_file.is_media_file:
-        logger.info(f"Using audio processing path")
+        logger.info("Using audio processing path")
         audio_data = await file_processing_service._extract_audio_content(db_file, file_content)
         extracted_context["audio"] = audio_data
         db_file.extraction_method = "speech_transcription"
@@ -255,9 +258,10 @@ async def _process_file_using_service_methods(file_processing_service, db_file):
 
 def _process_pending_files_sync() -> int:
     """Process all pending files using sync database session"""
+    from sqlalchemy import and_, select
+
     from app.database import SessionLocal
     from app.models.file import File, FileStatus
-    from sqlalchemy import select, and_
     
     db = SessionLocal()
     
@@ -266,7 +270,7 @@ def _process_pending_files_sync() -> int:
         query = select(File).where(
             and_(
                 File.status == FileStatus.UPLOADED,
-                File.is_deleted == False
+                File.deleted_at.is_(None)
             )
         )
         
@@ -298,10 +302,12 @@ def _process_pending_files_sync() -> int:
 
 def _cleanup_failed_uploads_sync(older_than_hours: int) -> int:
     """Clean up failed uploads using sync database session"""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import and_, select
+
     from app.database import SessionLocal
     from app.models.file import File, FileStatus
-    from sqlalchemy import select, and_
-    from datetime import datetime, timezone, timedelta
     
     db = SessionLocal()
     
@@ -313,7 +319,7 @@ def _cleanup_failed_uploads_sync(older_than_hours: int) -> int:
             and_(
                 File.status == FileStatus.FAILED,
                 File.created_at < cutoff_time,
-                File.is_deleted == False
+                File.deleted_at.is_(None)
             )
         )
         

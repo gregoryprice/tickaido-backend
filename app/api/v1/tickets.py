@@ -4,32 +4,72 @@ Ticket API endpoints
 """
 
 from uuid import UUID
-from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db_session
-from app.schemas.ticket import (
-    TicketCreateRequest,
-    TicketUpdateRequest,
-    TicketPatchRequest,
-    TicketDetailResponse,
-    TicketSearchParams,
-    TicketSortParams,
-    TicketAICreateRequest,
-    TicketAICreateResponse,
-    TicketStatsResponse
-)
-from app.schemas.base import PaginationParams, PaginatedResponse
-from app.services.ticket_service import ticket_service
-from app.services.ai_service import ai_service
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
+from app.schemas.base import PaginatedResponse, PaginationParams
+from app.schemas.comment import CommentCreate, CommentListResponse, CommentResponse, CommentUpdate
+from app.schemas.ticket import (
+    TicketAICreateRequest,
+    TicketAICreateResponse,
+    TicketCreateRequest,
+    TicketDetailResponse,
+    TicketPatchRequest,
+    TicketSearchParams,
+    TicketSortParams,
+    TicketStatsResponse,
+    TicketUpdateRequest,
+)
+from app.services.ai_service import ai_service
+from app.services.ticket_service import ticket_service
 
 router = APIRouter(prefix="/tickets")
 
 
 # Helper function removed - detailed file info should be fetched via GET /api/v1/files/{file_id}
+
+
+async def create_comment_author_from_user(user: User, db: AsyncSession) -> dict:
+    """Create CommentAuthor data from User model with Clerk integration"""
+    try:
+        # Try to get Clerk user data if available
+        if user.clerk_id:
+            from app.services.clerk_service import clerk_service
+            clerk_user_data = await clerk_service.get_user(user.clerk_id)
+            if clerk_user_data:
+                return {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": clerk_user_data.get("first_name"),
+                    "last_name": clerk_user_data.get("last_name"), 
+                    "full_name": clerk_user_data.get("full_name") or user.full_name,
+                    "image_url": clerk_user_data.get("image_url"),
+                    "has_image": bool(clerk_user_data.get("image_url")),
+                    "identifier": user.email,
+                    "username": None,
+                    "profile_image_url": clerk_user_data.get("image_url")
+                }
+    except Exception as e:
+        # If Clerk lookup fails, fall back to local user data
+        pass
+    
+    # Fall back to local user data
+    return {
+        "id": user.id,
+        "email": user.email,
+        "first_name": user.full_name.split()[0] if user.full_name and ' ' in user.full_name else user.full_name,
+        "last_name": user.full_name.split()[1] if user.full_name and ' ' in user.full_name else None,
+        "full_name": user.full_name,
+        "image_url": user.avatar_url,
+        "has_image": bool(user.avatar_url),
+        "identifier": user.email,
+        "username": None,
+        "profile_image_url": user.avatar_url
+    }
 
 
 @router.get("/", response_model=PaginatedResponse)
@@ -115,7 +155,7 @@ async def create_ticket(
                 try:
                     # attachment.file_id is already validated as UUID by Pydantic schema
                     pass
-                except (ValueError, AttributeError) as e:
+                except (ValueError, AttributeError):
                     raise HTTPException(status_code=400, detail="Invalid attachment format")
         
         # Check if integration is specified for external creation
@@ -453,4 +493,290 @@ async def get_ticket_attachments(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get ticket files: {str(e)}"
+        )
+
+
+# Comment Management Endpoints for Enhanced Jira Integration
+
+@router.post("/{ticket_id}/comments")
+async def create_comment(
+    ticket_id: UUID,
+    comment: "CommentCreate",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> "CommentResponse":
+    """
+    Create a new comment on a ticket.
+    Supports both plain text and ADF (Atlassian Document Format) content.
+    """
+    try:
+        from app.services.comment_service import comment_service
+        
+        # Get the ticket to inherit its integration_id
+        ticket = await ticket_service.get_ticket(
+            db=db,
+            ticket_id=ticket_id,
+            organization_id=current_user.organization_id
+        )
+        
+        if not ticket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found"
+            )
+        
+        # Create comment with current user as author and inherit ticket's integration_id
+        new_comment = await comment_service.create_comment(
+            db=db,
+            ticket_id=ticket_id,
+            author_email=current_user.email,
+            author_display_name=current_user.full_name or current_user.email,
+            body=comment.body,
+            is_internal=comment.is_internal,
+            integration_id=ticket.integration_id,  # Always inherit from ticket
+            user=current_user
+        )
+        
+        # Convert to response format
+        from app.schemas.comment import CommentResponse, CommentAuthor
+        author_data = await create_comment_author_from_user(current_user, db)
+        return CommentResponse(
+            id=new_comment.id,
+            ticket_id=new_comment.ticket_id,
+            author=CommentAuthor(**author_data),
+            body=new_comment.body,
+            body_html=new_comment.render_html(),
+            body_plain_text=new_comment.body_plain_text,
+            created_at=new_comment.created_at,
+            updated_at=new_comment.updated_at,
+            external_comment_id=new_comment.external_comment_id,
+            integration_id=new_comment.integration_id,
+            is_internal=new_comment.is_internal,
+            is_synchronized=new_comment.is_synchronized
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create comment: {str(e)}"
+        )
+
+
+@router.get("/{ticket_id}/comments")
+async def list_comments(
+    ticket_id: UUID,
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(10, ge=1, le=50, description="Items per page"),
+    include_internal: bool = Query(False, description="Include internal comments"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> "CommentListResponse":
+    """
+    List comments for a ticket with pagination.
+    Internal comments are only visible to authorized users.
+    """
+    try:
+        from app.services.comment_service import comment_service
+        
+        comments, total = await comment_service.list_comments(
+            db=db,
+            ticket_id=ticket_id,
+            page=page,
+            per_page=per_page,
+            include_internal=include_internal,
+            user=current_user
+        )
+        
+        # Convert to response format
+        from app.schemas.comment import CommentListResponse, CommentResponse, CommentAuthor
+        from sqlalchemy import select
+        comment_responses = []
+        
+        # Get unique author emails and fetch user data
+        author_emails = list(set(comment.author_email for comment in comments))
+        users_by_email = {}
+        
+        # Fetch user data for all authors in batch
+        if author_emails:
+            user_stmt = select(User).where(User.email.in_(author_emails))
+            user_result = await db.execute(user_stmt)
+            for user in user_result.scalars().all():
+                users_by_email[user.email] = user
+        
+        for comment in comments:
+            # Get author data
+            comment_user = users_by_email.get(comment.author_email)
+            if comment_user:
+                author_data = await create_comment_author_from_user(comment_user, db)
+            else:
+                # Fallback for comments by users not found in database
+                author_data = {
+                    "id": None,  # Will need to handle this case
+                    "email": comment.author_email,
+                    "first_name": comment.author_display_name.split()[0] if comment.author_display_name and ' ' in comment.author_display_name else comment.author_display_name,
+                    "last_name": comment.author_display_name.split()[1] if comment.author_display_name and ' ' in comment.author_display_name else None,
+                    "full_name": comment.author_display_name,
+                    "image_url": None,
+                    "has_image": False,
+                    "identifier": comment.author_email,
+                    "username": None,
+                    "profile_image_url": None
+                }
+            
+            comment_responses.append(CommentResponse(
+                id=comment.id,
+                ticket_id=comment.ticket_id,
+                author=CommentAuthor(**author_data),
+                body=comment.body,
+                body_html=comment.render_html(),
+                body_plain_text=comment.body_plain_text,
+                created_at=comment.created_at,
+                updated_at=comment.updated_at,
+                external_comment_id=comment.external_comment_id,
+                integration_id=comment.integration_id,
+                is_internal=comment.is_internal,
+                is_synchronized=comment.is_synchronized
+            ))
+        
+        return CommentListResponse(
+            comments=comment_responses,
+            total=total,
+            page=page,
+            per_page=per_page,
+            has_next=(page * per_page) < total,
+            has_prev=page > 1
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list comments: {str(e)}"
+        )
+
+
+@router.put("/{ticket_id}/comments/{comment_id}")
+async def update_comment(
+    ticket_id: UUID,
+    comment_id: UUID,
+    comment_update: "CommentUpdate",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> "CommentResponse":
+    """
+    Update an existing comment.
+    Users can only update their own comments unless they have admin privileges.
+    """
+    try:
+        from app.services.comment_service import comment_service
+        
+        updated_comment = await comment_service.update_comment(
+            db=db,
+            comment_id=comment_id,
+            body=comment_update.body,
+            is_internal=comment_update.is_internal,
+            user=current_user
+        )
+        
+        # Convert to response format
+        from app.schemas.comment import CommentResponse, CommentAuthor
+        from sqlalchemy import select
+        
+        # Get user data for the comment author
+        user_stmt = select(User).where(User.email == updated_comment.author_email)
+        user_result = await db.execute(user_stmt)
+        comment_user = user_result.scalar_one_or_none()
+        
+        if comment_user:
+            author_data = await create_comment_author_from_user(comment_user, db)
+        else:
+            # Fallback for comments by users not found in database
+            author_data = {
+                "id": None,
+                "email": updated_comment.author_email,
+                "first_name": updated_comment.author_display_name.split()[0] if updated_comment.author_display_name and ' ' in updated_comment.author_display_name else updated_comment.author_display_name,
+                "last_name": updated_comment.author_display_name.split()[1] if updated_comment.author_display_name and ' ' in updated_comment.author_display_name else None,
+                "full_name": updated_comment.author_display_name,
+                "image_url": None,
+                "has_image": False,
+                "identifier": updated_comment.author_email,
+                "username": None,
+                "profile_image_url": None
+            }
+        
+        return CommentResponse(
+            id=updated_comment.id,
+            ticket_id=updated_comment.ticket_id,
+            author=CommentAuthor(**author_data),
+            body=updated_comment.body,
+            body_html=updated_comment.render_html(),
+            body_plain_text=updated_comment.body_plain_text,
+            created_at=updated_comment.created_at,
+            updated_at=updated_comment.updated_at,
+            external_comment_id=updated_comment.external_comment_id,
+            integration_id=updated_comment.integration_id,
+            is_internal=updated_comment.is_internal,
+            is_synchronized=updated_comment.is_synchronized
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update comment: {str(e)}"
+        )
+
+
+@router.delete("/{ticket_id}/comments/{comment_id}")
+async def delete_comment(
+    ticket_id: UUID,
+    comment_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+) -> dict:
+    """
+    Delete a comment.
+    Users can only delete their own comments unless they have admin privileges.
+    """
+    try:
+        from app.services.comment_service import comment_service
+        
+        await comment_service.delete_comment(
+            db=db,
+            comment_id=comment_id,
+            user=current_user
+        )
+        
+        return {
+            "message": "Comment deleted successfully",
+            "comment_id": str(comment_id)
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete comment: {str(e)}"
         )

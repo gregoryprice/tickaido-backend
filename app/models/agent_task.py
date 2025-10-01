@@ -3,9 +3,10 @@
 Agent Task model for autonomous task processing and queue management
 """
 
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone, timedelta
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, DateTime, JSON, CheckConstraint
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
+
+from sqlalchemy import JSON, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 

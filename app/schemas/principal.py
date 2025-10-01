@@ -5,9 +5,10 @@ Principal schema for secure authentication and authorization
 
 import json
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SessionType(str, Enum):

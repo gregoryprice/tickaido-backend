@@ -4,12 +4,13 @@ Organization schemas for API validation and serialization
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any, List
-from uuid import UUID
-from pydantic import Field, field_validator
 from enum import Enum
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse, EmailStr
+from pydantic import Field, field_validator
+
+from app.schemas.base import BaseCreate, BaseResponse, BaseSchema, BaseUpdate, EmailStr
 
 
 class OrganizationSizeSchema(str, Enum):

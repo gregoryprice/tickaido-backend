@@ -5,28 +5,33 @@ Handles user registration, login, token refresh, and profile management
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
 from ..database import get_db_session
-from ..models.user import User
-from ..models.organization import Organization
-from ..models.organization_invitation import OrganizationRole
-from ..schemas.user import (
-    UserCreate, UserLogin, UserResponse, TokenResponse, RefreshTokenRequest, 
-    UserUpdate, EmailCheckRequest, EmailCheckResponse
-)
 from ..middleware.auth_middleware import (
-    auth_middleware, 
-    get_current_user, 
-    get_current_user_optional
+    auth_middleware,
+    get_current_user,
+    get_current_user_optional,
 )
 from ..middleware.rate_limiting import auth_rate_limit
+from ..models.organization import Organization
+from ..models.organization_invitation import OrganizationRole
+from ..models.user import User
+from ..schemas.user import (
+    EmailCheckRequest,
+    EmailCheckResponse,
+    RefreshTokenRequest,
+    TokenResponse,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +205,7 @@ async def register_user(
                 select(User).where(
                     User.organization_id == organization_id,
                     User.organization_role.is_not(None),  # Only count users with actual organization roles
-                    User.is_deleted == False
+                    User.deleted_at.is_(None)
                 )
             )
             existing_members = existing_members_result.scalars().all()
@@ -265,8 +270,9 @@ async def generate_api_key_for_testing(
             )
         
         # Check for existing active API tokens
-        from app.models.api_token import APIToken
         from sqlalchemy import func
+
+        from app.models.api_token import APIToken
         
         existing_count = await db.scalar(
             select(func.count(APIToken.id)).where(
@@ -285,8 +291,8 @@ async def generate_api_key_for_testing(
             )
         
         # Generate secure token  
-        import secrets
         import hashlib
+        import secrets
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         

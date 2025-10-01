@@ -8,13 +8,15 @@ to dynamically list available tools for agent configuration.
 
 import logging
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db_session
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
 from app.schemas.tools import ToolListResponse
 from app.services.mcp_tool_service import mcp_tool_service
-from app.database import get_db_session
 
 logger = logging.getLogger(__name__)
 

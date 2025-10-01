@@ -8,10 +8,11 @@ with retry mechanisms and error handling.
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from app.schemas.principal import Principal
+
 from app.middleware.auth_middleware import clerk_auth
+from app.schemas.principal import Principal
 from app.services.clerk_service import clerk_service
 
 logger = logging.getLogger(__name__)

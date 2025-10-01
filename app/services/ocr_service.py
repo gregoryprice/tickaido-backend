@@ -5,10 +5,11 @@ Uses Tesseract (free, local) with Google Vision API fallback.
 """
 
 import logging
-from typing import Dict, Any
-from PIL import Image
-from io import BytesIO
 import xml.etree.ElementTree as ET
+from io import BytesIO
+from typing import Any, Dict
+
+from PIL import Image
 
 try:
     import pytesseract

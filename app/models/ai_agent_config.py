@@ -5,8 +5,10 @@ AI Agent Configuration model for dynamic AI system management
 
 import enum
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, Integer, ForeignKey
+from typing import Any, Dict, Optional
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 

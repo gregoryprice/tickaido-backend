@@ -4,10 +4,10 @@ API Token model for organization-scoped programmatic access
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, JSON, ForeignKey, UniqueConstraint
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from uuid import uuid4
 
 from app.models.base import BaseModel
 

@@ -4,17 +4,16 @@ AI service for AI-powered operations
 """
 
 import logging
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.agents.categorization_agent import CategorizationContext, categorization_agent
 
 # Legacy import - now using organization-scoped agents
 from app.schemas.ai_response import CustomerSupportContext
-from app.agents.categorization_agent import (
-    categorization_agent,
-    CategorizationContext
-)
 from app.services.ticket_service import ticket_service
 
 logger = logging.getLogger(__name__)

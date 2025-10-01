@@ -4,12 +4,14 @@ Storage backend factory and service creation
 """
 
 from typing import Optional
+
 from app.config.settings import get_settings
+
+from .avatar_storage_service import AvatarStorageService
 from .backend import StorageBackend
 from .local_backend import LocalStorageBackend
 from .s3_backend import S3StorageBackend
 from .storage_service import StorageService
-from .avatar_storage_service import AvatarStorageService
 
 
 def create_storage_backend(

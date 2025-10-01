@@ -5,8 +5,8 @@ Uses Celery's built-in inspection and control features
 """
 
 import logging
-from typing import List, Dict, Any, Optional
-from celery import current_app
+from typing import Any, Dict, List
+
 from app.celery_app import celery_app
 
 logger = logging.getLogger(__name__)

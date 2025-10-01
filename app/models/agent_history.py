@@ -3,12 +3,13 @@
 Agent History model for tracking configuration changes and agent lifecycle events
 """
 
-from typing import Optional, Any, List
+import json
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func
+from typing import Any, List, Optional
+
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import json
 
 from app.models.base import BaseModel
 

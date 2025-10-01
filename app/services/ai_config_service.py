@@ -8,9 +8,10 @@ model parameters, and runtime configuration updates.
 
 import logging
 import os
-import yaml
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import yaml
 from pydantic import BaseModel, Field
 
 from app.config.settings import get_settings
@@ -67,7 +68,7 @@ class AIConfigService:
                 
                 logger.info(f"Loading AI configuration from {self.config_file_path}")
                 
-                with open(self.config_file_path, 'r') as file:
+                with open(self.config_file_path) as file:
                     config_content = file.read()
                     
                     # Substitute environment variables

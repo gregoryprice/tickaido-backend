@@ -6,18 +6,20 @@ This factory replaces the hardcoded CustomerSupportAgent by creating Pydantic AI
 agents dynamically based on Agent model configuration, with direct MCP integration.
 """
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
 from pydantic_ai import Agent as PydanticAgent
-from pydantic_ai.usage import UsageLimits
-from pydantic_ai.messages import ModelMessage
 from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.messages import ModelMessage
+from pydantic_ai.usage import UsageLimits
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config.settings import get_settings
 from app.models.ai_agent import Agent as AgentModel
-from app.schemas.ai_response import ChatResponse, AgentContext
-from mcp_client.client import mcp_client
+from app.schemas.ai_response import AgentContext, ChatResponse
 from app.schemas.principal import Principal
 from app.services.agent_service import agent_service
-from app.config.settings import get_settings
+from mcp_client.client import mcp_client
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +344,7 @@ class DynamicAgentFactory:
             # Temporarily disable memory context to test FastMCP integration
             if False and thread_id and agent_model.use_memory_context:
                 try:
-                    from app.services.ai_chat_service import ai_chat_service, MessageFormat
+                    from app.services.ai_chat_service import MessageFormat, ai_chat_service
                     
                     # Get user info from context if available
                     user_id = context.user_metadata.get('user_id', 'system')

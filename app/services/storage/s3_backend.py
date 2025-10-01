@@ -3,13 +3,15 @@
 AWS S3 storage backend implementation
 """
 
-import boto3
-from botocore.exceptions import ClientError, NoCredentialsError
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 from urllib.parse import quote
 
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
+
 from app.config.settings import get_settings
+
 from .backend import StorageBackend
 
 
@@ -160,7 +162,7 @@ class S3StorageBackend(StorageBackend):
             )
             return True
             
-        except ClientError as e:
+        except ClientError:
             # S3 delete returns success even if object doesn't exist
             return False
     

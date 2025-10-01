@@ -4,9 +4,11 @@ Organization Invitation model for managing member invitations
 """
 
 import enum
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from sqlalchemy import Column, String, DateTime, ForeignKey, Enum as SQLEnum
+
+from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 

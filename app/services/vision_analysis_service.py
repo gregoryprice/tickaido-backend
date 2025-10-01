@@ -6,10 +6,11 @@ VisionAnalysisService - Analyze images using computer vision and AI models
 import base64
 import logging
 import re
-from typing import Dict, Any, List
-from PIL import Image
-from io import BytesIO
 import xml.etree.ElementTree as ET
+from io import BytesIO
+from typing import Any, Dict, List
+
+from PIL import Image
 
 from app.config.settings import get_settings
 from app.services.ai_config_service import AIConfigService

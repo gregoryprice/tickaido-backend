@@ -7,13 +7,14 @@ with high accuracy and consistency.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
-from app.services.ai_config_service import ai_config_service
 from app.agents.prompts import format_categorization_prompt
+from app.services.ai_config_service import ai_config_service
 from mcp_client.client import mcp_client
 
 logger = logging.getLogger(__name__)

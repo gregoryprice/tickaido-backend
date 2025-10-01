@@ -4,27 +4,23 @@ Organization Discovery API endpoints - Public endpoints for organization discove
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from uuid import UUID
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Request
 
 from app.database import get_db_session
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
-from app.services.organization_discovery_service import OrganizationDiscoveryService
 from app.schemas.member_management import (
-    OrganizationDiscoveryResponse,
-    OrganizationDirectoryParams,
-    OrganizationDirectoryResponse,
-    RegistrationOptionsRequest,
-    RegistrationOptionsResponse,
     DomainCheckRequest,
     DomainCheckResponse,
-    MemberManagementError
+    OrganizationDirectoryResponse,
+    OrganizationDiscoveryResponse,
+    RegistrationOptionsRequest,
+    RegistrationOptionsResponse,
 )
+from app.services.organization_discovery_service import OrganizationDiscoveryService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations")

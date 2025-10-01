@@ -3,19 +3,20 @@
 Agent-Aware Chat WebSocket endpoints for real-time thread messaging
 """
 
+import asyncio
 import json
 import logging
-from typing import Dict, Any, Optional, List
-from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-import asyncio
 
 from app.database import get_db_session
-from app.services.thread_service import thread_service
-from app.services.ai_chat_service import ai_chat_service
 from app.dependencies import get_current_user_from_token
+from app.services.ai_chat_service import ai_chat_service
+from app.services.thread_service import thread_service
 
 logger = logging.getLogger(__name__)
 
@@ -384,6 +385,7 @@ async def handle_get_agent_status(
     try:
         # Get agent information
         from sqlalchemy import select
+
         from app.models.ai_agent import Agent
         
         agent_query = select(Agent).where(Agent.id == agent_id)

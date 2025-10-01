@@ -5,17 +5,18 @@ Coordinates DocumentParserService, OCRService, TranscriptionService, VisionAnaly
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.file import File, FileStatus
 from app.schemas.file import FileProcessingStatusResponse
+from app.services.ai_analysis_service import AIAnalysisService
 from app.services.document_parser_service import DocumentParserService
+from app.services.file_service import FileService
 from app.services.ocr_service import OCRService
 from app.services.transcription_service import TranscriptionService
 from app.services.vision_analysis_service import VisionAnalysisService
-from app.services.ai_analysis_service import AIAnalysisService
-from app.services.file_service import FileService
 
 logger = logging.getLogger(__name__)
 
@@ -59,19 +60,19 @@ class FileProcessingService:
             logger.debug(f"DEBUG: File processing - MIME: {file_obj.mime_type}, is_text_file: {file_obj.is_text_file}")
             
             if file_obj.is_text_file or file_obj.mime_type == "application/pdf":
-                logger.info(f"DEBUG: Using document processing path")
+                logger.info("DEBUG: Using document processing path")
                 document_data = await self._extract_document_content(file_obj, file_content)
                 extracted_context["document"] = document_data
                 file_obj.extraction_method = "document_parser"
             
             elif file_obj.is_image_file:
-                logger.info(f"DEBUG: Using image processing path")
+                logger.info("DEBUG: Using image processing path")
                 image_data = await self._extract_image_content(file_obj, file_content)
                 extracted_context["image"] = image_data
                 file_obj.extraction_method = "vision_ocr"
             
             elif file_obj.is_media_file:
-                logger.info(f"DEBUG: Using audio processing path")
+                logger.info("DEBUG: Using audio processing path")
                 audio_data = await self._extract_audio_content(file_obj, file_content)
                 extracted_context["audio"] = audio_data
                 file_obj.extraction_method = "speech_transcription"
@@ -109,7 +110,7 @@ class FileProcessingService:
         logger.debug(f"DEBUG: _extract_document_content called with MIME: {file_obj.mime_type}")
         
         if file_obj.mime_type == "application/pdf":
-            logger.debug(f"DEBUG: Calling document_parser.analyze_document for PDF")
+            logger.debug("DEBUG: Calling document_parser.analyze_document for PDF")
             # Use document parser with structure detection
             result = await self.document_parser.analyze_document(
                 file_content,
@@ -187,7 +188,7 @@ class FileProcessingService:
         
         logger.info(f"DEBUG: _extract_image_content called with MIME: {file_obj.mime_type}")
         
-        logger.info(f"DEBUG: Calling vision_service.analyze_image")
+        logger.info("DEBUG: Calling vision_service.analyze_image")
         # Vision analysis
         vision_result = await self.vision_service.analyze_image(
             file_content,
@@ -195,7 +196,7 @@ class FileProcessingService:
         )
         logger.info(f"DEBUG: Vision analysis result: {vision_result}")
         
-        logger.info(f"DEBUG: Calling ocr_service.extract_text_with_regions")
+        logger.info("DEBUG: Calling ocr_service.extract_text_with_regions")
         # OCR extraction
         ocr_result = await self.ocr_service.extract_text_with_regions(file_content)
         

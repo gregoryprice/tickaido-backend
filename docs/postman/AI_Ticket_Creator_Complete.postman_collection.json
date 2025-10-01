@@ -2316,6 +2316,126 @@
 							"body": "{\n  \"id\": \"tick_12345678-1234-1234-1234-123456789012\",\n  \"title\": \"Database Performance Issue with Supporting Documentation\",\n  \"description\": \"Critical database performance degradation affecting multiple services...\",\n  \"category\": \"technical\",\n  \"priority\": \"critical\",\n  \"status\": \"new\",\n  \"attachments\": [\n    {\"file_id\": \"12345678-1234-1234-1234-123456789012\"},\n    {\"file_id\": \"87654321-4321-4321-4321-210987654321\"},\n    {\"file_id\": \"11111111-2222-3333-4444-555555555555\"},\n    {\"file_id\": \"66666666-7777-8888-9999-000000000000\"}\n  ],\n  \"files\": [],\n  \"ai_analysis\": {\n    \"confidence_score\": 0.95,\n    \"reasoning\": \"High confidence classification based on keywords in description and file content analysis\",\n    \"tags\": [\"database\", \"performance\", \"critical\", \"infrastructure\"],\n    \"business_impact\": \"critical\"\n  },\n  \"created_by\": {\n    \"id\": \"{{USER_ID}}\",\n    \"email\": \"user@example.com\",\n    \"display_name\": \"John Doe\"\n  },\n  \"created_at\": \"2024-01-15T12:00:00Z\",\n  \"updated_at\": \"2024-01-15T12:00:00Z\"\n}"
 						}
 					]
+				},
+				{
+					"name": "Create Comment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"body\": \"This is a **markdown** comment with [links](https://example.com) and `code`\",\n  \"is_internal\": false,\n  \"integration_id\": \"{{INTEGRATION_ID}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/{{TICKET_ID}}/comments",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "{{TICKET_ID}}", "comments"]
+						},
+						"description": "Create a new comment on a ticket with markdown support and optional integration sync"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('COMMENT_ID', response.id);",
+									"    console.log('Comment created:', response.body);",
+									"    console.log('Comment ID:', response.id);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "List Comments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/{{TICKET_ID}}/comments?page=1&per_page=10&include_internal=false",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "{{TICKET_ID}}", "comments"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "per_page",
+									"value": "10",
+									"description": "Items per page"
+								},
+								{
+									"key": "include_internal",
+									"value": "false",
+									"description": "Include internal comments"
+								}
+							]
+						},
+						"description": "List comments for a ticket with pagination and internal comment filtering"
+					}
+				},
+				{
+					"name": "Update Comment",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"body\": \"Updated **markdown** content\",\n  \"is_internal\": true\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/{{TICKET_ID}}/comments/{{COMMENT_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "{{TICKET_ID}}", "comments", "{{COMMENT_ID}}"]
+						},
+						"description": "Update an existing comment (users can only update their own comments)"
+					}
+				},
+				{
+					"name": "Delete Comment",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/tickets/{{TICKET_ID}}/comments/{{COMMENT_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "tickets", "{{TICKET_ID}}", "comments", "{{COMMENT_ID}}"]
+						},
+						"description": "Delete a comment (users can only delete their own comments)"
+					}
 				}
 			],
 			"description": "Comprehensive ticket management system with AI-powered creation and standardized attachment format [{'file_id':'uuid'}]. Supports flexible updates, detailed analytics, and cascade file deletion when tickets are removed."
@@ -3062,5 +3182,21 @@
 			}
 		}
 	],
-	"variable": []
+	"variable": [
+		{
+			"key": "TICKET_ID",
+			"value": "",
+			"description": "ID of a ticket for parameterized operations"
+		},
+		{
+			"key": "COMMENT_ID", 
+			"value": "",
+			"description": "ID of a comment for parameterized operations"
+		},
+		{
+			"key": "INTEGRATION_ID",
+			"value": "",
+			"description": "ID of an integration for synchronization"
+		}
+	]
 }
