@@ -1,18 +1,14 @@
-from typing import List, Dict, Any
 import json
+import logging
 from datetime import datetime, timezone
+from typing import List
+
 from pydantic import TypeAdapter
-from pydantic_ai.messages import (
-    ModelMessage, 
-    ModelRequest, 
-    ModelResponse,
-    UserPromptPart,
-    TextPart
-)
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.usage import Usage
 from pydantic_core import to_jsonable_python
+
 from app.models.chat import Message
-import logging
 
 logger = logging.getLogger(__name__)
 

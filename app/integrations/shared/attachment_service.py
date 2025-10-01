@@ -5,12 +5,13 @@ Common utilities for handling attachments across different integrations
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.file_service import FileService
 from app.models.file import File
+from app.services.file_service import FileService
 
 logger = logging.getLogger(__name__)
 

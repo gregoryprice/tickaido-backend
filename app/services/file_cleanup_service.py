@@ -4,13 +4,14 @@ File Cleanup Service for cascade deletion of attached files
 """
 
 import logging
-from typing import List, Set
+from typing import Set
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, delete
 
-from app.models.file import File, FileStatus
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.chat import Message
+from app.models.file import File, FileStatus
 from app.models.ticket import Ticket
 
 logger = logging.getLogger(__name__)
@@ -196,7 +197,7 @@ class FileCleanupService:
                 and_(
                     File.id.in_(file_ids),
                     File.organization_id == organization_id,
-                    File.is_deleted == False  # Don't delete already deleted files
+                    File.deleted_at.is_(None)  # Don't delete already deleted files
                 )
             )
             
@@ -215,8 +216,9 @@ class FileCleanupService:
             file_ids_to_delete = [f.id for f in files_to_delete]
             
             # Option 1: Soft delete (recommended for audit trail)
-            from sqlalchemy import update
             from datetime import datetime, timezone
+
+            from sqlalchemy import update
             
             soft_delete_query = update(File).where(
                 File.id.in_(file_ids_to_delete)

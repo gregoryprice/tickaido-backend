@@ -4,16 +4,17 @@ Agent History Service for tracking configuration changes and lifecycle events
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc, func
 from sqlalchemy.orm import selectinload
 
+from app.database import get_async_db_session
 from app.models.agent_history import AgentHistory
 from app.models.ai_agent import Agent
-from app.database import get_async_db_session
 
 logger = logging.getLogger(__name__)
 

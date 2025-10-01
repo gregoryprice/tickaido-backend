@@ -5,32 +5,32 @@ Handles CRUD operations, testing, and synchronization of third-party integration
 """
 
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
 from ..database import get_db_session
-from ..models.user import User
+from ..integrations.jira import JiraIntegration
+from ..middleware.auth_middleware import get_current_user
 from ..models.integration import IntegrationCategory, IntegrationStatus
+from ..models.user import User
 from ..schemas.integration import (
     IntegrationCreateRequest,
-    IntegrationUpdateRequest,
     IntegrationDetailResponse,
     IntegrationListResponse,
-    IntegrationTestRequest,
-    IntegrationTestResponse,
+    IntegrationSearchParams,
+    IntegrationSortParams,
+    IntegrationStatusUpdateRequest,
     IntegrationSyncRequest,
     IntegrationSyncResponse,
-    IntegrationStatusUpdateRequest,
-    IntegrationSearchParams,
-    IntegrationSortParams
+    IntegrationTestRequest,
+    IntegrationTestResponse,
+    IntegrationUpdateRequest,
 )
-from ..middleware.auth_middleware import get_current_user
 from ..services.integration_service import IntegrationService
-from ..integrations.jira import JiraIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -637,7 +637,7 @@ async def get_active_integrations(
         # Build query for active integrations
         filters = [
             Integration.status == IntegrationStatus.ACTIVE,
-            Integration.is_deleted == False,
+            Integration.deleted_at.is_(None),
             Integration.organization_id == current_user.organization_id
         ]
         

@@ -5,7 +5,7 @@ Abstract base class that all integrations must implement
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class IntegrationInterface(ABC):

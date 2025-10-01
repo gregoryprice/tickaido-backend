@@ -5,25 +5,26 @@ API Token management routes for organization-scoped programmatic access
 
 import logging
 import secrets
-from datetime import datetime, timezone, timedelta
-from typing import List
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config.settings import get_settings
 from app.database import get_db_session
-from app.models.user import User
+from app.middleware.organization_middleware import OrganizationContext, get_organization_context
 from app.models.api_token import APIToken
 from app.schemas.api_token import (
-    APITokenGenerationRequest, APITokenResponse, APITokenListResponse, 
-    APITokenListItem, APITokenRevokeResponse, APITokenUpdateRequest,
-    APITokenPartialUpdateRequest
+    APITokenGenerationRequest,
+    APITokenListItem,
+    APITokenListResponse,
+    APITokenPartialUpdateRequest,
+    APITokenResponse,
+    APITokenRevokeResponse,
+    APITokenUpdateRequest,
 )
-from app.middleware.auth_middleware import get_current_user
-from app.middleware.organization_middleware import get_organization_context, OrganizationContext
-from app.middleware.auth_middleware import auth_middleware
-from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api-tokens", tags=["API Token Management"])

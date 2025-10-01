@@ -4,8 +4,9 @@ Provides MCP tools with user JWT token authentication for backend API calls
 """
 
 import logging
-import httpx
 from typing import Dict
+
+import httpx
 from pydantic_ai.tools import Tool
 
 logger = logging.getLogger(__name__)

@@ -4,12 +4,13 @@ Ticket schemas for API validation and serialization
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from uuid import UUID
-from pydantic import Field, field_validator, model_validator, computed_field
 from enum import Enum
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from app.schemas.base import BaseSchema, BaseCreate, BaseUpdate, BaseResponse
+from pydantic import Field, computed_field, field_validator, model_validator
+
+from app.schemas.base import BaseCreate, BaseResponse, BaseSchema, BaseUpdate
 from app.schemas.chat import FileAttachment
 
 

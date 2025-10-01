@@ -8,17 +8,17 @@ providing caching, organization context, and secure authentication.
 
 import json
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any, List
-from jose import jwt, JWTError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 import redis.asyncio as redis
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import get_settings
-from app.models.user import User
 from app.models.organization import Organization
+from app.models.user import User
 from app.schemas.principal import Principal, SessionType
 from app.services.clerk_service import clerk_service
 
@@ -280,7 +280,7 @@ class PrincipalService:
             select(User).where(
                 User.id == user_id,
                 User.is_active == True,
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         return result.scalar_one_or_none()

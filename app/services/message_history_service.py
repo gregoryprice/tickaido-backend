@@ -1,9 +1,11 @@
-from typing import List, Optional
+import logging
+from typing import List
+
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+
 from app.models.chat import Message, Thread
 from app.services.token_counter_service import token_counter_service
-import logging
 
 logger = logging.getLogger(__name__)
 

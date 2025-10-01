@@ -6,7 +6,9 @@ Ticket model for support ticket management
 import enum
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, JSON, ForeignKey, Integer
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -394,6 +396,14 @@ class Ticket(BaseModel):
         "Organization",
         back_populates="tickets",
         foreign_keys=[organization_id]
+    )
+    
+    comments = relationship(
+        "TicketComment",
+        back_populates="ticket",
+        foreign_keys="TicketComment.ticket_id",
+        cascade="all, delete-orphan",
+        order_by="TicketComment.created_at"
     )
     
     def __repr__(self):

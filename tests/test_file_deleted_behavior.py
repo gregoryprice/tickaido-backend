@@ -48,8 +48,7 @@ class TestDeletedFileRestoration:
         deleted_processed_file.mime_type = "audio/wav"
         deleted_processed_file.file_type = FileType.AUDIO
         deleted_processed_file.status = FileStatus.DELETED
-        deleted_processed_file.is_deleted = True
-        deleted_processed_file.deleted_at = datetime.now(timezone.utc)
+        deleted_processed_file.soft_delete()  # Use soft_delete() method instead of direct assignment
         deleted_processed_file.processing_completed_at = datetime.now(timezone.utc)  # Was processed!
         deleted_processed_file.extracted_context = {"audio": {"transcription": {"text": "test"}}}
         deleted_processed_file.organization_id = mock_user.organization_id
@@ -76,7 +75,7 @@ class TestDeletedFileRestoration:
         
         # Verify file was restored with PROCESSED status (no reprocessing needed)
         assert restored_file.status == FileStatus.PROCESSED
-        assert restored_file.is_deleted == False
+        assert not restored_file.is_deleted
         assert restored_file.deleted_at is None
         assert restored_file.processing_completed_at is not None
         
@@ -93,8 +92,7 @@ class TestDeletedFileRestoration:
         deleted_unprocessed_file.mime_type = "application/pdf"
         deleted_unprocessed_file.file_type = FileType.DOCUMENT
         deleted_unprocessed_file.status = FileStatus.DELETED
-        deleted_unprocessed_file.is_deleted = True
-        deleted_unprocessed_file.deleted_at = datetime.now(timezone.utc)
+        deleted_unprocessed_file.soft_delete()  # Use soft_delete() method instead of direct assignment
         deleted_unprocessed_file.processing_completed_at = None  # Never processed!
         deleted_unprocessed_file.organization_id = mock_user.organization_id
         
@@ -120,7 +118,7 @@ class TestDeletedFileRestoration:
         
         # Verify file was restored with UPLOADED status (needs processing)
         assert restored_file.status == FileStatus.UPLOADED
-        assert restored_file.is_deleted == False
+        assert not restored_file.is_deleted
         assert restored_file.deleted_at is None
         assert restored_file.processing_completed_at is None
 
@@ -140,9 +138,11 @@ class TestFileListFiltering:
     async def test_deleted_status_filter_rejected(self, mock_user):
         """Test that using DELETED status as filter raises error"""
         mock_db_session = AsyncMock()
+        mock_request = AsyncMock()
         
         with pytest.raises(HTTPException) as exc_info:
             await list_user_files(
+                request=mock_request,
                 skip=0,
                 limit=50,
                 file_type=None,
@@ -182,9 +182,9 @@ class TestFileListFiltering:
         assert True
 
     def test_file_service_filters_deleted_files(self):
-        """Test that get_files_for_organization includes is_deleted=False filter"""
+        """Test that get_files_for_organization includes deleted_at IS NULL filter"""
         # This is more of a documentation test - the actual filtering happens in the SQL query
-        # The query should include: File.is_deleted == False
+        # The query should include: File.deleted_at.is_(None)
         
         # We can verify this by checking the service method exists and has the right signature
         file_service = FileService()

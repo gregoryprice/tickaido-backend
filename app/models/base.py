@@ -6,10 +6,10 @@ Base model class with common fields and functionality
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column, DateTime, Boolean, Text
+
+from sqlalchemy import Boolean, Column, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import declarative_mixin
+from sqlalchemy.orm import declarative_base, declarative_mixin
 
 # Create the declarative base
 Base = declarative_base()
@@ -35,30 +35,27 @@ class TimestampMixin:
 
 @declarative_mixin 
 class SoftDeleteMixin:
-    """Mixin to add soft delete functionality"""
+    """Mixin to add soft delete functionality using deleted_at timestamp only"""
     
     deleted_at = Column(
         DateTime(timezone=True),
         nullable=True,
-        index=True
+        index=True,
+        comment="Soft delete timestamp - NULL means not deleted"
     )
     
-    is_deleted = Column(
-        Boolean,
-        default=False,
-        nullable=False,
-        index=True
-    )
+    @property
+    def is_deleted(self) -> bool:
+        """Check if record is soft deleted by checking if deleted_at is set"""
+        return self.deleted_at is not None
     
     def soft_delete(self):
         """Mark record as deleted"""
         self.deleted_at = datetime.now(timezone.utc)
-        self.is_deleted = True
     
     def restore(self):
         """Restore soft deleted record"""
         self.deleted_at = None
-        self.is_deleted = False
 
 class BaseModel(Base, TimestampMixin, SoftDeleteMixin):
     """
@@ -93,7 +90,7 @@ class BaseModel(Base, TimestampMixin, SoftDeleteMixin):
         Returns:
             dict: Model data as dictionary
         """
-        if not include_deleted and getattr(self, 'is_deleted', False):
+        if not include_deleted and self.is_deleted:
             return {}
         
         result = {}
@@ -108,6 +105,9 @@ class BaseModel(Base, TimestampMixin, SoftDeleteMixin):
                 value = str(value)
             
             result[column.name] = value
+        
+        # Add computed is_deleted property to the dict
+        result['is_deleted'] = self.is_deleted
             
         return result
     

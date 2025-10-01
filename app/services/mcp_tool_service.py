@@ -7,8 +7,8 @@ to call the MCP server's built-in tools/list operation to discover available too
 """
 
 import logging
-from typing import List, Optional, Dict, Any
-from fastapi import Request
+from typing import Any, Dict, List, Optional
+
 from app.schemas.tools import ToolInfo, ToolParameter
 from app.services.principal_service import PrincipalService
 from mcp_client.client import mcp_client

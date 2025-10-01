@@ -7,218 +7,202 @@ serialization, and automatic OpenAPI documentation generation.
 """
 
 # Base schemas and utilities
+# AI Configuration schemas
+from app.schemas.ai_config import (
+    AIAgentConfigActivationRequest,
+    AIAgentConfigApprovalRequest,
+    AIAgentConfigBaseResponse,
+    AIAgentConfigBulkActivateRequest,
+    AIAgentConfigBulkDeprecateRequest,
+    AIAgentConfigBulkTestRequest,
+    AIAgentConfigCloneRequest,
+    # Request schemas
+    AIAgentConfigCreateRequest,
+    AIAgentConfigDeprecationRequest,
+    AIAgentConfigDetailResponse,
+    AIAgentConfigEffectiveResponse,
+    AIAgentConfigExportRequest,
+    AIAgentConfigExportResponse,
+    AIAgentConfigImportRequest,
+    AIAgentConfigImportResponse,
+    AIAgentConfigListResponse,
+    # Search and filter schemas
+    AIAgentConfigSearchParams,
+    AIAgentConfigSortParams,
+    AIAgentConfigStatsResponse,
+    AIAgentConfigTestRequest,
+    AIAgentConfigTestResponse,
+    AIAgentConfigUpdateRequest,
+    AIAgentConfigUsageStats,
+    # Response schemas
+    AIAgentConfigUserInfo,
+    AIAgentConfigVersionResponse,
+    # Enums
+    AIAgentTypeSchema,
+)
 from app.schemas.base import (
-    BaseSchema,
-    BaseResponse,
     BaseCreate,
+    BaseResponse,
+    BaseSchema,
     BaseUpdate,
-    TimestampMixin,
-    UUIDMixin,
-    SoftDeleteMixin,
-    PaginationParams,
-    SortParams,
-    FilterParams,
-    PaginatedResponse,
-    ErrorDetail,
-    ErrorResponse,
-    SuccessResponse,
     BulkOperationRequest,
     BulkOperationResponse,
-    HealthCheckResponse,
-    ValidationErrorResponse,
     EmailStr,
+    ErrorDetail,
+    ErrorResponse,
+    FilterParams,
+    HealthCheckResponse,
+    PaginatedResponse,
+    PaginationParams,
     PhoneStr,
+    SoftDeleteMixin,
+    SortParams,
+    SuccessResponse,
+    TimestampMixin,
     URLStr,
+    UUIDMixin,
+    ValidationErrorResponse,
     exclude_none,
     to_camel_case,
     to_snake_case,
 )
 
-# User schemas
-from app.schemas.user import (
-    # Enums
-    UserRoleSchema,
-    
-    # Request schemas
-    UserCreateRequest,
-    UserUpdateRequest,
-    UserPasswordChangeRequest,
-    UserPermissionsUpdateRequest,
-    UserAPIKeyRequest,
-    UserBulkCreateRequest,
-    UserBulkUpdateRequest,
-    UserBulkDeactivateRequest,
-    UserLoginRequest,
-    UserRegistrationRequest,
-    UserPasswordResetRequest,
-    UserPasswordResetConfirmRequest,
-    UserEmailVerificationRequest,
-    
-    # Response schemas
-    UserPublicResponse,
-    UserPrivateResponse,
-    UserAdminResponse,
-    UserListResponse,
-    UserProfileResponse,
-    UserAPIKeyResponse,
-    UserPermissionsResponse,
-    UserStatsResponse,
-    UserLoginResponse,
-    UserActivityResponse,
-    UserAuditLogResponse,
-    
-    # Search and filter schemas
-    UserSearchParams,
-    UserSortParams,
-)
-
-# Ticket schemas
-from app.schemas.ticket import (
-    # Enums
-    TicketStatusSchema,
-    TicketPrioritySchema,
-    TicketCategorySchema,
-    
-    # Request schemas
-    TicketCreateRequest,
-    TicketUpdateRequest,
-    TicketStatusUpdateRequest,
-    TicketAssignmentRequest,
-    TicketEscalationRequest,
-    TicketSatisfactionRequest,
-    TicketAIAnalysisRequest,
-    TicketBulkUpdateRequest,
-    TicketBulkStatusUpdateRequest,
-    TicketBulkAssignRequest,
-    TicketBulkCategoryRequest,
-    TicketAICreateRequest,
-    
-    # Response schemas
-    TicketUserInfo,
-    TicketAIAnalysis,
-    TicketBaseResponse,
-    TicketDetailResponse,
-    TicketPublicResponse,
-    TicketStatsResponse,
-    TicketActivityResponse,
-    TicketAICreateResponse,
-    TicketAIAnalysisResponse,
-    
-    # Search and filter schemas
-    TicketSearchParams,
-    TicketSortParams,
-)
-
 # File schemas
 from app.schemas.file import (
-    # Enums
-    FileStatusSchema,
-    FileTypeSchema,
-    
-    # Request schemas
-    FileUploadRequest,
-    FileUpdateRequest,
-    FileProcessingRequest,
     FileAnalysisRequest,
-    FileBulkProcessRequest,
-    FileBulkDeleteRequest,
-    FileBulkUpdateRequest,
-    FileBulkTagRequest,
-    FileUploadUrlRequest,
-    
-    # Response schemas
-    FileUserInfo,
-    FileTicketInfo,
-    FileProcessingResults,
-    FileBaseResponse,
-    FileListResponse,
-    FileDetailResponse,
-    FileContentResponse,
-    FileProcessingResponse,
     FileAnalysisResponse,
-    FileStatsResponse,
+    FileBaseResponse,
+    FileBulkDeleteRequest,
+    FileBulkProcessRequest,
+    FileBulkTagRequest,
+    FileBulkUpdateRequest,
+    FileContentResponse,
+    FileDetailResponse,
     FileDownloadResponse,
-    FileUploadResponse,
-    FileUploadUrlResponse,
     FileErrorResponse,
-    
+    FileListResponse,
+    FileProcessingRequest,
+    FileProcessingResponse,
+    FileProcessingResults,
     # Search and filter schemas
     FileSearchParams,
     FileSortParams,
+    FileStatsResponse,
+    # Enums
+    FileStatusSchema,
+    FileTicketInfo,
+    FileTypeSchema,
+    FileUpdateRequest,
+    # Request schemas
+    FileUploadRequest,
+    FileUploadResponse,
+    FileUploadUrlRequest,
+    FileUploadUrlResponse,
+    # Response schemas
+    FileUserInfo,
 )
 
 # Integration schemas
 from app.schemas.integration import (
+    IntegrationBaseResponse,
+    IntegrationBulkStatusUpdateRequest,
+    IntegrationBulkSyncRequest,
+    IntegrationBulkTestRequest,
     # Enums
     IntegrationCategorySchema,
-    IntegrationStatusSchema,
-    
+    IntegrationConfigResponse,
     # Request schemas
     IntegrationCreateRequest,
-    IntegrationUpdateRequest,
-    IntegrationStatusUpdateRequest,
-    IntegrationTestRequest,
-    IntegrationSyncRequest,
-    IntegrationRoutingTestRequest,
-    IntegrationBulkStatusUpdateRequest,
-    IntegrationBulkTestRequest,
-    IntegrationBulkSyncRequest,
-    
+    IntegrationDetailResponse,
+    IntegrationErrorResponse,
     # Response schemas
     IntegrationHealthInfo,
-    IntegrationUsageStats,
-    IntegrationBaseResponse,
     IntegrationListResponse,
-    IntegrationDetailResponse,
-    IntegrationConfigResponse,
-    IntegrationTestResponse,
-    IntegrationSyncResponse,
+    IntegrationRoutingTestRequest,
     IntegrationRoutingTestResponse,
-    IntegrationStatsResponse,
-    IntegrationWebhookEvent,
-    IntegrationWebhookResponse,
-    IntegrationErrorResponse,
-    
     # Search and filter schemas
     IntegrationSearchParams,
     IntegrationSortParams,
+    IntegrationStatsResponse,
+    IntegrationStatusSchema,
+    IntegrationStatusUpdateRequest,
+    IntegrationSyncRequest,
+    IntegrationSyncResponse,
+    IntegrationTestRequest,
+    IntegrationTestResponse,
+    IntegrationUpdateRequest,
+    IntegrationUsageStats,
+    IntegrationWebhookEvent,
+    IntegrationWebhookResponse,
 )
 
-# AI Configuration schemas
-from app.schemas.ai_config import (
-    # Enums
-    AIAgentTypeSchema,
-    
+# Ticket schemas
+from app.schemas.ticket import (
+    TicketActivityResponse,
+    TicketAIAnalysis,
+    TicketAIAnalysisRequest,
+    TicketAIAnalysisResponse,
+    TicketAICreateRequest,
+    TicketAICreateResponse,
+    TicketAssignmentRequest,
+    TicketBaseResponse,
+    TicketBulkAssignRequest,
+    TicketBulkCategoryRequest,
+    TicketBulkStatusUpdateRequest,
+    TicketBulkUpdateRequest,
+    TicketCategorySchema,
     # Request schemas
-    AIAgentConfigCreateRequest,
-    AIAgentConfigUpdateRequest,
-    AIAgentConfigActivationRequest,
-    AIAgentConfigApprovalRequest,
-    AIAgentConfigDeprecationRequest,
-    AIAgentConfigCloneRequest,
-    AIAgentConfigTestRequest,
-    AIAgentConfigBulkActivateRequest,
-    AIAgentConfigBulkDeprecateRequest,
-    AIAgentConfigBulkTestRequest,
-    AIAgentConfigExportRequest,
-    AIAgentConfigImportRequest,
-    
-    # Response schemas
-    AIAgentConfigUserInfo,
-    AIAgentConfigUsageStats,
-    AIAgentConfigBaseResponse,
-    AIAgentConfigListResponse,
-    AIAgentConfigDetailResponse,
-    AIAgentConfigEffectiveResponse,
-    AIAgentConfigTestResponse,
-    AIAgentConfigStatsResponse,
-    AIAgentConfigVersionResponse,
-    AIAgentConfigExportResponse,
-    AIAgentConfigImportResponse,
-    
+    TicketCreateRequest,
+    TicketDetailResponse,
+    TicketEscalationRequest,
+    TicketPrioritySchema,
+    TicketPublicResponse,
+    TicketSatisfactionRequest,
     # Search and filter schemas
-    AIAgentConfigSearchParams,
-    AIAgentConfigSortParams,
+    TicketSearchParams,
+    TicketSortParams,
+    TicketStatsResponse,
+    # Enums
+    TicketStatusSchema,
+    TicketStatusUpdateRequest,
+    TicketUpdateRequest,
+    # Response schemas
+    TicketUserInfo,
+)
+
+# User schemas
+from app.schemas.user import (
+    UserActivityResponse,
+    UserAdminResponse,
+    UserAPIKeyRequest,
+    UserAPIKeyResponse,
+    UserAuditLogResponse,
+    UserBulkCreateRequest,
+    UserBulkDeactivateRequest,
+    UserBulkUpdateRequest,
+    # Request schemas
+    UserCreateRequest,
+    UserEmailVerificationRequest,
+    UserListResponse,
+    UserLoginRequest,
+    UserLoginResponse,
+    UserPasswordChangeRequest,
+    UserPasswordResetConfirmRequest,
+    UserPasswordResetRequest,
+    UserPermissionsResponse,
+    UserPermissionsUpdateRequest,
+    UserPrivateResponse,
+    UserProfileResponse,
+    # Response schemas
+    UserPublicResponse,
+    UserRegistrationRequest,
+    # Enums
+    UserRoleSchema,
+    # Search and filter schemas
+    UserSearchParams,
+    UserSortParams,
+    UserStatsResponse,
+    UserUpdateRequest,
 )
 
 # Export all schemas for easy importing

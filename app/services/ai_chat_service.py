@@ -18,17 +18,18 @@ Key Features:
 import json
 import logging
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional, AsyncIterator, Union
-from uuid import UUID
 from enum import Enum
+from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.models.chat import Thread, Message
-from app.models.ai_agent import Agent as AgentModel
 from app.database import get_async_db_session
-from app.services.agent_service import agent_service
+from app.models.ai_agent import Agent as AgentModel
+from app.models.chat import Message, Thread
 from app.schemas.ai_response import ChatResponse
+from app.services.agent_service import agent_service
 
 # Use dynamic agent factory for generic context building and MCP integration
 from app.services.dynamic_agent_factory import dynamic_agent_factory
@@ -510,9 +511,10 @@ class AIChatService:
         file_contexts = []
         try:
             async with get_async_db_session() as db:
+                from sqlalchemy import select
+
                 from app.models.file import File, FileStatus
                 from app.services.file_service import FileService
-                from sqlalchemy import select
                 
                 file_service = FileService()
                 

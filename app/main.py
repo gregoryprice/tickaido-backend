@@ -3,9 +3,9 @@
 Main FastAPI application for AI Ticket Creator Backend
 """
 
+import logging
 import os
 import sys
-import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -52,34 +52,34 @@ logger = setup_logging()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
+from app.api.v1.agent_avatars import router as agent_avatars_router
+from app.api.v1.agents import router as agents_router
+from app.api.v1.chat import router as chat_router
+from app.api.v1.file_cleanup import router as file_cleanup_router
+from app.api.v1.files import router as files_router
+from app.api.v1.invitations import router as invitations_router
+from app.api.v1.members import router as members_router
+from app.api.v1.organization_discovery import router as org_discovery_router
+
+# Import route modules
+from app.api.v1.tickets import router as tickets_router
+from app.api.v1.tools import router as tools_router
+from app.api.v1.users import router as users_router
+
+# Import Celery app to ensure it's initialized
 # Import configuration
 from app.config.settings import get_settings
 from app.database import check_database_connection
 
-# Import Celery app to ensure it's initialized
-from app.celery_app import celery_app
-
 # Import middleware
 from app.middleware.rate_limiting import FastAPIRateLimitMiddleware
-
-# Import route modules
-from app.api.v1.tickets import router as tickets_router
-from app.api.v1.chat import router as chat_router
-from app.api.v1.users import router as users_router
-from app.api.v1.agents import router as agents_router
-from app.api.v1.agent_avatars import router as agent_avatars_router
-from app.api.v1.members import router as members_router
-from app.api.v1.organization_discovery import router as org_discovery_router
-from app.api.v1.invitations import router as invitations_router
-from app.api.v1.tools import router as tools_router
 from app.routers.auth import router as auth_router
 from app.routers.integration import router as integration_router
 from app.websocket.chat import router as chat_websocket_router
-from app.api.v1.files import router as files_router
-from app.api.v1.file_cleanup import router as file_cleanup_router
+
 
 def wait_for_database_ready(max_retries: int = 30, delay: int = 2) -> bool:
     """Wait for database to be ready"""
@@ -157,11 +157,13 @@ async def ensure_admin_organization():
     import threading
     logger.debug(f"🔍 ensure_admin_organization called from thread: {threading.get_ident()}")
     
+    import uuid
+
+    from sqlalchemy import select
+
     from app.database import get_async_db_session
     from app.models.organization import Organization
     from app.models.user import User, UserRole
-    from sqlalchemy import select
-    import uuid
     
     async with get_async_db_session() as db:
         # Check if TickAido organization exists
@@ -216,8 +218,8 @@ async def ensure_admin_organization():
 
 async def startup_event():
     """FastAPI startup event handler"""
-    import threading
     import os
+    import threading
     logger.debug(f"🔍 startup_event called from thread: {threading.get_ident()}, PID: {os.getpid()}")
     
     global _startup_completed
@@ -230,18 +232,21 @@ async def startup_event():
     
     # Step 0: Initialize HTTP debug logging
     try:
-        from app.utils.http_debug_logger import enable_http_debug_logging
-        from app.config.settings import get_settings
         import logging
+        from app.config.settings import get_settings
+        from app.utils.http_debug_logger import enable_http_debug_logging
         
         settings = get_settings()
-        if settings.http_debug_logging_enabled:
-            log_level = getattr(logging, settings.http_debug_log_level.upper(), logging.DEBUG)
-            enable_http_debug_logging(enabled=True, log_level=log_level)
-            logger.info(f"✅ HTTP debug logging enabled at level {settings.http_debug_log_level}")
-        else:
-            enable_http_debug_logging(enabled=False)
-            logger.info("ℹ️  HTTP debug logging disabled")
+        log_level = getattr(logging, settings.http_debug_log_level.upper(), logging.INFO)
+        enable_http_debug_logging(enabled=True, log_level=log_level)
+
+        # if settings.http_debug_logging_enabled:
+        #     log_level = getattr(logging, settings.http_debug_log_level.upper(), logging.DEBUG)
+        #     enable_http_debug_logging(enabled=True, log_level=log_level)    
+        #     logger.info(f"✅ HTTP debug logging enabled at level {settings.http_debug_log_level}")
+        # else:
+        #     enable_http_debug_logging(enabled=False)
+        #     logger.info("ℹ️  HTTP debug logging disabled")
     except Exception as e:
         logger.warning(f"⚠️  Failed to initialize HTTP debug logging: {e}")
     
@@ -279,8 +284,8 @@ async def startup_event():
     
     # Step 4: Initialize all system agents
     try:
-        from app.services.agent_service import agent_service
         from app.database import get_async_db_session
+        from app.services.agent_service import agent_service
         
         logger.info("🔧 Initializing system agents...")
         async with get_async_db_session() as db:
@@ -356,8 +361,9 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(integration_router, prefix="/api/v1")
 
 # Clerk integration routes
-from app.routers.clerk_webhooks import router as clerk_webhook_router
 from app.routers.api_tokens import router as api_token_router
+from app.routers.clerk_webhooks import router as clerk_webhook_router
+
 app.include_router(clerk_webhook_router, prefix="/api/v1")
 app.include_router(api_token_router, prefix="/api/v1")
 app.include_router(files_router, prefix="/api/v1/files", tags=["Files"])

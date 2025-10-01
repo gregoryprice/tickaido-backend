@@ -4,12 +4,13 @@ Chat schemas for API validation and serialization - Agent-Centric Thread Archite
 """
 
 from datetime import datetime
-from typing import Optional, List, Union, Dict, Any
-from uuid import UUID
-from pydantic import Field
 from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+from uuid import UUID
 
-from app.schemas.base import BaseSchema, BaseResponse
+from pydantic import Field
+
+from app.schemas.base import BaseResponse, BaseSchema
 
 
 class FileAttachment(BaseSchema):

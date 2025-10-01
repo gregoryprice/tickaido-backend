@@ -10,7 +10,8 @@ HTTP communication with 3rd party APIs (Jira, AI providers, etc.).
 import json
 import logging
 import time
-from typing import Dict, Any, Optional, Union
+from typing import Any, Dict, Optional, Union
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ class HTTPDebugLogger:
                 
             return formatted
             
-        except (TypeError, ValueError) as e:
+        except (TypeError, ValueError):
             # Fallback for non-serializable objects
             str_repr = str(data)
             if len(str_repr) > max_length:

@@ -6,7 +6,8 @@ This module contains shared response models used across AI services
 to avoid circular imports and code duplication.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 

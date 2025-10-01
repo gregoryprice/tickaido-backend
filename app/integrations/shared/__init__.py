@@ -5,7 +5,7 @@ Common utilities used across different integration types
 """
 
 from .attachment_service import BaseAttachmentService
-from .field_mapping import CommonFieldMapper, StandardPriority, StandardCategory
+from .field_mapping import CommonFieldMapper, StandardCategory, StandardPriority
 
 __all__ = [
     "BaseAttachmentService",

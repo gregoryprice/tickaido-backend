@@ -3,12 +3,13 @@
 Agent File model for managing file attachments and context processing
 """
 
-from typing import Optional
+import hashlib
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, DateTime, func, CheckConstraint
+from typing import Optional
+
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import hashlib
 
 from app.models.base import BaseModel
 

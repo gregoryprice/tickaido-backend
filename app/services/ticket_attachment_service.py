@@ -5,17 +5,18 @@ Implements the new file association pattern from PRP specification
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.models.ticket import Ticket
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.file import File
+from app.models.ticket import Ticket
 from app.models.user import User
-from app.services.file_service import FileService
-from app.services.file_processing_service import FileProcessingService
 from app.services.ai_analysis_service import AIAnalysisService
+from app.services.file_processing_service import FileProcessingService
+from app.services.file_service import FileService
 
 logger = logging.getLogger(__name__)
 

@@ -4,20 +4,24 @@ Agent Avatar API endpoints
 """
 
 import logging
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db_session
-from app.schemas.agent import AgentAvatarResponse, AgentAvatarDeleteResponse, AgentAvatarInfoResponse
-from app.models.user import User
-from app.models.ai_agent import Agent
-from app.services.avatar_service import AvatarService
 from app.middleware.auth_middleware import get_current_user
+from app.models.ai_agent import Agent
+from app.models.user import User
+from app.schemas.agent import (
+    AgentAvatarDeleteResponse,
+    AgentAvatarInfoResponse,
+    AgentAvatarResponse,
+)
+from app.services.avatar_service import AvatarService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents")

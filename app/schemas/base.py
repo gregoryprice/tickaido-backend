@@ -4,9 +4,10 @@ Base Pydantic schemas for common validation patterns
 """
 
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseSchema(BaseModel):
@@ -34,7 +35,7 @@ class UUIDMixin(BaseSchema):
 class SoftDeleteMixin(BaseSchema):
     """Mixin for soft delete fields"""
     deleted_at: Optional[datetime] = Field(None, description="Deletion timestamp")
-    is_deleted: bool = Field(False, description="Whether record is deleted")
+    is_deleted: bool = Field(description="Whether record is deleted (computed property)")
 
 
 class BaseResponse(UUIDMixin, TimestampMixin):

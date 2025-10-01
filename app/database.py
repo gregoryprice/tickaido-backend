@@ -5,12 +5,12 @@ Database configuration and connection management
 
 import logging
 import time
+from typing import AsyncGenerator, Generator
+
 from sqlalchemy import create_engine, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
-from typing import Generator, AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from app.config.settings import get_settings
 

@@ -5,17 +5,18 @@ Agent File Service for managing file attachments and context processing
 
 import logging
 import os
-from typing import Optional, List
 from datetime import datetime, timezone
+from typing import List, Optional
 from uuid import UUID
+
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
+from app.database import get_async_db_session
 from app.models.agent_file import AgentFile
 from app.models.ai_agent import Agent
 from app.models.file import File
-from app.database import get_async_db_session
 from app.services.file_service import FileService
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ class AgentFileService:
                     and_(
                         AgentFile.agent_id == agent_id,
                         AgentFile.file_id == file_id,
-                        AgentFile.is_deleted == False
+                        AgentFile.deleted_at.is_(None)
                     )
                 )
                 existing_result = await session.execute(existing_stmt)
@@ -152,7 +153,7 @@ class AgentFileService:
                     and_(
                         AgentFile.agent_id == agent_id,
                         AgentFile.file_id == file_id,
-                        AgentFile.is_deleted == False
+                        AgentFile.deleted_at.is_(None)
                     )
                 )
                 result = await session.execute(stmt)
@@ -199,7 +200,7 @@ class AgentFileService:
             try:
                 conditions = [
                     AgentFile.agent_id == agent_id,
-                    AgentFile.is_deleted == False
+                    AgentFile.deleted_at.is_(None)
                 ]
                 
                 if not include_processing:
@@ -269,7 +270,7 @@ class AgentFileService:
                 stmt = select(func.count(AgentFile.id)).where(
                     and_(
                         AgentFile.agent_id == agent_id,
-                        AgentFile.is_deleted == False
+                        AgentFile.deleted_at.is_(None)
                     )
                 )
                 result = await session.execute(stmt)
@@ -440,7 +441,7 @@ class AgentFileService:
                         and_(
                             AgentFile.agent_id == agent_id,
                             AgentFile.file_id == file_id,
-                            AgentFile.is_deleted == False
+                            AgentFile.deleted_at.is_(None)
                         )
                     )
                     result = await session.execute(stmt)
@@ -483,7 +484,7 @@ class AgentFileService:
                     and_(
                         AgentFile.agent_id == agent_id,
                         AgentFile.file_id == file_id,
-                        AgentFile.is_deleted == False
+                        AgentFile.deleted_at.is_(None)
                     )
                 )
                 result = await session.execute(stmt)

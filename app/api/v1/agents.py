@@ -6,23 +6,24 @@ Simplified Agent Management API - 6 CRUD + History Endpoints
 import logging
 from typing import Optional
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db_session
-from app.models.user import User
-from app.services.agent_service import agent_service
-from app.services.agent_history_service import agent_history_service
 from app.middleware.auth_middleware import get_current_user
+from app.models.user import User
 from app.schemas.agent import (
-    AgentCreateRequest, 
-    AgentUpdateRequest, 
-    AgentResponse, 
-    AgentListResponse,
-    AgentHistoryResponse,
+    AgentCreateRequest,
     AgentHistoryListResponse,
-    SuccessResponse
+    AgentHistoryResponse,
+    AgentListResponse,
+    AgentResponse,
+    AgentUpdateRequest,
+    SuccessResponse,
 )
+from app.services.agent_history_service import agent_history_service
+from app.services.agent_service import agent_service
 
 router = APIRouter(prefix="/agents", tags=["Agent Management"])
 logger = logging.getLogger(__name__)

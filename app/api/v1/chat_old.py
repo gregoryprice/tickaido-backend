@@ -4,19 +4,28 @@ Chat API endpoints
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db_session
-from app.schemas.chat import ConversationResponse, CreateConversationRequest, MessageResponse, SendMessageRequest, GenerateTitleResponse, UpdateConversationRequest, ConversationUpdateResponse
-from app.models.user import User
-from app.services.chat_service import chat_service
-from app.services.ai_chat_service import ai_chat_service
 from app.middleware.auth_middleware import get_current_user
+from app.models.user import User
+from app.schemas.chat import (
+    ConversationResponse,
+    ConversationUpdateResponse,
+    CreateConversationRequest,
+    GenerateTitleResponse,
+    MessageResponse,
+    SendMessageRequest,
+    UpdateConversationRequest,
+)
+from app.services.ai_chat_service import ai_chat_service
 from app.services.auth_provider import decode_jwt_token
+from app.services.chat_service import chat_service
 
 router = APIRouter(prefix="/chat", tags=["Chat Assistant"])
 logger = logging.getLogger(__name__)

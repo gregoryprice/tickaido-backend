@@ -4,14 +4,15 @@ Thread service for agent-centric conversation management
 """
 
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, or_, delete
-from sqlalchemy.exc import IntegrityError
 
-from app.models.chat import Thread, Message
+from sqlalchemy import delete, desc, func, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.ai_agent import Agent
+from app.models.chat import Message, Thread
 
 logger = logging.getLogger(__name__)
 
@@ -515,8 +516,9 @@ class ThreadService:
                 return None
             
             # Use title agent runner to generate title
-            from app.services.title_generation_runner import TitleGenerationAgentRunner
             from datetime import datetime, timezone
+
+            from app.services.title_generation_runner import TitleGenerationAgentRunner
             
             title_runner = TitleGenerationAgentRunner(title_agent)
             result = await title_runner.generate_title(messages, thread.title)

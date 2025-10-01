@@ -4,16 +4,16 @@ Rate Limiting Middleware for AI Ticket Creator Backend
 Implements Redis-based rate limiting with flexible policies and user-specific limits
 """
 
+import hashlib
 import logging
 import time
-import hashlib
-from typing import Dict, Optional, Any
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
-from fastapi import HTTPException, status, Request
+import redis.asyncio as redis
+from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-import redis.asyncio as redis
 
 from ..config.settings import get_settings
 

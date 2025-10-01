@@ -3,18 +3,20 @@
 Chat WebSocket endpoints for real-time messaging
 """
 
+import asyncio
 import json
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 from uuid import UUID
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
-import asyncio
 
 from app.database import get_db_session
+from app.dependencies import get_current_user_from_token
+
 # MessageRole is no longer needed since we use string constants
 from app.services.chat_service import chat_service
-from app.dependencies import get_current_user_from_token
 
 logger = logging.getLogger(__name__)
 

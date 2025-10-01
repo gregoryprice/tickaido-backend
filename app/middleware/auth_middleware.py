@@ -4,21 +4,21 @@ Authentication middleware for FastAPI with dual authentication support
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from datetime import datetime, timezone, timedelta
-from fastapi import Request, HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from passlib.context import CryptContext
-from jose import jwt, JWTError
 
-from app.services.clerk_service import clerk_service
-from app.models.user import User
-from app.models.organization import Organization
-from app.models.api_token import APIToken
-from app.database import AsyncSessionLocal
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from passlib.context import CryptContext
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.config.settings import get_settings
+from app.database import AsyncSessionLocal
+from app.models.api_token import APIToken
+from app.models.organization import Organization
+from app.models.user import User
+from app.services.clerk_service import clerk_service
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
@@ -59,7 +59,7 @@ class AuthMiddleware:
             # Get user by email
             result = await db.execute(
                 select(User).where(
-                    and_(User.email == email, User.is_deleted == False)
+                    and_(User.email == email, User.deleted_at.is_(None))
                 )
             )
             user = result.scalar_one_or_none()
@@ -127,7 +127,7 @@ class AuthMiddleware:
     
     def verify_token(self, token: str, token_type: str = "access") -> dict:
         """Verify and decode JWT token"""
-        from jose import jwt, JWTError
+        from jose import JWTError, jwt
         
         try:
             settings = get_settings()
@@ -489,7 +489,7 @@ class AuthMiddleware:
             # Use existing JWT validation logic
             payload = self.verify_token(token)
             if payload:
-                logger.debug(f"Valid JWT token for MCP usage")
+                logger.debug("Valid JWT token for MCP usage")
                 return token
             return None
         except Exception as e:

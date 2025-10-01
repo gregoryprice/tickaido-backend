@@ -3,9 +3,10 @@
 Agent model for organization-scoped multi-agent management
 """
 
-from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, Text, JSON, Integer, ForeignKey, DECIMAL, DateTime
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import DECIMAL, JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -26,9 +27,9 @@ class Agent(BaseModel):
     organization_id = Column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="Organization this agent belongs to"
+        comment="Organization this agent belongs to (NULL for system agents)"
     )
     
     # Agent type and identification

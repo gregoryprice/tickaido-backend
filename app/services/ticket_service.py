@@ -4,17 +4,18 @@ Ticket service for business logic operations
 """
 
 import logging
-from typing import List, Tuple, Optional, Dict, Any
-from uuid import UUID
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
+
+from sqlalchemy import and_, asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc, asc
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models.ticket import Ticket, TicketStatus, TicketPriority
-from app.models.user import User
 from app.models.integration import Integration, IntegrationStatus
+from app.models.ticket import Ticket, TicketPriority, TicketStatus
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ class TicketService:
                     query = query.where(and_(*conditions))
             
             # Exclude soft-deleted records
-            query = query.where(Ticket.is_deleted == False)
+            query = query.where(Ticket.deleted_at.is_(None))
             
             # Get total count
             count_query = select(func.count()).select_from(query.subquery())
@@ -396,7 +397,7 @@ class TicketService:
                 Integration.id == integration_id,
                 Integration.status == IntegrationStatus.ACTIVE,
                 Integration.enabled == True,
-                Integration.is_deleted == False,
+                Integration.deleted_at.is_(None),
                 Integration.organization_id == user.organization_id
             )
         )
@@ -479,7 +480,7 @@ class TicketService:
                 and_(
                     Ticket.id == ticket_id,
                     User.organization_id == organization_id,
-                    Ticket.is_deleted == False
+                    Ticket.deleted_at.is_(None)
                 )
             )
             
@@ -585,6 +586,19 @@ class TicketService:
             if changes:
                 logger.info(f"Ticket {ticket_id} updated by user {updated_by_user.id} in organization {organization_id}: {changes}")
             
+            # Sync changes with external integration if ticket is integrated
+            if ticket.integration_id and ticket.external_ticket_id and changes:
+                try:
+                    # Convert changes dict back to update_data format for sync
+                    sync_data = {field: change_info["to"] for field, change_info in changes.items() 
+                                if field not in ["attachments"]}  # Skip attachments for now
+                    
+                    if sync_data:  # Only sync if there are syncable field changes
+                        await self._sync_ticket_update_with_integration(db, ticket, sync_data)
+                except Exception as sync_error:
+                    logger.error(f"Failed to sync ticket {ticket_id} patch with integration: {sync_error}")
+                    # Don't fail the local update if external sync fails
+            
             return ticket
             
         except Exception as e:
@@ -654,12 +668,117 @@ class TicketService:
             await db.commit()
             await db.refresh(ticket)
             
+            # Sync changes with external integration if ticket is integrated
+            if ticket.integration_id and ticket.external_ticket_id:
+                try:
+                    await self._sync_ticket_update_with_integration(db, ticket, update_data)
+                except Exception as sync_error:
+                    logger.error(f"Failed to sync ticket {ticket_id} update with integration: {sync_error}")
+                    # Don't fail the local update if external sync fails
+            
             logger.info(f"Updated ticket {ticket_id}")
             return ticket
             
         except Exception as e:
             await db.rollback()
             logger.error(f"Error updating ticket {ticket_id}: {e}")
+            raise
+    
+    async def _sync_ticket_update_with_integration(
+        self,
+        db: AsyncSession,
+        ticket: "Ticket",
+        update_data: Dict[str, Any]
+    ):
+        """
+        Synchronize ticket updates with external integration platform.
+        
+        Args:
+            db: Database session
+            ticket: Updated ticket instance
+            update_data: Data that was updated
+        """
+        try:
+            from app.services.integration_service import IntegrationService
+            
+            # Get the integration directly from database
+            from app.models.integration import Integration
+            from sqlalchemy import select
+            
+            stmt = select(Integration).where(
+                Integration.id == ticket.integration_id,
+                Integration.deleted_at.is_(None)
+            )
+            result = await db.execute(stmt)
+            integration = result.scalar_one_or_none()
+            
+            if not integration:
+                logger.warning(f"Integration {ticket.integration_id} not found for ticket {ticket.id}")
+                return
+            
+            # Get the integration implementation
+            integration_service = IntegrationService()
+            integration_impl = integration_service._get_integration_implementation(integration)
+            
+            # Map internal fields to JIRA fields
+            jira_update_data = {}
+            
+            if "title" in update_data:
+                jira_update_data["summary"] = update_data["title"]
+            
+            if "description" in update_data:
+                jira_update_data["description"] = update_data["description"]
+            
+            # Map priority enum to JIRA priority names
+            if "priority" in update_data and update_data["priority"]:
+                priority_mapping = {
+                    "low": "Low",
+                    "medium": "Medium",
+                    "high": "High", 
+                    "critical": "Critical"
+                }
+                jira_update_data["priority"] = priority_mapping.get(
+                    str(update_data["priority"]).lower(), 
+                    str(update_data["priority"]).title()
+                )
+            
+            # Map status to JIRA workflow transitions (simplified)
+            # Note: Full status sync would require workflow mapping
+            if "status" in update_data:
+                # For now, just log the status change - proper workflow transitions need mapping
+                logger.info(f"Status change detected: {update_data['status']} (JIRA transition mapping needed)")
+            
+            # Only sync if there are mappable changes
+            if jira_update_data:
+                logger.info(f"Syncing ticket {ticket.id} updates to JIRA {ticket.external_ticket_id}")
+                logger.info(f"Updates to sync: {list(jira_update_data.keys())}")
+                
+                # Sync with JIRA using official library
+                if integration.platform_name.lower() == "jira":
+                    sync_result = await integration_impl.update_issue(
+                        issue_key=ticket.external_ticket_id,
+                        update_data=jira_update_data
+                    )
+                    
+                    logger.info(f"✅ Successfully synced ticket {ticket.id} with JIRA:")
+                    logger.info(f"   Changes made: {', '.join(sync_result.get('changes_made', []))}")
+                    logger.info(f"   Duration: {sync_result.get('duration_ms', 0)}ms")
+                    
+                    # Update integration result with sync information
+                    if ticket.integration_result:
+                        ticket.integration_result["last_sync_at"] = datetime.now(timezone.utc).isoformat()
+                        ticket.integration_result["sync_changes"] = sync_result.get("changes_made", [])
+                        await db.commit()
+                else:
+                    logger.info(f"Sync not implemented for platform: {integration.platform_name}")
+            else:
+                logger.info(f"No syncable changes detected for ticket {ticket.id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to sync ticket update with integration: {e}")
+            # Log the full error but don't fail the ticket update
+            import traceback
+            logger.error(f"Sync error traceback: {traceback.format_exc()}")
             raise
     
     async def update_ticket_status(
@@ -751,7 +870,7 @@ class TicketService:
                     and_(
                         User.id == assigned_to_id,
                         User.is_active == True,
-                        User.is_deleted == False
+                        User.deleted_at.is_(None)
                     )
                 )
                 user_result = await db.execute(user_query)
@@ -843,7 +962,7 @@ class TicketService:
         try:
             # Base organization filter - join with User table
             base_filter = lambda: and_(
-                Ticket.is_deleted == False,
+                Ticket.deleted_at.is_(None),
                 Ticket.created_by_id == User.id,
                 User.organization_id == organization_id
             )
@@ -883,7 +1002,7 @@ class TicketService:
             now = datetime.now(timezone.utc)
             overdue_query = select(func.count(Ticket.id)).where(
                 and_(
-                    Ticket.is_deleted == False,
+                    Ticket.deleted_at.is_(None),
                     Ticket.sla_due_date.isnot(None),
                     Ticket.sla_due_date < now,
                     Ticket.status.in_([TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS])
@@ -895,7 +1014,7 @@ class TicketService:
             # High priority tickets
             high_priority_query = select(func.count(Ticket.id)).where(
                 and_(
-                    Ticket.is_deleted == False,
+                    Ticket.deleted_at.is_(None),
                     Ticket.priority.in_([TicketPriority.HIGH, TicketPriority.CRITICAL]),
                     Ticket.status.in_([TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS])
                 )
@@ -908,7 +1027,7 @@ class TicketService:
                 Ticket.category,
                 func.count(Ticket.id).label('count')
             ).where(
-                Ticket.is_deleted == False
+                Ticket.deleted_at.is_(None)
             ).group_by(Ticket.category)
             
             category_result = await db.execute(category_query)
@@ -922,7 +1041,7 @@ class TicketService:
                 Ticket.priority,
                 func.count(Ticket.id).label('count')
             ).where(
-                Ticket.is_deleted == False
+                Ticket.deleted_at.is_(None)
             ).group_by(Ticket.priority)
             
             priority_result = await db.execute(priority_query)
@@ -936,7 +1055,7 @@ class TicketService:
                 Ticket.status,
                 func.count(Ticket.id).label('count')
             ).where(
-                Ticket.is_deleted == False
+                Ticket.deleted_at.is_(None)
             ).group_by(Ticket.status)
             
             status_result = await db.execute(status_query)

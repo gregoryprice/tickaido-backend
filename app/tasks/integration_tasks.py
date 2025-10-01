@@ -4,18 +4,18 @@ Celery tasks for third-party integrations
 """
 
 import asyncio
-from typing import Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
 
 from celery import current_app as celery_app
 from celery.utils.log import get_task_logger
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 
 from app.database import get_db_session
 from app.models.integration import Integration, IntegrationStatus
-from app.services.integration_service import IntegrationService
 from app.schemas.integration import IntegrationSyncRequest, IntegrationTestRequest
+from app.services.integration_service import IntegrationService
 
 # Get logger
 logger = get_task_logger(__name__)
@@ -231,7 +231,7 @@ async def _sync_all_active_integrations_async() -> Dict[str, Any]:
             and_(
                 Integration.is_enabled == True,
                 Integration.status == IntegrationStatus.ACTIVE,
-                Integration.is_deleted == False
+                Integration.deleted_at.is_(None)
             )
         )
         
@@ -285,7 +285,7 @@ async def _health_check_integrations_async() -> Dict[str, Any]:
         query = select(Integration).where(
             and_(
                 Integration.is_enabled == True,
-                Integration.is_deleted == False
+                Integration.deleted_at.is_(None)
             )
         )
         
@@ -366,7 +366,7 @@ async def _cleanup_failed_syncs_async(older_than_hours: int) -> Dict[str, Any]:
             and_(
                 Integration.status == IntegrationStatus.ERROR,
                 Integration.last_error_at < cutoff_time,
-                Integration.is_deleted == False
+                Integration.deleted_at.is_(None)
             )
         )
         

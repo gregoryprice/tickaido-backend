@@ -3,9 +3,21 @@
 Agent Action model for tracking agent operations and performance metrics
 """
 
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, DateTime, JSON, Boolean, DECIMAL, CheckConstraint
+from typing import Any, Dict, Optional
+
+from sqlalchemy import (
+    DECIMAL,
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 

@@ -6,12 +6,13 @@ User model for authentication and user management
 import enum
 from datetime import datetime, timezone
 from typing import List
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, JSON, ForeignKey
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, String
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
-
 
 # Import OrganizationRole from organization_invitation module
 from app.models.organization_invitation import OrganizationRole

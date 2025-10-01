@@ -4,15 +4,19 @@ Tests for JIRA Attachment Service
 Validates attachment upload functionality, error handling, and edge cases
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.integrations.jira.jira_attachment_service import JiraAttachmentService, AttachmentResult, AttachmentSummary
+from app.integrations.jira.jira_attachment_service import (
+    AttachmentResult,
+    AttachmentSummary,
+    JiraAttachmentService,
+)
 from app.integrations.jira.jira_integration import JiraIntegration
 from app.models.file import File, FileStatus
-from app.services.file_service import FileService
 
 
 class TestJiraAttachmentService:

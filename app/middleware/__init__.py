@@ -4,21 +4,20 @@ Middleware package for AI Ticket Creator Backend
 """
 
 from .auth_middleware import (
+    AuthenticationError,
+    AuthMiddleware,
+    WebSocketAuthMiddleware,
     auth_middleware,
     get_current_user,
     get_current_user_optional,
     require_permissions,
     websocket_auth,
-    WebSocketAuthMiddleware,
-    AuthMiddleware,
-    AuthenticationError
 )
-
 from .rate_limiting import (
-    rate_limiter,
+    RateLimitExceeded,
     RateLimitMiddleware,
     create_rate_limit_dependency,
-    RateLimitExceeded
+    rate_limiter,
 )
 
 __all__ = [

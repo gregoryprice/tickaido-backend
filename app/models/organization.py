@@ -3,8 +3,9 @@
 Organization model for multi-tenant company isolation
 """
 
-from typing import Optional, Dict, Any
-from sqlalchemy import Column, String, Boolean, Text, JSON
+from typing import Any, Dict, Optional
+
+from sqlalchemy import JSON, Boolean, Column, String, Text
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel

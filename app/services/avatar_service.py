@@ -3,17 +3,17 @@
 Avatar Service - Business logic for user and agent avatar management using unified storage
 """
 
+import io
+import re
 from typing import Optional
 from uuid import UUID
-import re
-import io
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException, UploadFile
 from PIL import Image
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User
 from app.models.ai_agent import Agent
+from app.models.user import User
 from app.services.storage.factory import get_avatar_storage_service
 
 

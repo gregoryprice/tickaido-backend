@@ -5,15 +5,14 @@ Organization context middleware for multi-tenant request handling
 
 import logging
 from typing import Optional
-from fastapi import Request, HTTPException, status, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
-from app.database import get_db_session
-from app.models.user import User
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import and_, select
+
+from app.middleware.auth_middleware import get_current_user
 from app.models.organization import Organization
 from app.models.organization_invitation import OrganizationRole
-from app.middleware.auth_middleware import get_current_user
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 

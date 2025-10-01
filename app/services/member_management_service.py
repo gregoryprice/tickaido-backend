@@ -5,23 +5,21 @@ invitations, and organization discovery
 """
 
 import secrets
-import hashlib
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
-import re
 
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import selectinload
 
-from app.models.user import User, UserRole
 from app.models.organization import Organization
 from app.models.organization_invitation import (
-    OrganizationInvitation, 
-    OrganizationRole, 
-    InvitationStatus
+    InvitationStatus,
+    OrganizationInvitation,
+    OrganizationRole,
 )
+from app.models.user import User, UserRole
 
 
 class MemberManagementService:
@@ -83,7 +81,7 @@ class MemberManagementService:
             and_(
                 Organization.domain == domain,
                 Organization.is_enabled == True,
-                Organization.is_deleted == False
+                Organization.deleted_at.is_(None)
             )
         ).order_by(Organization.created_at.desc())
         
@@ -144,7 +142,7 @@ class MemberManagementService:
             and_(
                 User.organization_id == organization_id,
                 User.organization_role.is_not(None),  # Only users with actual organization roles
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         ).options(
             selectinload(User.invited_by),
@@ -155,7 +153,7 @@ class MemberManagementService:
             and_(
                 User.organization_id == organization_id,
                 User.organization_role.is_not(None),  # Only users with actual organization roles
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         
@@ -279,7 +277,7 @@ class MemberManagementService:
                 User.organization_id == organization_id,
                 User.organization_role.is_not(None),  # Only actual organization members
                 User.is_active == True,
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         total_members = (await db.execute(member_count_query)).scalar() or 0
@@ -294,7 +292,7 @@ class MemberManagementService:
                     User.organization_id == organization_id,
                     User.organization_role == OrganizationRole.ADMIN,
                     User.is_active == True,
-                    User.is_deleted == False
+                    User.deleted_at.is_(None)
                 )
             )
             admin_count = (await db.execute(admin_count_query)).scalar() or 0
@@ -331,7 +329,7 @@ class MemberManagementService:
                 User.organization_id == organization_id,
                 User.organization_role == OrganizationRole.MEMBER,
                 User.is_active == True,
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         
@@ -406,7 +404,7 @@ class MemberManagementService:
                 OrganizationInvitation.organization_id == organization_id,
                 OrganizationInvitation.email == email,
                 OrganizationInvitation.status == InvitationStatus.PENDING,
-                OrganizationInvitation.is_deleted == False
+                OrganizationInvitation.deleted_at.is_(None)
             )
         )
         
@@ -452,7 +450,7 @@ class MemberManagementService:
         query = select(OrganizationInvitation).where(
             and_(
                 OrganizationInvitation.invitation_token == token,
-                OrganizationInvitation.is_deleted == False
+                OrganizationInvitation.deleted_at.is_(None)
             )
         ).options(
             selectinload(OrganizationInvitation.organization),
@@ -639,7 +637,7 @@ class MemberManagementService:
         query = select(OrganizationInvitation).where(
             and_(
                 OrganizationInvitation.organization_id == organization_id,
-                OrganizationInvitation.is_deleted == False
+                OrganizationInvitation.deleted_at.is_(None)
             )
         ).options(
             selectinload(OrganizationInvitation.invited_by)
@@ -648,7 +646,7 @@ class MemberManagementService:
         count_query = select(func.count(OrganizationInvitation.id)).where(
             and_(
                 OrganizationInvitation.organization_id == organization_id,
-                OrganizationInvitation.is_deleted == False
+                OrganizationInvitation.deleted_at.is_(None)
             )
         )
         
@@ -682,7 +680,7 @@ class MemberManagementService:
         query = select(User).where(
             and_(
                 User.email == email.lower(),
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         
@@ -712,7 +710,7 @@ class MemberManagementService:
                 User.organization_id == organization_id,
                 User.organization_role == OrganizationRole.ADMIN,
                 User.is_active == True,
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         
@@ -721,7 +719,7 @@ class MemberManagementService:
                 User.organization_id == organization_id,
                 User.organization_role == OrganizationRole.MEMBER,
                 User.is_active == True,
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         
@@ -730,7 +728,7 @@ class MemberManagementService:
             and_(
                 OrganizationInvitation.organization_id == organization_id,
                 OrganizationInvitation.status == InvitationStatus.PENDING,
-                OrganizationInvitation.is_deleted == False
+                OrganizationInvitation.deleted_at.is_(None)
             )
         )
         
@@ -771,7 +769,7 @@ class MemberManagementService:
             and_(
                 User.organization_id == organization_id,
                 User.is_active == True,
-                User.is_deleted == False
+                User.deleted_at.is_(None)
             )
         )
         

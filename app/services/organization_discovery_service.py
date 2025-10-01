@@ -4,9 +4,10 @@ Organization Discovery Service - Public service for organization discovery
 during user registration and domain-based organization matching
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
 
 from app.models.organization import Organization
 from app.models.user import User
@@ -66,7 +67,7 @@ class OrganizationDiscoveryService:
             and_(
                 Organization.domain == domain,
                 Organization.is_enabled == True,
-                Organization.is_deleted == False
+                Organization.deleted_at.is_(None)
             )
         ).order_by(Organization.created_at.desc()).limit(1)
         
@@ -125,7 +126,7 @@ class OrganizationDiscoveryService:
             and_(
                 Organization.domain == domain,
                 Organization.is_enabled == True,
-                Organization.is_deleted == False
+                Organization.deleted_at.is_(None)
             )
         ).order_by(
             Organization.created_at.desc()
@@ -183,14 +184,14 @@ class OrganizationDiscoveryService:
         query = select(Organization).where(
             and_(
                 Organization.is_enabled == True,
-                Organization.is_deleted == False
+                Organization.deleted_at.is_(None)
             )
         )
         
         count_query = select(func.count(Organization.id)).where(
             and_(
                 Organization.is_enabled == True,
-                Organization.is_deleted == False
+                Organization.deleted_at.is_(None)
             )
         )
         

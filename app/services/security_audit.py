@@ -7,8 +7,8 @@ enabling security monitoring, forensic analysis, and compliance reporting.
 """
 
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 # Dedicated security logger for audit events
 security_logger = logging.getLogger("security.mcp_auth")

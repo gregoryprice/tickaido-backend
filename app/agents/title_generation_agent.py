@@ -7,9 +7,11 @@ Focuses on creating concise, descriptive titles that summarize conversation cont
 """
 
 import logging
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
+
 try:
     from pydantic_ai import Agent
 except ImportError:
@@ -25,8 +27,8 @@ except ImportError:
             result.output.confidence = 0.8
             return result
 
-from app.services.ai_config_service import ai_config_service
 from app.models.chat import Message
+from app.services.ai_config_service import ai_config_service
 
 logger = logging.getLogger(__name__)
 

@@ -4,34 +4,32 @@ Member Management API endpoints
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db_session
 from app.middleware.auth_middleware import get_current_user
-from app.models.user import User
 from app.models.organization import Organization
 from app.models.organization_invitation import OrganizationRole
-from app.services.member_management_service import MemberManagementService
-from app.schemas.user import UserResponse
+from app.models.user import User
 from app.schemas.member_management import (
-    MemberListParams,
     MemberInviteRequest,
     MemberInviteResponse,
+    MemberRemovalResponse,
     MemberRoleUpdateRequest,
     MemberRoleUpdateResponse,
+    MembersListResponse,
     MemberUpdateResponse,
-    MemberRemovalResponse,
+    OrganizationMemberStatsResponse,
     UserDeleteRequest,
     UserDeleteResponse,
-    OrganizationMemberStatsResponse,
-    MembersListResponse,
-    MemberManagementError
 )
+from app.schemas.user import UserResponse
+from app.services.member_management_service import MemberManagementService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

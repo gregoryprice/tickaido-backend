@@ -4,10 +4,23 @@ Chat models for agent-centric thread management
 """
 
 import uuid
-from sqlalchemy import Column, String, Text, DateTime, Boolean, Integer, Float, ForeignKey, Index, JSON
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.models.base import BaseModel
 
 

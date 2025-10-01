@@ -4,12 +4,13 @@ Member Management API schemas for validation and serialization
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from uuid import UUID
-from pydantic import Field, field_validator, model_validator
 from enum import Enum
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from app.schemas.base import BaseSchema, BaseResponse, EmailStr
+from pydantic import Field, field_validator, model_validator
+
+from app.schemas.base import BaseResponse, BaseSchema, EmailStr
 
 # Import UserResponse directly  
 from app.schemas.user import UserResponse

@@ -8,7 +8,7 @@ Contains all third-party integration services and interfaces
 from .base import IntegrationInterface, IntegrationTestResult, IntegrationTicketResult
 
 # Import specific integrations
-from .jira import JiraIntegration, JiraAttachmentService
+from .jira import JiraAttachmentService, JiraIntegration
 
 __all__ = [
     # Base integration classes

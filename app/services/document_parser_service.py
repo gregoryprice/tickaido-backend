@@ -4,9 +4,9 @@ DocumentParserService - Extract structured content from documents (PDFs, Word, E
 Similar to AWS Textract functionality but using local libraries.
 """
 
-from typing import Dict, Any, List
 import logging
 from io import BytesIO
+from typing import Any, Dict, List
 
 try:
     import pymupdf  # PyMuPDF library - correct import
@@ -46,16 +46,16 @@ class DocumentParserService:
         logger.debug(f"DocumentParserService detected MIME type: {mime_type} for {len(content)} bytes")
         
         if mime_type == "application/pdf":
-            logger.debug(f"DEBUG: DocumentParserService using PDF analysis path")
+            logger.debug("DEBUG: DocumentParserService using PDF analysis path")
             return await self._analyze_pdf(content, features)
         elif mime_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
-            logger.debug(f"DEBUG: DocumentParserService using Word analysis path")
+            logger.debug("DEBUG: DocumentParserService using Word analysis path")
             return await self._analyze_word_doc(content, features)
         elif mime_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]:
-            logger.debug(f"DEBUG: DocumentParserService using Excel analysis path")
+            logger.debug("DEBUG: DocumentParserService using Excel analysis path")
             return await self._analyze_excel_doc(content, features)
         elif mime_type.startswith("text/"):
-            logger.info(f"DocumentParserService: Using text file analysis path")
+            logger.info("DocumentParserService: Using text file analysis path")
             return await self._analyze_text_file(content, features)
         else:
             raise ValueError(f"Unsupported document type: {mime_type}")
@@ -98,8 +98,8 @@ class DocumentParserService:
                         )
                         
                         if is_pdf_source:
-                            print(f"DEBUG: Detected PDF source code in extracted text, clearing...")
-                            logger.warning(f"PyMuPDF returned PDF source code instead of readable text")
+                            print("DEBUG: Detected PDF source code in extracted text, clearing...")
+                            logger.warning("PyMuPDF returned PDF source code instead of readable text")
                             # Set empty text so it can be handled appropriately
                             text = ""
                     
@@ -325,7 +325,7 @@ class DocumentParserService:
         
         # Fallback MIME type detection when python-magic isn't available
         if content.startswith(b'%PDF'):
-            print(f"DEBUG: Fallback detection: application/pdf")
+            print("DEBUG: Fallback detection: application/pdf")
             return "application/pdf"
         elif content.startswith(b'PK\x03\x04'):
             # ZIP-based formats (Office documents)

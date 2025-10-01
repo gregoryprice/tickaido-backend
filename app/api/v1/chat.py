@@ -4,24 +4,30 @@ Agent-Centric Chat API endpoints for thread management
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
-from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db_session
-from app.schemas.chat import (
-    ThreadResponse, CreateThreadRequest, MessageResponse, SendMessageRequest, 
-    GenerateTitleResponse, UpdateThreadRequest, ThreadUpdateResponse,
-    ThreadListResponse, MessageListResponse
-)
-from app.models.user import User
-from app.models.chat import Message
-from app.services.thread_service import thread_service
-from app.services.ai_chat_service import ai_chat_service
 from app.middleware.auth_middleware import get_current_user
-from app.services.auth_provider import decode_jwt_token
+from app.models.chat import Message
+from app.models.user import User
+from app.schemas.chat import (
+    CreateThreadRequest,
+    GenerateTitleResponse,
+    MessageListResponse,
+    MessageResponse,
+    SendMessageRequest,
+    ThreadListResponse,
+    ThreadResponse,
+    ThreadUpdateResponse,
+    UpdateThreadRequest,
+)
+from app.services.ai_chat_service import ai_chat_service
+from app.services.thread_service import thread_service
 
 router = APIRouter(prefix="/chat", tags=["Agent-Centric Chat"])
 logger = logging.getLogger(__name__)
@@ -238,7 +244,7 @@ async def send_message(
         logger.info(f"[CHAT_API] AI response generated with confidence: {getattr(ai_response, 'confidence', 0.0)}")
         
         # Get the most recent messages from the thread (we need a custom query for this)
-        from sqlalchemy import select, desc
+        from sqlalchemy import desc, select
         query = select(Message).where(
             Message.thread_id == thread_id
         ).order_by(desc(Message.created_at)).limit(10)

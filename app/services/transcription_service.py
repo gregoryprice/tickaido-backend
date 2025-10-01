@@ -3,15 +3,16 @@
 TranscriptionService - Transcribe audio and video files using OpenAI API
 """
 
-import os
-import tempfile
-import subprocess
-import uuid
-from typing import Dict, Any
-from dataclasses import dataclass
 import logging
+import os
+import subprocess
+import tempfile
+import uuid
+from dataclasses import dataclass
+from typing import Any, Dict
 
 from openai import AsyncOpenAI
+
 from app.config.settings import get_settings
 from app.services.ai_config_service import AIConfigService
 

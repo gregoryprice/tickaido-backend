@@ -6,24 +6,25 @@ Implements the file attachment system according to PRP specifications
 
 import logging
 import urllib.parse
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.middleware.auth_middleware import get_current_user
 from app.database import get_db_session
+from app.middleware.auth_middleware import get_current_user
+from app.models.file import FileStatus, FileType
 from app.models.user import User
-from app.models.file import File as FileModel, FileStatus, FileType
 from app.schemas.file import (
-    FileUploadResponse, 
-    FileResponse, 
     FileListResponse,
-    FileProcessingStatusResponse
+    FileProcessingStatusResponse,
+    FileResponse,
+    FileUploadResponse,
 )
-from app.services.file_service import FileService, DuplicateFileError
 from app.services.file_processing_service import FileProcessingService
+from app.services.file_service import DuplicateFileError, FileService
 from app.tasks.file_tasks import process_file_upload
 
 router = APIRouter()
