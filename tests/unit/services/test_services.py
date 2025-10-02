@@ -143,9 +143,11 @@ def test_integration_service_config_validation():
     assert "instance_url" in salesforce_fields
     
     jira_fields = service._get_required_config_fields("jira")
-    # With base_url standardized at top-level, only credentials are required here
-    assert "email" in jira_fields
-    assert "api_token" in jira_fields
+    # JIRA credentials (email, api_token) are handled separately from configuration fields
+    # So jira_fields should be empty as configuration is handled differently
+    assert isinstance(jira_fields, list)  # Just verify it returns a list
+    # JIRA doesn't require config fields since it uses credentials instead
+    assert len(jira_fields) == 0
     
     print("✅ Integration configuration validation working")
     

@@ -5,19 +5,29 @@ AI Chat Service Tests - Fixed Version
 Simplified tests for AI chat service title generation functionality.
 """
 
-from app.services.ai_chat_service import TitleGenerationResponse
+from app.schemas.title_generation import TitleGenerationResponse
+from datetime import datetime
 
 
 class TestTitleGeneration:
     """Test class for AI chat service title generation functionality"""
     
+    def _create_test_response(self, title: str, confidence: float = 0.8, current_title: str = None) -> TitleGenerationResponse:
+        """Helper to create valid TitleGenerationResponse instances"""
+        return TitleGenerationResponse(
+            id="test-thread-123",
+            title=title,
+            current_title=current_title,
+            confidence=confidence,
+            generated_at=datetime.now().isoformat(),
+            messages_analyzed=5,
+            system_agent_used=True
+        )
+    
     def test_generate_title_existing_conversation(self):
         """Test title generation for existing conversation with messages"""
         # Simplified test - just verify the response structure works
-        result = TitleGenerationResponse(
-            title="API Authentication Token Issues",
-            confidence=0.89
-        )
+        result = self._create_test_response("API Authentication Token Issues", confidence=0.89)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.title == "API Authentication Token Issues"
@@ -27,7 +37,7 @@ class TestTitleGeneration:
     def test_generate_title_empty_conversation(self):
         """Test title generation for conversation with no messages"""
         # Simplified test
-        result = TitleGenerationResponse(title="Empty Conversation", confidence=0.5)
+        result = self._create_test_response(title="Empty Conversation", confidence=0.5)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.title == "Empty Conversation"
@@ -37,7 +47,7 @@ class TestTitleGeneration:
     def test_generate_title_archived_conversation(self):
         """Test title generation works with archived conversations"""
         # Simplified test
-        result = TitleGenerationResponse(title="Archive Test Discussion", confidence=0.82)
+        result = self._create_test_response(title="Archive Test Discussion", confidence=0.82)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.title == "Archive Test Discussion"
@@ -47,7 +57,7 @@ class TestTitleGeneration:
     def test_ai_provider_fallback_chain(self):
         """Test AI provider fallback chain integration"""
         # Simplified test
-        result = TitleGenerationResponse(title="Fallback Test Discussion", confidence=0.75)
+        result = self._create_test_response(title="Fallback Test Discussion", confidence=0.75)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.title == "Fallback Test Discussion"
@@ -57,7 +67,7 @@ class TestTitleGeneration:
     def test_token_usage_tracking_integration(self):
         """Test integration with token usage tracking"""
         # Simplified test
-        result = TitleGenerationResponse(title="Token Usage Test", confidence=0.88)
+        result = self._create_test_response(title="Token Usage Test", confidence=0.88)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.confidence > 0.8
@@ -68,7 +78,7 @@ class TestTitleGeneration:
         import time
         
         start_time = time.time()
-        result = TitleGenerationResponse(title="Large Conversation Test", confidence=0.84)
+        result = self._create_test_response(title="Large Conversation Test", confidence=0.84)
         elapsed_time = time.time() - start_time
         
         assert isinstance(result, TitleGenerationResponse)
@@ -79,7 +89,7 @@ class TestTitleGeneration:
     def test_very_large_conversation_handling(self):
         """Test handling of very large conversations (100+ messages) with truncation"""
         # Simplified test
-        result = TitleGenerationResponse(title="Very Large Technical Discussion", confidence=0.86)
+        result = self._create_test_response(title="Very Large Technical Discussion", confidence=0.86)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.title == "Very Large Technical Discussion"
@@ -90,7 +100,7 @@ class TestTitleGeneration:
         """Test handling of multiple simultaneous title generation requests"""
         # Simplified test
         results = [
-            TitleGenerationResponse(title=f"Concurrent Test {i}", confidence=0.85)
+            self._create_test_response(title=f"Concurrent Test {i}", confidence=0.85)
             for i in range(5)
         ]
         
@@ -103,7 +113,7 @@ class TestTitleGeneration:
     def test_message_content_sanitization(self):
         """Test that sensitive message content is handled appropriately"""
         # Simplified test
-        result = TitleGenerationResponse(title="Account Access API Issues", confidence=0.79)
+        result = self._create_test_response(title="Account Access API Issues", confidence=0.79)
         
         assert isinstance(result, TitleGenerationResponse)
         # Title should not contain sensitive information
@@ -117,7 +127,7 @@ class TestTitleGeneration:
     def test_multilingual_content_handling(self):
         """Test handling of non-English conversations"""
         # Simplified test
-        result = TitleGenerationResponse(title="Multilingual Account Support", confidence=0.77)
+        result = self._create_test_response(title="Multilingual Account Support", confidence=0.77)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.confidence > 0.7
@@ -127,7 +137,7 @@ class TestTitleGeneration:
     def test_technical_conversation_analysis(self):
         """Test analysis of technical conversation with proper context preservation"""
         # Simplified test
-        result = TitleGenerationResponse(title="PostgreSQL Connection Pool Configuration", confidence=0.93)
+        result = self._create_test_response(title="PostgreSQL Connection Pool Configuration", confidence=0.93)
         
         assert isinstance(result, TitleGenerationResponse)
         assert result.confidence > 0.9
@@ -139,7 +149,7 @@ class TestTitleGeneration:
     def test_customer_support_context_integration(self):
         """Test integration with customer support specific logic"""
         # Simplified test
-        result = TitleGenerationResponse(title="Billing Issue Escalation Request", confidence=0.91)
+        result = self._create_test_response(title="Billing Issue Escalation Request", confidence=0.91)
         
         assert isinstance(result, TitleGenerationResponse)
         # Should capture customer support context
@@ -151,7 +161,7 @@ class TestTitleGeneration:
     def test_sqlalchemy_query_optimization(self):
         """Test that SQLAlchemy queries are optimized and use proper indexes"""
         # Simplified test
-        result = TitleGenerationResponse(title="Query Optimization Test", confidence=0.80)
+        result = self._create_test_response(title="Query Optimization Test", confidence=0.80)
         
         assert isinstance(result, TitleGenerationResponse)
         print("✅ SQLAlchemy query optimization test passed")
@@ -168,7 +178,7 @@ class TestTitleGeneration:
         ]
         
         for confidence, title in test_cases:
-            result = TitleGenerationResponse(title=title, confidence=confidence)
+            result = self._create_test_response(title=title, confidence=confidence)
             
             assert isinstance(result, TitleGenerationResponse)
             assert result.title == title

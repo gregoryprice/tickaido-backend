@@ -144,7 +144,7 @@ def test_schema_validation_comprehensive():
         "email": "test@example.com",
         "password": "secure_password123",
         "full_name": "Test User",
-        "role": "user"
+        "role": "MEMBER"
     }
     
     user_request = UserCreateRequest(**user_data)

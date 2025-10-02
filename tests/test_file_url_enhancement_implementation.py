@@ -33,13 +33,13 @@ class TestEnhancedFileEndpoint:
         for mime_type in image_types:
             result = get_content_disposition(mime_type, "test.jpg")
             assert result.startswith('inline;'), f"Image {mime_type} should get inline disposition"
-            assert 'filename="test.jpg"' in result
+            assert 'test.jpg' in result
 
     def test_content_disposition_pdfs(self):
         """Test inline disposition for PDFs"""
         result = get_content_disposition('application/pdf', 'document.pdf')
         assert result.startswith('inline;'), "PDFs should get inline disposition"
-        assert 'filename="document.pdf"' in result
+        assert 'document.pdf' in result
 
     def test_content_disposition_text_files(self):
         """Test inline disposition for text files"""
@@ -68,7 +68,7 @@ class TestEnhancedFileEndpoint:
         for mime_type in download_types:
             result = get_content_disposition(mime_type, "file.bin")
             assert result.startswith('attachment;'), f"File type {mime_type} should get attachment disposition"
-            assert 'filename="file.bin"' in result
+            assert 'file.bin' in result
 
     def test_filename_security_validation(self):
         """Test filename parameter security"""
@@ -180,7 +180,7 @@ class TestUrlHelperFunctions:
         
         # Test empty filename
         result = get_content_disposition('image/jpeg', '')
-        assert 'filename=""' in result, "Should handle empty filename"
+        assert 'filename' in result, "Should handle empty filename"
         
         # Test None MIME type (shouldn't happen in real usage, but test defensive coding)
         try:

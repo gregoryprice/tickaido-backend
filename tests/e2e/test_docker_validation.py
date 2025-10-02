@@ -35,7 +35,7 @@ def test_schema_validation():
         "email": "test@example.com",
         "password": "secure_password",
         "full_name": "Test User",
-        "role": "user"
+        "role": "MEMBER"
     }
     user_schema = UserCreateRequest(**user_data)
     assert user_schema.email == "test@example.com"
